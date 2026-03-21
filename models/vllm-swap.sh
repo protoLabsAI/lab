@@ -10,7 +10,7 @@
 #   qwen-35b         — Qwen3.5-35B-A3B MoE bf16, 64K ctx
 #   llama-70b        — Llama-3.3-70B-Instruct-AWQ, 128K ctx (creative/fast)
 #   qwen-27b-opus-v2 — Qwen3.5-27B-Opus-v2 bf16, 128K ctx
-#   omnicoder        — OmniCoder-9B, 262K ctx (fine-tune base)
+#   qwen-9b          — Qwen3.5-9B bf16, 262K ctx (fine-tune base)
 #
 # === Dual GPU (TP=2, needs UPS) ===
 #   qwen-122b        — Qwen3.5-122B-A10B-FP8, 64K ctx
@@ -31,7 +31,7 @@ export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
 
 usage() {
     echo "Single GPU:"
-    echo "  $0 {qwen-27b-int4|qwen-27b-int4-160k|qwen-122b-int4-1gpu|qwen-27b|qwen-35b|llama-70b|omnicoder}"
+    echo "  $0 {qwen-27b-int4|qwen-27b-int4-160k|qwen-122b-int4-1gpu|qwen-27b|qwen-35b|llama-70b|qwen-9b}"
     echo ""
     echo "Dual GPU (TP=2):"
     echo "  $0 {qwen-122b|qwen-122b-128k|qwen-122b-int4|qwen-27b-int4-tp2}"
@@ -153,15 +153,15 @@ case "$1" in
             --trust-remote-code \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
-    omnicoder)
-        echo "Starting OmniCoder-9B (GPU 0, 262K)..."
-        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Tesslate/OmniCoder-9B \
+    qwen-9b)
+        echo "Starting Qwen3.5-9B (GPU 0, 262K)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-9B \
             --host 0.0.0.0 --port $PORT \
             --max-model-len 262144 \
             --served-model-name local \
-            --enable-auto-tool-choice --tool-call-parser hermes \
+            --reasoning-parser qwen3 \
+            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.90 \
-            --trust-remote-code \
             --language-model-only \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
