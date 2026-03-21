@@ -148,6 +148,18 @@ model_list:
       model: openrouter/openai/gpt-oss-20b
       api_key: os.environ/OPENROUTER_API_KEY
 
+  - model_name: mimo-v2-flash
+    litellm_params:
+      model: openrouter/xiaomi/mimo-v2-flash
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  # ─── xAI (new models) ─────────────────────────────────────────────
+  - model_name: grok-4.1-fast
+    litellm_params:
+      model: xai/grok-4.1-fast
+      api_key: os.environ/XAI_API_KEY
+      drop_params: true
+
 litellm_settings:
   # Langfuse tracing (auto-enabled when LANGFUSE_* keys are set)
   success_callback: ["langfuse"]

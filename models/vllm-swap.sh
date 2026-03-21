@@ -18,6 +18,7 @@
 #   qwen-122b-int4   — Qwen3.5-122B-A10B-GPTQ-Int4, 128K ctx
 #   qwen-35b-tp2      — Qwen3.5-35B-A3B MoE, 128K ctx
 #   qwen-27b-int4-tp2 — Qwen3.5-27B-GPTQ-Int4, 256K ctx
+#   minimax-reap     — MiniMax-M2.5-REAP-139B-A10B-AWQ, 64K ctx
 
 set -euo pipefail
 
@@ -234,6 +235,20 @@ case "$1" in
             --gpu-memory-utilization 0.90 \
             --disable-custom-all-reduce \
             --enforce-eager \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+    minimax-reap)
+        echo "Starting MiniMax-M2.5-REAP-139B-A10B-AWQ (TP=2, 64K)..."
+        $VLLM_BIN serve cassettesgoboom/MiniMax-M2.5-REAP-139B-A10B-AWQ-w4g128-int4all \
+            --host 0.0.0.0 --port $PORT \
+            --tensor-parallel-size 2 \
+            --served-model-name local \
+            --max-model-len 65536 \
+            --enable-auto-tool-choice --tool-call-parser minimax_m2 \
+            --gpu-memory-utilization 0.90 \
+            --disable-custom-all-reduce \
+            --enforce-eager \
+            --trust-remote-code \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     *)
