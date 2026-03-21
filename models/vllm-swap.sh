@@ -2,25 +2,29 @@
 # Usage: ./vllm-swap.sh <model-name>
 # Gracefully stops vLLM, waits for port release, starts new model.
 #
-# === Single GPU (GPU 0) ===
-#   qwen-27b-int4    — Qwen3.5-27B-GPTQ-Int4, 128K ctx (daily driver)
-#   qwen-27b-int4-160k — Qwen3.5-27B-GPTQ-Int4, 160K ctx (max single GPU)
-#   qwen-122b-int4-1gpu — Qwen3.5-122B-A10B-GPTQ-Int4, 64K ctx
-#   qwen-27b         — Qwen3.5-27B bf16, 128K ctx (baseline)
-#   qwen-35b         — Qwen3.5-35B-A3B MoE bf16, 64K ctx
-#   llama-70b        — Llama-3.3-70B-Instruct-AWQ, 128K ctx (creative/fast)
-#   qwen-27b-opus-v2 — Qwen3.5-27B-Opus-v2 bf16, 128K ctx
-#   qwen-9b          — Qwen3.5-9B bf16, 262K ctx (fine-tune base)
-#   cydonia-24b      — Cydonia-24B-v4.3 (Mistral base), 32K ctx (creative/roleplay)
-#   mistral-119b     — Mistral-Small-4-119B AWQ-4bit, 32K ctx (MoE)
+# === Production (Single GPU) ===
+#   qwen-27b-int4      — daily driver, agentic work (53 tok/s)
+#   qwen-27b-int4-mtp  — daily driver + MTP, chat/creative (70 tok/s, T08 regresses)
+#   qwen-35b           — speed king MoE (171 tok/s, DON'T use MTP)
+#   qwen-9b-mtp        — fine-tune base + MTP (112 tok/s, tools safe)
+#   qwen-4b-int4       — edge deploy (297 tok/s)
 #
-# === Dual GPU (TP=2, needs UPS) ===
-#   qwen-122b        — Qwen3.5-122B-A10B-FP8, 64K ctx
-#   qwen-122b-128k   — Qwen3.5-122B-A10B-FP8, 128K ctx
-#   qwen-122b-int4   — Qwen3.5-122B-A10B-GPTQ-Int4, 128K ctx
-#   qwen-35b-tp2      — Qwen3.5-35B-A3B MoE, 128K ctx
-#   qwen-27b-int4-tp2 — Qwen3.5-27B-GPTQ-Int4, 256K ctx
-#   minimax-reap     — MiniMax-M2.5-REAP-139B-A10B-AWQ, 64K ctx
+# === Training / LoRA ===
+#   qwen-9b            — fine-tune base, no MTP (92 tok/s)
+#   qwen-4b            — LoRA base bf16 (155 tok/s)
+#   qwen-2b / qwen-0.8b — training experiments
+#
+# === Creative / Experimental ===
+#   cydonia-24b        — Mistral 24B creative/roleplay (no tool calling)
+#   llama-70b          — Llama 70B AWQ creative (38 tok/s)
+#
+# === TP=2 (Both GPUs) ===
+#   qwen-122b-int4     — quality ceiling (30 tok/s)
+#   qwen-35b-tp2-opt   — 250K context, prefix caching (220 tok/s)
+#   qwen-27b-int4-tp2  — 256K context
+#
+# === Legacy / Eval-only (suffix -opt adds P1+P2 flags) ===
+#   qwen-27b-int4-opt, qwen-4b-int4-opt, qwen-35b-opt, qwen-122b-opt
 
 set -euo pipefail
 
@@ -32,11 +36,17 @@ export HF_HOME="/mnt/models/huggingface"
 export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
 
 usage() {
-    echo "Single GPU:"
-    echo "  $0 {qwen-27b-int4|qwen-27b-int4-160k|qwen-122b-int4-1gpu|qwen-27b|qwen-35b|llama-70b|qwen-9b}"
+    echo "Production:"
+    echo "  $0 {qwen-27b-int4|qwen-27b-int4-mtp|qwen-35b|qwen-9b-mtp|qwen-4b-int4}"
     echo ""
-    echo "Dual GPU (TP=2):"
-    echo "  $0 {qwen-122b|qwen-122b-128k|qwen-122b-int4|qwen-27b-int4-tp2}"
+    echo "Training / LoRA:"
+    echo "  $0 {qwen-9b|qwen-4b|qwen-2b|qwen-0.8b}"
+    echo ""
+    echo "Creative:"
+    echo "  $0 {cydonia-24b|llama-70b}"
+    echo ""
+    echo "TP=2 (both GPUs):"
+    echo "  $0 {qwen-122b-int4|qwen-35b-tp2-opt|qwen-27b-int4-tp2}"
     exit 1
 }
 
@@ -87,6 +97,21 @@ case "$1" in
             --gpu-memory-utilization 0.90 \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
+    qwen-27b-int4-mtp)
+        echo "Starting Qwen3.5-27B-GPTQ-Int4 + MTP (GPU 0, 128K, 70 tok/s)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-27B-GPTQ-Int4 \
+            --host 0.0.0.0 --port $PORT \
+            --served-model-name local \
+            --max-model-len 131072 \
+            --reasoning-parser qwen3 \
+            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
+            --gpu-memory-utilization 0.90 \
+            --async-scheduling \
+            --enable-prefix-caching \
+            --kv-cache-dtype fp8 \
+            --speculative-config '{"method": "mtp", "num_speculative_tokens": 1}' \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
     qwen-27b-int4-opt)
         echo "Starting Qwen3.5-27B-GPTQ-Int4 OPTIMIZED (GPU 0, 128K, FP8 KV)..."
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-27B-GPTQ-Int4 \
@@ -123,17 +148,6 @@ case "$1" in
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.90 \
             --enforce-eager \
-            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
-        ;;
-    qwen-27b)
-        echo "Starting Qwen3.5-27B bf16 (GPU 0, 128K)..."
-        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-27B \
-            --host 0.0.0.0 --port $PORT \
-            --served-model-name local \
-            --max-model-len 131072 \
-            --reasoning-parser qwen3 \
-            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
-            --gpu-memory-utilization 0.85 \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     qwen-35b)
@@ -175,19 +189,6 @@ case "$1" in
             --gpu-memory-utilization 0.90 \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
-    qwen-27b-opus-v2)
-        echo "Starting Qwen3.5-27B-Opus-v2 bf16 (GPU 0, 128K)..."
-        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled-v2 \
-            --host 0.0.0.0 --port $PORT \
-            --served-model-name local \
-            --tokenizer Qwen/Qwen3.5-27B \
-            --max-model-len 131072 \
-            --reasoning-parser qwen3 \
-            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
-            --gpu-memory-utilization 0.85 \
-            --trust-remote-code \
-            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
-        ;;
     qwen-9b)
         echo "Starting Qwen3.5-9B (GPU 0, 262K)..."
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-9B \
@@ -198,6 +199,22 @@ case "$1" in
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.90 \
             --language-model-only \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+    qwen-9b-mtp)
+        echo "Starting Qwen3.5-9B + MTP (GPU 0, 262K, 112 tok/s)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-9B \
+            --host 0.0.0.0 --port $PORT \
+            --max-model-len 262144 \
+            --served-model-name local \
+            --reasoning-parser qwen3 \
+            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
+            --gpu-memory-utilization 0.90 \
+            --language-model-only \
+            --async-scheduling \
+            --enable-prefix-caching \
+            --kv-cache-dtype fp8 \
+            --speculative-config '{"method": "mtp", "num_speculative_tokens": 1}' \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     qwen-4b-int4)
@@ -275,20 +292,9 @@ case "$1" in
             --gpu-memory-utilization 0.90 \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
-    mistral-119b)
-        echo "Starting Mistral-Small-4-119B AWQ-4bit (GPU 0, 32K)..."
-        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve cyankiwi/Mistral-Small-4-119B-2603-AWQ-4bit \
-            --host 0.0.0.0 --port $PORT \
-            --max-model-len 32768 \
-            --served-model-name local \
-            --enable-auto-tool-choice --tool-call-parser mistral \
-            --gpu-memory-utilization 0.90 \
-            --language-model-only \
-            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
-        ;;
-
-    # ─── MTP configs (speculative decoding, NO tool calling) ────────
-    # MTP breaks tool calls (issue #36872) — use for creative/roleplay/summarization only
+    # ─── Experimental MTP configs (no tool calling) ─────────────────
+    # These are for creative/roleplay/summarization benchmarking only.
+    # MTP hurts MoE models — these exist for testing, not production.
 
     qwen-35b-mtp)
         echo "Starting Qwen3.5-35B-A3B MoE + MTP (GPU 0, 64K, NO TOOLS)..."
@@ -322,56 +328,6 @@ case "$1" in
 
     # ─── Dual GPU configs (TP=2) ───────────────────────────────────
 
-    qwen-122b)
-        echo "Starting Qwen3.5-122B-A10B-FP8 (TP=2, 64K)..."
-        $VLLM_BIN serve Qwen/Qwen3.5-122B-A10B-FP8 \
-            --host 0.0.0.0 --port $PORT \
-            --tensor-parallel-size 2 \
-            --served-model-name local \
-            --max-model-len 65536 \
-            --reasoning-parser qwen3 \
-            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
-            --gpu-memory-utilization 0.90 \
-            --disable-custom-all-reduce \
-            --enforce-eager \
-            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
-        ;;
-    qwen-122b-opt)
-        echo "Starting Qwen3.5-122B-A10B-FP8 OPTIMIZED (TP=2, 64K, NCCL tuned)..."
-        # Note: VLLM_USE_FLASHINFER_MOE_FP8 breaks on 122B FP8 (unsupported quant scheme)
-        NCCL_ALGO=Ring \
-        NCCL_PROTO=Simple \
-        NCCL_MIN_NCHANNELS=4 \
-        NCCL_MAX_NCHANNELS=8 \
-        $VLLM_BIN serve Qwen/Qwen3.5-122B-A10B-FP8 \
-            --host 0.0.0.0 --port $PORT \
-            --tensor-parallel-size 2 \
-            --served-model-name local \
-            --max-model-len 65536 \
-            --reasoning-parser qwen3 \
-            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
-            --gpu-memory-utilization 0.90 \
-            --disable-custom-all-reduce \
-            --enforce-eager \
-            --async-scheduling \
-            --enable-prefix-caching \
-            --kv-cache-dtype fp8 \
-            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
-        ;;
-    qwen-122b-128k)
-        echo "Starting Qwen3.5-122B-A10B-FP8 (TP=2, 128K)..."
-        $VLLM_BIN serve Qwen/Qwen3.5-122B-A10B-FP8 \
-            --host 0.0.0.0 --port $PORT \
-            --tensor-parallel-size 2 \
-            --served-model-name local \
-            --max-model-len 131072 \
-            --reasoning-parser qwen3 \
-            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
-            --gpu-memory-utilization 0.95 \
-            --disable-custom-all-reduce \
-            --enforce-eager \
-            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
-        ;;
     qwen-122b-int4)
         echo "Starting Qwen3.5-122B-A10B-GPTQ-Int4 (TP=2, 128K)..."
         $VLLM_BIN serve Qwen/Qwen3.5-122B-A10B-GPTQ-Int4 \
@@ -433,20 +389,6 @@ case "$1" in
             --gpu-memory-utilization 0.90 \
             --disable-custom-all-reduce \
             --enforce-eager \
-            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
-        ;;
-    minimax-reap)
-        echo "Starting MiniMax-M2.5-REAP-139B-A10B-AWQ (TP=2, 64K)..."
-        $VLLM_BIN serve cassettesgoboom/MiniMax-M2.5-REAP-139B-A10B-AWQ-w4g128-int4all \
-            --host 0.0.0.0 --port $PORT \
-            --tensor-parallel-size 2 \
-            --served-model-name local \
-            --max-model-len 65536 \
-            --enable-auto-tool-choice --tool-call-parser minimax_m2 \
-            --gpu-memory-utilization 0.90 \
-            --disable-custom-all-reduce \
-            --enforce-eager \
-            --trust-remote-code \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     *)

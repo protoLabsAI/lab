@@ -24,14 +24,14 @@ uv run ruff check .                        # lint everything
 ## Running Models
 
 ```bash
-bash models/vllm-swap.sh qwen-27b-int4     # daily driver (44 tok/s, 3/4 pass^3)
-bash models/vllm-swap.sh qwen-27b-int4-opt # daily driver + P1+P2 optimizations
-bash models/vllm-swap.sh qwen-35b          # speed king (170 tok/s MoE)
-bash models/vllm-swap.sh qwen-122b-int4-1gpu  # highest quality (30 tok/s)
-bash models/vllm-swap.sh qwen-9b           # fine-tune base (92 tok/s)
-bash models/vllm-swap.sh qwen-4b-int4      # edge deploy (294 tok/s)
-bash models/vllm-swap.sh qwen-4b-int4-opt  # edge deploy + P1+P2 optimizations
-bash models/vllm-swap.sh qwen-4b           # edge deploy bf16 (155 tok/s)
+bash models/vllm-swap.sh qwen-27b-int4      # daily driver, agentic (53 tok/s)
+bash models/vllm-swap.sh qwen-27b-int4-mtp  # daily driver + MTP, chat/creative (70 tok/s)
+bash models/vllm-swap.sh qwen-35b           # speed king MoE (171 tok/s)
+bash models/vllm-swap.sh qwen-9b-mtp        # fine-tune base + MTP (112 tok/s)
+bash models/vllm-swap.sh qwen-4b-int4       # edge deploy (297 tok/s)
+bash models/vllm-swap.sh qwen-4b            # LoRA base bf16 (155 tok/s)
+bash models/vllm-swap.sh qwen-122b-int4     # quality ceiling TP=2 (30 tok/s)
+bash models/vllm-swap.sh qwen-35b-tp2-opt   # 250K context TP=2 (220 tok/s)
 ```
 
 ## Speed Testing
@@ -136,7 +136,9 @@ cd evals
 | Qwen 2B BF16 | 4GB | 307 | — | 0/4 | Training experiments |
 | Qwen 0.8B BF16 | 1.5GB | 547 | — | 0/4 | Training experiments |
 
-Base models (0.8B, 2B, 4B) also downloaded for pretraining. 126GB free on `/mnt/models`.
+Base models (0.8B, 2B, 4B) also downloaded for pretraining. 420GB free on `/mnt/models`.
+
+Cold storage (`/mnt/data/models-cold/`): FLUX.2-klein 9B+base (100GB), Z-Image+Turbo (51GB), Voxtral-Mini-4B (17GB), Qianfan-OCR (9GB), GLM-OCR (2.5GB).
 
 ## Blackwell GPU Constraints
 
@@ -154,6 +156,7 @@ All secrets in Infisical at `secrets.proto-labs.ai`. Never commit secrets. Gatew
 
 ## Storage
 
-- `/mnt/models` — model weights only (1TB NVMe)
-- `/mnt/data` — datasets, checkpoints, outputs (2TB NVMe)
+- `/mnt/models` — frequently-accessed model weights only (1TB NVMe, 420GB free)
+- `/mnt/data` — datasets, checkpoints, outputs, cold model storage (2TB NVMe)
+- `/mnt/data/models-cold/` — FLUX, Z-Image, Voxtral, OCR models (moved off fast drive)
 - `/mnt/scratch` — logs, caches, docker volumes (disposable)
