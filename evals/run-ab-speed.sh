@@ -35,8 +35,8 @@ for line in sys.stdin:
 
 ttft_sum = metrics.get('vllm:time_to_first_token_seconds_sum', '0')
 ttft_count = metrics.get('vllm:time_to_first_token_seconds_count', '0')
-tpot_sum = metrics.get('vllm:time_per_output_token_seconds_sum', '0')
-tpot_count = metrics.get('vllm:time_per_output_token_seconds_count', '0')
+tpot_sum = metrics.get('vllm:request_time_per_output_token_seconds_sum', '0')
+tpot_count = metrics.get('vllm:request_time_per_output_token_seconds_count', '0')
 gen_tokens = metrics.get('vllm:generation_tokens_total', '0')
 print(f'{ttft_sum} {ttft_count} {tpot_sum} {tpot_count} {gen_tokens}')
 "
@@ -139,10 +139,11 @@ print('========================================')
 print('COMPARISON: BASELINE vs OPTIMIZED')
 print('========================================')
 print(f'                  Baseline    Optimized   Change')
-print(f'  Decode tok/s:   {b_decode:>8.1f}    {o_decode:>8.1f}    {((o_decode/b_decode)-1)*100:>+.1f}%')
-print(f'  Avg TTFT (ms):  {b_ttft:>8.0f}    {o_ttft:>8.0f}    {((o_ttft/b_ttft)-1)*100:>+.1f}%')
-print(f'  Avg TPOT (ms):  {b_tpot:>8.2f}    {o_tpot:>8.2f}    {((o_tpot/b_tpot)-1)*100:>+.1f}%')
-print(f'  Wall tok/s:     {b_wall:>8.1f}    {o_wall:>8.1f}    {((o_wall/b_wall)-1)*100:>+.1f}%')
+def pct(a, b): return f'{((b/a)-1)*100:>+.1f}%' if a > 0 else 'N/A'
+print(f'  Decode tok/s:   {b_decode:>8.1f}    {o_decode:>8.1f}    {pct(b_decode, o_decode)}')
+print(f'  Avg TTFT (ms):  {b_ttft:>8.0f}    {o_ttft:>8.0f}    {pct(b_ttft, o_ttft)}')
+print(f'  Avg TPOT (ms):  {b_tpot:>8.2f}    {o_tpot:>8.2f}    {pct(b_tpot, o_tpot)}')
+print(f'  Wall tok/s:     {b_wall:>8.1f}    {o_wall:>8.1f}    {pct(b_wall, o_wall)}')
 print()
 "
 

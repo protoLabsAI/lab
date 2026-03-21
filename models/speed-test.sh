@@ -45,7 +45,7 @@ for line in sys.stdin:
     parts = line.split(' ')
     if len(parts) >= 2:
         m[parts[0].split('{')[0]] = parts[-1]
-print(f\"{m.get('vllm:time_to_first_token_seconds_sum','0')} {m.get('vllm:time_to_first_token_seconds_count','0')} {m.get('vllm:time_per_output_token_seconds_sum','0')} {m.get('vllm:time_per_output_token_seconds_count','0')} {m.get('vllm:generation_tokens_total','0')}\")
+print(f\"{m.get('vllm:time_to_first_token_seconds_sum','0')} {m.get('vllm:time_to_first_token_seconds_count','0')} {m.get('vllm:request_time_per_output_token_seconds_sum','0')} {m.get('vllm:request_time_per_output_token_seconds_count','0')} {m.get('vllm:generation_tokens_total','0')}\")
 "
 }
 
