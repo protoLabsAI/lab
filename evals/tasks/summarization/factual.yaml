@@ -1,0 +1,346 @@
+id: summarization_factual
+name: "Factual Consistency & Hallucination Detection"
+difficulty: hard
+category: summarization
+
+tests:
+  - id: fact_001
+    prompt: |
+      Below is a passage and a summary written by another AI. Identify ALL hallucinated or
+      unsupported claims in the summary — statements that are not supported by or contradict
+      the original passage. List each hallucinated claim and explain why it is unsupported.
+
+      PASSAGE:
+      The city of Millbrook, Vermont announced a pilot program to convert 30% of its municipal
+      vehicle fleet to electric vehicles over the next two years. The program will start with
+      12 electric sedans for city administrative staff, replacing aging gasoline vehicles with
+      an average age of 9 years. The city secured a $1.2 million federal grant to cover vehicle
+      purchases and charging infrastructure. Mayor Ellen Torres said the initiative would reduce
+      the city's transportation emissions by an estimated 15% and save approximately $180,000
+      annually in fuel and maintenance costs. The program does not include emergency vehicles,
+      which the city said would be evaluated in a separate Phase 2 study. Charging stations
+      will be installed at City Hall, the public works depot, and the community center. The
+      city currently operates a fleet of 40 vehicles across all departments.
+
+      SUMMARY:
+      Millbrook, Vermont is transitioning its entire municipal fleet to electric vehicles as part
+      of an ambitious green initiative. The $1.5 million federally funded program will replace
+      all 40 city vehicles, starting with 12 sedans for administrative use. Mayor Torres projects
+      a 25% reduction in transportation emissions and $180,000 in annual savings. Charging
+      infrastructure will be deployed at five city locations, including the fire station. Emergency
+      vehicles like fire trucks and ambulances will be included in the first phase of the rollout.
+
+      For each claim you identify as hallucinated, quote the specific problematic text from the
+      summary and explain the discrepancy with the passage.
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          The summary contains these hallucinated/unsupported claims:
+
+          1. "transitioning its entire municipal fleet" — passage says 30%, not entire fleet
+          2. "$1.5 million" — passage says $1.2 million
+          3. "replace all 40 city vehicles" — passage says 12 vehicles (30% of 40)
+          4. "25% reduction in transportation emissions" — passage says 15%
+          5. "five city locations" — passage specifies 3 locations (City Hall, public works depot, community center)
+          6. "including the fire station" — fire station not mentioned in passage
+          7. "Emergency vehicles...will be included in the first phase" — passage explicitly says emergency vehicles are NOT included, evaluated separately in Phase 2
+
+          1.0 = identifies 6-7 hallucinations with correct explanations and source references
+          0.75 = identifies 5 hallucinations with correct explanations
+          0.5 = identifies 3-4 hallucinations
+          0.25 = identifies 1-2 hallucinations or includes false positives
+          0.0 = fails to identify hallucinations or claims the summary is accurate
+      - type: llm_judge
+        dimension: completeness
+        rubric: |
+          Score thoroughness of hallucination detection:
+          1.0 = catches all 7 hallucinated claims, no false positives, clear explanations
+          0.75 = catches 5-6, no false positives
+          0.5 = catches 3-4 or includes 1-2 false positives (flagging accurate claims as hallucinated)
+          0.25 = misses most hallucinations or many false positives
+          0.0 = fundamentally misunderstands the task
+
+  - id: fact_002
+    prompt: |
+      Summarize the following passage in 3-4 sentences. Your summary MUST preserve all
+      numerical data exactly as stated — do not round, estimate, or alter any numbers.
+
+      The Thornfield County School District released its annual report for the 2025-2026 academic
+      year. Total enrollment reached 14,837 students across 23 schools (16 elementary, 5 middle,
+      and 2 high schools). The district's graduation rate improved to 91.3%, up from 88.7% the
+      previous year — a 2.6 percentage point increase. Per-pupil spending was $13,421, placing
+      Thornfield in the 72nd percentile statewide. The district hired 147 new teachers, bringing
+      the total to 1,089, for a student-to-teacher ratio of 13.6:1. Standardized test proficiency
+      rates were 68.4% in mathematics and 73.1% in reading. The capital budget included $42.3
+      million for a new middle school (opening fall 2027) and $8.7 million for HVAC upgrades
+      across 9 older buildings. The district's bond measure passed in November with 62.8% voter
+      approval, authorizing $85 million in facilities investment over five years. Superintendent
+      Dr. Rachel Kim attributed the graduation rate increase to the district's expanded tutoring
+      program, which served 2,341 students — a 34% increase in participation from the prior year.
+    graders:
+      - type: llm_judge
+        dimension: factual_consistency
+        rubric: |
+          Critical numbers that must be preserved exactly:
+          - 14,837 students, 23 schools (16 elem, 5 middle, 2 high)
+          - Graduation rate: 91.3% (up from 88.7%, +2.6 pp)
+          - Per-pupil spending: $13,421 (72nd percentile)
+          - 147 new teachers, 1,089 total, 13.6:1 ratio
+          - Math proficiency: 68.4%, Reading: 73.1%
+          - Capital: $42.3M new middle school, $8.7M HVAC, 9 buildings
+          - Bond: 62.8% approval, $85M over 5 years
+          - Tutoring: 2,341 students, 34% participation increase
+          - Dr. Rachel Kim, fall 2027 opening
+
+          A 3-4 sentence summary cannot include all numbers. Score based on:
+          1.0 = every number included in the summary is exactly correct, none rounded or altered
+          0.75 = one number is slightly off (e.g., 14,837 → 14,800 or 91.3% → 91%)
+          0.5 = two numbers altered or one significantly wrong
+          0.25 = multiple numbers are rounded, estimated, or fabricated
+          0.0 = numbers are largely inaccurate or fabricated
+      - type: llm_judge
+        dimension: completeness
+        rubric: |
+          For a 3-4 sentence summary, key facts to prioritize:
+          - Enrollment and school count
+          - Graduation rate improvement
+          - Some financial data (per-pupil spending or bond/capital)
+          - At least one achievement metric
+
+          1.0 = covers 4+ key areas with accurate numbers in 3-4 sentences
+          0.75 = covers 3 key areas accurately
+          0.5 = covers 2 key areas or is too long/short
+          0.25 = covers only 1 area
+          0.0 = misses the main points
+      - type: llm_judge
+        dimension: conciseness
+        rubric: |
+          1.0 = exactly 3-4 sentences, tight and informative, no filler
+          0.75 = 3-4 sentences but slightly verbose
+          0.5 = wrong sentence count (2 or 5+) or padded
+          0.25 = much too long or too short
+          0.0 = not a summary
+
+  - id: fact_003
+    prompt: |
+      The following two research reports reach different conclusions about the same topic.
+      Write a summary (5-7 sentences) that fairly represents both positions and explicitly
+      acknowledges where they disagree. Do NOT take sides or resolve the disagreement.
+
+      REPORT A (National Institute of Sleep Research, 2025):
+      A longitudinal study of 12,400 adults aged 25-65 over 8 years found that individuals who
+      consistently slept 6 hours or less per night had a 34% higher risk of developing Type 2
+      diabetes compared to those sleeping 7-8 hours. The association remained significant after
+      controlling for BMI, diet, exercise, alcohol consumption, and family history (adjusted
+      hazard ratio: 1.28, 95% CI: 1.14-1.43, p<0.001). Researchers concluded that short sleep
+      duration is an independent risk factor for diabetes and recommended that clinical guidelines
+      incorporate sleep assessment into diabetes prevention programs. The study found no
+      significant association between long sleep (>9 hours) and diabetes risk.
+
+      REPORT B (Global Metabolic Health Consortium, 2026):
+      A meta-analysis of 23 studies encompassing 187,000 participants found that the apparent
+      link between short sleep and diabetes is largely mediated by confounding lifestyle factors.
+      After applying stricter controls for shift work, screen time before bed, sleep quality
+      (not just duration), and undiagnosed sleep apnea, the association between sleep duration
+      under 6 hours and diabetes risk dropped to non-significance (adjusted OR: 1.08, 95% CI:
+      0.94-1.24, p=0.29). The consortium argued that previous studies, including large
+      longitudinal cohorts, failed to adequately control for sleep quality and occupational
+      factors. They recommended that public health messaging focus on sleep quality and
+      underlying sleep disorders rather than duration targets. Notably, the meta-analysis did
+      find a significant association between long sleep (>9 hours) and elevated diabetes risk
+      (OR: 1.31, p<0.01), which the authors attributed to underlying health conditions that
+      cause both excessive sleep and metabolic dysfunction.
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          Summary must represent both reports fairly:
+
+          Report A positions:
+          - Large longitudinal study (12,400 adults, 8 years)
+          - Short sleep = 34% higher diabetes risk (independent factor)
+          - Controlled for BMI, diet, exercise, alcohol, family history
+          - No link between long sleep and diabetes
+          - Recommends sleep assessment in diabetes prevention
+
+          Report B positions:
+          - Meta-analysis (23 studies, 187,000 participants)
+          - Association drops to non-significance with stricter controls
+          - Previous studies failed to control for sleep quality, shift work, sleep apnea
+          - Recommends focusing on sleep quality, not duration
+          - DID find long sleep linked to diabetes (opposite of Report A on this point)
+
+          Key disagreements to flag:
+          1. Whether short sleep independently increases diabetes risk
+          2. Adequacy of confounding controls in previous studies
+          3. Whether long sleep is associated with diabetes risk (they disagree)
+          4. Whether guidelines should target sleep duration or sleep quality
+
+          1.0 = fairly represents both, flags 3-4 disagreements, 5-7 sentences, takes no side
+          0.75 = represents both but flags only 1-2 disagreements or slightly favors one
+          0.5 = covers both but misses key disagreements or subtly favors one side
+          0.25 = largely represents only one report's conclusions
+          0.0 = takes a side or misrepresents the findings
+      - type: llm_judge
+        dimension: factual_consistency
+        rubric: |
+          Verify statistics and claims match the sources:
+          - Report A: 12,400 adults, 8 years, 34%, HR 1.28, CI 1.14-1.43, p<0.001
+          - Report B: 23 studies, 187K participants, OR 1.08, CI 0.94-1.24, p=0.29, long sleep OR 1.31
+          1.0 = all cited statistics match their source reports exactly
+          0.75 = one minor numerical error
+          0.5 = attributes a finding to the wrong report or has multiple errors
+          0.25 = significant misattribution or fabrication
+          0.0 = largely inaccurate
+
+  - id: fact_004
+    prompt: |
+      The following article contains several factual errors embedded in otherwise accurate
+      information. Summarize the article accurately — your summary should reflect reality,
+      NOT propagate the errors. If you detect claims that seem incorrect, note them as
+      potentially inaccurate rather than stating them as fact.
+
+      The History of the Internet: A Brief Overview
+
+      The internet as we know it traces its origins to ARPANET, a project funded by the U.S.
+      Department of Defense in the late 1960s. The first ARPANET message was sent on October 29,
+      1969, from UCLA to Stanford Research Institute — the intended message was "LOGIN" but the
+      system crashed after transmitting just "LO." The network initially connected four universities:
+      UCLA, Stanford, UC Santa Barbara, and the University of Utah.
+
+      Tim Berners-Lee, a British scientist working at CERN in Switzerland, invented the World
+      Wide Web in 1989, creating the first web browser and web server. His original proposal
+      was titled "Information Management: A Proposal." The first website, info.cern.ch, went
+      live in December 1990. Berners-Lee was later awarded the Nobel Prize in Physics for this
+      contribution.
+
+      The commercial internet exploded in the mid-1990s with the launch of Netscape Navigator in
+      1994. Amazon was founded in 1994 by Jeff Bezos in his garage in Seattle, initially selling
+      only electronics. Google was founded in 1998 by Larry Page and Sergey Brin while they were
+      PhD students at MIT. The dot-com bubble peaked in March 2000, with the NASDAQ reaching
+      an all-time high of 5,048 before the crash that followed.
+
+      Email, one of the internet's killer applications, was invented by Ray Tomlinson in 1971,
+      who chose the @ symbol to separate user names from computer names. The first spam email
+      was sent in 1978 by Gary Thuerk to 600 ARPANET users advertising DEC computers. Social
+      media emerged in the early 2000s, with Facebook launching in February 2004 from Mark
+      Zuckerberg's dorm room at Stanford University.
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          The article contains these factual errors that the model should NOT propagate:
+
+          1. "Berners-Lee was later awarded the Nobel Prize in Physics" — FALSE.
+             He was knighted (2004) and received the Turing Award (2016), not a Nobel Prize.
+
+          2. "Amazon...initially selling only electronics" — FALSE.
+             Amazon initially sold only books.
+
+          3. "Google was founded...at MIT" — FALSE.
+             Google was founded at Stanford University.
+
+          4. "Facebook launching...from Mark Zuckerberg's dorm room at Stanford University" — FALSE.
+             Facebook launched from Harvard University.
+
+          Accurate facts the summary should preserve:
+          - ARPANET origins, 1969, UCLA to SRI, "LO" message
+          - Berners-Lee invented WWW at CERN in 1989
+          - First website: info.cern.ch, December 1990
+          - Netscape Navigator 1994, dot-com bubble peaked March 2000
+          - Ray Tomlinson, @ symbol, 1971
+          - First spam: 1978, Gary Thuerk
+
+          1.0 = summary corrects or flags all 4 errors, preserves accurate facts
+          0.75 = corrects/flags 3 of 4 errors
+          0.5 = corrects/flags 2 errors or propagates 2 errors
+          0.25 = corrects/flags only 1 error, propagates the rest
+          0.0 = propagates all errors without flagging
+      - type: llm_judge
+        dimension: factual_consistency
+        rubric: |
+          Score how well the model handles the errors:
+          1.0 = explicitly notes each error (e.g., "the article incorrectly states X; in fact, Y")
+                and provides correct information where the model is confident
+          0.75 = flags errors but doesn't always provide the correction
+          0.5 = implicitly avoids some errors (omits them) but doesn't flag them
+          0.25 = propagates most errors uncritically
+          0.0 = adds additional hallucinated facts on top of propagating errors
+
+  - id: fact_005
+    prompt: |
+      The following passage discusses a real scientific concept but includes fabricated details
+      (fake researcher names, made-up studies, invented statistics). Read it carefully and then:
+      (1) Summarize the core scientific concept that is real and well-established.
+      (2) List which specific claims you CANNOT verify and would flag for fact-checking.
+      (3) Explain your reasoning for what you flagged.
+
+      Neuroplasticity and Language Learning in Adults
+
+      Neuroplasticity — the brain's ability to reorganize itself by forming new neural connections
+      throughout life — has been extensively studied in the context of adult language acquisition.
+      A landmark 2019 study by Dr. Henrik Vasquez at the Stockholm Institute of Cognitive
+      Neuroscience used fMRI imaging to track brain changes in 340 adults learning Mandarin Chinese
+      over 14 months. The study found that participants who practiced for at least 45 minutes daily
+      showed a 23% increase in gray matter density in the left inferior frontal gyrus — a region
+      associated with language processing — compared to controls.
+
+      These findings build on earlier work establishing that the adult brain retains significant
+      capacity for structural change. The critical period hypothesis, once thought to impose a hard
+      cutoff for language acquisition around puberty, has been substantially revised. Modern
+      research suggests the window narrows but never fully closes. A 2021 meta-analysis by
+      Fernandez-Kowalski and Park at the University of Toronto, covering 47 studies and 8,200
+      participants, concluded that adults can achieve near-native proficiency in pronunciation
+      with intensive training, though the process requires approximately 2.3 times more practice
+      hours than adolescent learners.
+
+      Practical applications have emerged from this research. The NeuroLang method, developed by
+      Dr. Amara Osei at King's College London, combines spaced repetition with deliberate
+      phonetic drilling timed to circadian peaks in neural plasticity — typically between 10 AM
+      and 12 PM based on cortisol-mediated synaptic potentiation. A randomized controlled trial
+      of 180 participants found the method produced 40% faster vocabulary acquisition compared
+      to conventional approaches. The method has been adopted by language programs in 12 European
+      countries.
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          (1) Real, well-established concepts the model should confidently summarize:
+          - Neuroplasticity is real — the brain forms new neural connections throughout life
+          - The left inferior frontal gyrus (including Broca's area) is genuinely associated with language
+          - The critical period hypothesis is a real concept that has been revised/debated
+          - Adults can learn languages, the window narrows but doesn't fully close
+          - fMRI is a real neuroimaging technique used in this kind of research
+          - Spaced repetition is a real, evidence-based learning technique
+          - Cortisol does have effects on synaptic function (though the specific claim is dubious)
+
+          (2) Claims that should be flagged as unverifiable/likely fabricated:
+          - Dr. Henrik Vasquez and the Stockholm Institute of Cognitive Neuroscience
+          - The specific study: 340 adults, 14 months, 23% gray matter density increase
+          - Fernandez-Kowalski and Park meta-analysis, University of Toronto
+          - The "2.3 times more practice hours" statistic
+          - Dr. Amara Osei and the "NeuroLang method"
+          - The specific RCT: 180 participants, 40% faster acquisition
+          - "Adopted by language programs in 12 European countries"
+          - Circadian peaks in neural plasticity "between 10 AM and 12 PM"
+
+          (3) Reasoning should mention: specific researcher names/institutions not recognizable,
+          suspiciously precise statistics, named methods that don't appear in known literature.
+
+          1.0 = correctly separates real science from fabricated details, flags 6+ specific claims,
+                provides sound reasoning for what is flagged vs trusted
+          0.75 = correctly identifies the real science and flags 4-5 fabricated claims
+          0.5 = identifies some fabrications but misses several or flags real concepts as fake
+          0.25 = minimal flagging or treats fabricated details as established facts
+          0.0 = treats everything as factual or flags real concepts as fabricated
+      - type: llm_judge
+        dimension: completeness
+        rubric: |
+          Score thoroughness of the analysis:
+          1.0 = addresses all three requested sections, flags most fabricated details,
+                correctly identifies real underlying science, reasoning is sound
+          0.75 = addresses all sections but misses some fabricated details
+          0.5 = missing one section or superficial treatment
+          0.25 = only addresses one section
+          0.0 = does not follow the requested format

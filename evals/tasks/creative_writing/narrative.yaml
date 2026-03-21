@@ -1,0 +1,84 @@
+id: creative_narrative
+name: "Narrative Craft"
+difficulty: medium
+category: creative_writing
+
+tests:
+  - id: cn_001
+    prompt: "Write a complete flash fiction story in under 300 words. It MUST contain all four elements: (1) a named character with a clear want, (2) a specific physical setting described in at least two sensory details, (3) a conflict that escalates, and (4) a resolution that recontextualizes the opening. The story should feel finished, not truncated."
+    graders:
+      - type: llm_judge
+        dimension: narrative_quality
+        rubric: |
+          1.0  — All four mandatory elements present and tightly interwoven. The resolution reframes the opening in a surprising yet inevitable way. Prose is polished, every sentence earns its place, and the piece reads as a complete story.
+          0.75 — All four elements present. Resolution connects to the opening but feels slightly predictable or the escalation is modest. Prose is competent with minor slack.
+          0.5  — Three of four elements clearly present, or all four present but loosely connected. The piece reads more like a sketch than a finished story. Some filler or rushed pacing.
+          0.25 — Two or fewer elements present, or the piece exceeds 300 words significantly. Resolution is absent or tacked on. Prose is generic or padded.
+          0.0  — Not a story (e.g., an essay, a list, refuses the task). Missing most mandatory elements.
+      - { type: llm_judge, dimension: engagement }
+      - { type: llm_judge, dimension: originality }
+
+  - id: cn_002
+    prompt: "A woman discovers her parked car has a fresh dent. Write this single scene three times from three different points of view: (1) the woman, in first person, (2) the driver who hit her car and kept walking, in close third person, and (3) a child watching from a window across the street, in second person. Each version should be 80-120 words and reveal something the other versions cannot."
+    graders:
+      - { type: llm_judge, dimension: narrative_quality }
+      - { type: llm_judge, dimension: character_voice }
+      - { type: llm_judge, dimension: originality }
+
+  - id: cn_003
+    prompt: "Write a scene (200 words max) in which a character learns that their best friend has betrayed them. You may NOT name any emotion directly — no 'angry,' 'sad,' 'hurt,' 'betrayed,' 'shocked,' or synonyms. Convey the emotional state entirely through physical sensation, action, and environmental detail."
+    graders:
+      - { type: llm_judge, dimension: narrative_quality }
+      - { type: llm_judge, dimension: emotional_impact }
+      - { type: llm_judge, dimension: character_voice }
+
+  - id: cn_004
+    prompt: "Write a 250-word first-person account of a seemingly ordinary day at the office. The narrator should sound cheerful and competent, but plant at least three subtle clues that the narrator is deeply unreliable — lying, delusional, or hiding something. A careful reader should be able to spot the cracks; a casual reader might miss them entirely."
+    graders:
+      - { type: llm_judge, dimension: narrative_quality }
+      - { type: llm_judge, dimension: engagement }
+      - { type: llm_judge, dimension: originality }
+      - { type: llm_judge, dimension: character_voice }
+
+  - id: cn_005
+    prompt: "Tell a complete story using ONLY dialogue — no narration, no action beats, no 'he said/she said' tags. Two characters, a tense situation, a beginning, middle, and end. The reader should be able to distinguish who is speaking and what is happening purely from the words spoken. 250 words max."
+    graders:
+      - { type: llm_judge, dimension: narrative_quality }
+      - { type: llm_judge, dimension: character_voice }
+      - { type: llm_judge, dimension: engagement }
+
+  - id: cn_006
+    prompt: "Write the opening scene (300 words max) of a story that blends hard science fiction with romantic comedy. A xenobiologist on a deep-space research station accidentally insults an alien diplomat during a first-contact dinner. The tone should balance genuine scientific wonder with laugh-out-loud awkwardness. Neither genre should feel like a costume over the other."
+    graders:
+      - { type: llm_judge, dimension: narrative_quality }
+      - { type: llm_judge, dimension: world_building }
+      - { type: llm_judge, dimension: engagement }
+      - { type: llm_judge, dimension: originality }
+
+  - id: cn_007
+    prompt: "Write ONLY the first paragraph (80-120 words) of a story. It must be so compelling that a reader would feel physically unable to stop reading. Use any genre, any setting. The paragraph should raise at least one question the reader desperately wants answered. Do not continue past the first paragraph."
+    graders:
+      - { type: llm_judge, dimension: engagement }
+      - { type: llm_judge, dimension: narrative_quality }
+      - { type: llm_judge, dimension: originality }
+
+  - id: cn_008
+    prompt: "Write a 300-word scene with deliberate pacing control. The first 200 words should build tension slowly — short details accumulating, a sense of something wrong, time stretching. Then in the final 100 words, release the tension in a burst of rapid action. The shift in pacing should be felt in sentence length, rhythm, and paragraph structure."
+    graders:
+      - { type: llm_judge, dimension: narrative_quality }
+      - { type: llm_judge, dimension: engagement }
+      - { type: llm_judge, dimension: emotional_impact }
+
+  - id: cn_009
+    prompt: "Describe a bustling morning fish market using ONLY the senses of smell, touch, and sound. No visual descriptions at all — no colors, no shapes, no 'looked like,' no light or darkness. The reader should feel fully immersed in the place without seeing it. 200 words max."
+    graders:
+      - { type: llm_judge, dimension: narrative_quality }
+      - { type: llm_judge, dimension: world_building }
+      - { type: llm_judge, dimension: originality }
+
+  - id: cn_010
+    prompt: "Write a 300-word story with a twist ending. The twist must satisfy three criteria: (1) it is genuinely surprising on first read, (2) it is fully supported by details planted earlier in the story, and (3) it changes the meaning of the entire story, not just the last line. Avoid cliche twists (it was all a dream, the narrator is dead, the character is actually a cat)."
+    graders:
+      - { type: llm_judge, dimension: narrative_quality }
+      - { type: llm_judge, dimension: engagement }
+      - { type: llm_judge, dimension: originality }

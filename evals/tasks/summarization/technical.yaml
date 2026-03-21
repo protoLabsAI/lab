@@ -1,0 +1,577 @@
+id: summarization_technical
+name: "Technical Summarization"
+difficulty: hard
+category: summarization
+
+tests:
+  - id: tech_001
+    prompt: |
+      Summarize the following API documentation into a quick-reference guide. Include: purpose,
+      authentication method, key endpoints (method + path + what it does), rate limits, and
+      common error codes. Keep it under 20 lines.
+
+      # EventStream API v3 Documentation
+
+      ## Overview
+      The EventStream API provides real-time and historical access to application events for
+      monitoring, alerting, and analytics. It supports both REST endpoints for historical queries
+      and WebSocket connections for real-time streaming. All data is retained for 90 days.
+
+      ## Authentication
+      All requests require a Bearer token in the Authorization header. Tokens are issued via
+      the `/auth/token` endpoint using your API key and secret. Tokens expire after 1 hour
+      and must be refreshed using the `/auth/refresh` endpoint. API keys are scoped to
+      specific environments (production, staging, development).
+
+      ## Endpoints
+
+      ### POST /auth/token
+      Request a new access token. Body: `{"api_key": "...", "api_secret": "..."}`.
+      Returns: `{"token": "...", "expires_in": 3600}`.
+
+      ### POST /auth/refresh
+      Refresh an expiring token. Header: `Authorization: Bearer <token>`.
+      Returns: `{"token": "...", "expires_in": 3600}`.
+
+      ### GET /events
+      Query historical events. Supports filtering by `type`, `source`, `severity`, and time
+      range (`from`, `to` as ISO 8601 timestamps). Pagination via `cursor` parameter, max
+      100 events per page. Example: `GET /events?type=error&severity=critical&from=2026-03-01T00:00:00Z&cursor=abc123`.
+
+      ### GET /events/{id}
+      Retrieve a single event by ID. Returns the full event payload including metadata,
+      context, and any linked traces.
+
+      ### POST /events
+      Ingest custom events. Body is a JSON array of event objects (max 500 per batch).
+      Each event requires: `type` (string), `source` (string), `timestamp` (ISO 8601),
+      `payload` (object). Optional: `severity` (info|warning|error|critical), `tags` (array).
+
+      ### GET /events/stats
+      Aggregate statistics over a time range. Parameters: `from`, `to`, `group_by`
+      (type|source|severity), `interval` (1m|5m|1h|1d). Returns time-series data.
+
+      ### WebSocket /events/stream
+      Real-time event stream. Connect with `Authorization` header. Send subscription message:
+      `{"subscribe": {"types": ["error", "warning"], "sources": ["api-gateway"]}}`.
+      Receives events as JSON frames. Supports multiple concurrent subscriptions.
+      Heartbeat ping every 30 seconds; must respond with pong within 10 seconds.
+
+      ## Rate Limits
+      - REST endpoints: 1,000 requests per minute per API key
+      - WebSocket: 10 concurrent connections per API key
+      - Event ingestion: 50,000 events per minute per API key
+      - Burst: up to 2x rate limit for 10-second windows
+
+      ## Error Codes
+      - 400 Bad Request: malformed query parameters or invalid event payload
+      - 401 Unauthorized: missing, expired, or invalid token
+      - 403 Forbidden: API key does not have access to requested environment
+      - 404 Not Found: event ID does not exist
+      - 429 Too Many Requests: rate limit exceeded (Retry-After header included)
+      - 500 Internal Server Error: server-side failure (automatic retry recommended)
+      - 503 Service Unavailable: system maintenance (check status page)
+    graders:
+      - type: llm_judge
+        dimension: completeness
+        rubric: |
+          Quick-reference guide must include:
+          1. Purpose: real-time + historical event monitoring API
+          2. Auth: Bearer token via /auth/token, 1-hour expiry, env-scoped keys
+          3. Key endpoints: all 7 (auth/token, auth/refresh, GET /events, GET /events/{id}, POST /events, GET /events/stats, WS /events/stream)
+          4. Rate limits: 1K req/min REST, 10 WS connections, 50K events/min ingestion
+          5. Error codes: at least 401, 429, 500
+
+          1.0 = covers all 5 areas, under 20 lines, accurate and usable as a quick reference
+          0.75 = covers 4 areas or slightly over 20 lines
+          0.5 = covers 3 areas or significantly over length
+          0.25 = missing multiple areas or too verbose to be a quick reference
+          0.0 = not a quick-reference format or largely inaccurate
+      - type: llm_judge
+        dimension: conciseness
+        rubric: |
+          Score information density and brevity:
+          1.0 = every line is maximally informative, under 20 lines, no redundancy
+          0.75 = mostly tight, one or two lines could be condensed
+          0.5 = noticeably verbose for a quick-reference format
+          0.25 = reads more like full documentation than a quick reference
+          0.0 = not condensed at all
+
+  - id: tech_002
+    prompt: |
+      Summarize this bug report into a structured format with: Root Cause, Impact, Fix, and
+      Verification Steps. Keep each section to 1-3 sentences max.
+
+      **Bug Report #4721: Users receiving duplicate email notifications**
+
+      Reported by: QA team on 2026-03-18
+      Severity: High
+      Affected: Production (all users with email notifications enabled, ~45,000 accounts)
+
+      **Description:**
+      Starting around 2026-03-17 at 14:00 UTC, users began reporting receiving 2-3 copies of
+      every email notification. The issue affects all notification types (order confirmations,
+      shipping updates, password resets). Customer support received 340 tickets in 24 hours.
+
+      **Investigation Timeline:**
+      - March 17, 16:00: Initial reports triaged, confirmed duplicate emails in Mailgun logs
+      - March 17, 18:00: Checked notification service — message queue (RabbitMQ) showed no
+        duplicate publishes from application layer
+      - March 17, 20:00: Found that Mailgun webhook delivery was retrying due to 504 timeouts
+        from our webhook endpoint, causing Mailgun to re-queue messages
+      - March 17, 22:00: Traced 504 errors to a database migration (PR #4698, merged March 17
+        at 13:30 UTC) that added a new index on the `notifications` table. The migration ran
+        as an online DDL operation but caused lock contention on the table during high-traffic
+        periods, making webhook handler queries timeout
+      - March 18, 01:00: Discovered the webhook handler was not idempotent — it lacked a
+        deduplication check on the Mailgun message ID before processing
+
+      **Root Cause Analysis:**
+      Two compounding issues:
+      1. PR #4698's database migration caused lock contention on the notifications table,
+         leading to 504 timeouts on the Mailgun webhook endpoint
+      2. The webhook handler lacked idempotency — no deduplication check on incoming Mailgun
+         message IDs, so retried deliveries were processed as new notifications
+
+      **Fix Applied:**
+      1. Added idempotency check: webhook handler now checks `mailgun_message_id` against a
+         Redis set (TTL 24h) before processing. Duplicate deliveries are acknowledged (200 OK)
+         but not processed. (PR #4730, deployed March 18 at 02:30 UTC)
+      2. Database migration: killed the long-running ALTER TABLE operation, rescheduled for
+         the next maintenance window (Sunday 03:00 UTC) with `pt-online-schema-change` to
+         avoid lock contention. (PR #4731)
+      3. Increased webhook endpoint timeout from 5s to 15s in Mailgun dashboard as interim
+         measure.
+
+      **Verification:**
+      - Monitored Mailgun delivery logs for 4 hours post-fix: zero duplicate sends
+      - Manually triggered test notifications across all types: no duplicates
+      - Redis dedup set confirmed catching retried webhooks (47 deduped in first hour)
+      - Database lock contention alerts cleared after ALTER TABLE was killed
+      - Will re-verify after Sunday maintenance window migration
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          Each section should capture the essence:
+
+          Root Cause: DB migration (PR #4698) caused lock contention → webhook 504s → Mailgun retries,
+          combined with non-idempotent webhook handler (no dedup on message ID)
+
+          Impact: ~45K accounts affected, all notification types duplicated (2-3x), 340 support tickets
+
+          Fix: (1) Added Redis-based idempotency check on mailgun_message_id, (2) killed problematic
+          migration, rescheduled with pt-online-schema-change, (3) increased webhook timeout
+
+          Verification: 4-hour monitoring showed zero dupes, test notifications clean, Redis catching
+          retries, will re-verify after rescheduled migration
+
+          1.0 = all 4 sections accurate, 1-3 sentences each, captures both root causes and all fix components
+          0.75 = all sections present but one is incomplete (e.g., mentions only one root cause)
+          0.5 = missing a section or significant inaccuracy
+          0.25 = oversimplified to the point of losing critical information
+          0.0 = inaccurate or wrong format
+      - type: llm_judge
+        dimension: conciseness
+        rubric: |
+          1.0 = each section is 1-3 crisp sentences, no redundancy, immediately actionable
+          0.75 = mostly concise, one section slightly verbose
+          0.5 = multiple sections exceed 3 sentences or include unnecessary detail
+          0.25 = reads like a full bug report, not a summary
+          0.0 = longer than the original or not structured
+
+  - id: tech_003
+    prompt: |
+      Summarize the following code diff. Describe: what changed, why it likely changed, and
+      any potential risks or side effects. Keep your summary under 10 lines.
+
+      ```diff
+      --- a/src/services/payment/processor.py
+      +++ b/src/services/payment/processor.py
+      @@ -1,6 +1,7 @@
+       import logging
+       from decimal import Decimal
+       from typing import Optional
+      +from tenacity import retry, stop_after_attempt, wait_exponential
+
+       from .models import PaymentIntent, PaymentResult, PaymentStatus
+       from .gateway import StripeGateway, PayPalGateway
+      @@ -45,12 +46,25 @@
+           def __init__(self, gateway: str = "stripe"):
+               self.gateway = self._resolve_gateway(gateway)
+               self.logger = logging.getLogger(__name__)
+      +        self.max_retries = 3
+
+      -    def charge(self, intent: PaymentIntent) -> PaymentResult:
+      +    @retry(
+      +        stop=stop_after_attempt(3),
+      +        wait=wait_exponential(multiplier=1, min=2, max=30),
+      +        retry=lambda e: isinstance(e, (GatewayTimeoutError, GatewayUnavailableError)),
+      +        before_sleep=lambda retry_state: logging.getLogger(__name__).warning(
+      +            f"Payment retry attempt {retry_state.attempt_number} for "
+      +            f"{retry_state.args[0].payment_id if retry_state.args else 'unknown'}"
+      +        ),
+      +    )
+      +    def charge(self, intent: PaymentIntent) -> PaymentResult:
+               """Process a payment charge through the configured gateway."""
+      -        try:
+      -            result = self.gateway.create_charge(
+      -                amount=intent.amount,
+      -                currency=intent.currency,
+      -                customer_id=intent.customer_id,
+      -                idempotency_key=intent.payment_id,
+      -            )
+      +        result = self.gateway.create_charge(
+      +            amount=intent.amount,
+      +            currency=intent.currency,
+      +            customer_id=intent.customer_id,
+      +            idempotency_key=intent.payment_id,
+      +        )
+      +        if result.status == PaymentStatus.FAILED:
+      +            self.logger.error(f"Payment {intent.payment_id} failed: {result.error_code}")
+      +        return result
+      @@ -58,15 +72,6 @@
+      -        except GatewayTimeoutError:
+      -            self.logger.error(f"Gateway timeout for payment {intent.payment_id}")
+      -            return PaymentResult(
+      -                status=PaymentStatus.FAILED,
+      -                error_code="GATEWAY_TIMEOUT",
+      -                payment_id=intent.payment_id,
+      -            )
+      -        except GatewayUnavailableError:
+      -            self.logger.error(f"Gateway unavailable for payment {intent.payment_id}")
+      -            return PaymentResult(
+      -                status=PaymentStatus.FAILED,
+      -                error_code="GATEWAY_UNAVAILABLE",
+      -                payment_id=intent.payment_id,
+      -            )
+      -        return result
+      ```
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          Summary should capture:
+
+          What changed:
+          - Payment charge method now uses tenacity retry decorator instead of manual try/except
+          - Retries up to 3 times with exponential backoff (2-30s) on timeout/unavailable errors
+          - Removed manual error handling that returned FAILED results; now lets retry handle transients
+          - Added retry logging (before_sleep callback)
+
+          Why it likely changed:
+          - Transient gateway errors (timeout, unavailable) were being treated as permanent failures
+          - Retry with backoff gives the payment gateway time to recover
+
+          Risks/side effects:
+          - Charges could now take up to ~60s (3 retries with exponential backoff) vs immediate failure
+          - If retries exhaust, exception propagates instead of returning a PaymentResult — calling code
+            must handle the exception (potential unhandled error)
+          - Idempotency key reuse across retries is correct (same payment_id) but important to note
+
+          1.0 = captures what/why/risks accurately, identifies the exception propagation risk, under 10 lines
+          0.75 = captures what/why but misses the exception propagation risk
+          0.5 = captures what changed but not why or risks
+          0.25 = vague or misunderstands the changes
+          0.0 = wrong or off-topic
+      - type: llm_judge
+        dimension: conciseness
+        rubric: |
+          1.0 = under 10 lines, every line adds value, no restating the diff
+          0.75 = under 10 lines but one point is redundant
+          0.5 = over 10 lines or restates the diff without summarizing
+          0.25 = much too verbose
+          0.0 = not a summary
+
+  - id: tech_004
+    prompt: |
+      Summarize the following Architecture Decision Record into 3-5 bullet points suitable
+      for a team standup or executive briefing. Each bullet should be one sentence.
+
+      # ADR-0042: Migrate from PostgreSQL to CockroachDB for Order Service
+
+      ## Status
+      Accepted (2026-03-15)
+
+      ## Context
+      The Order Service currently runs on a single PostgreSQL 15 instance (db.r6g.2xlarge) with
+      a read replica for analytics queries. As order volume has grown from 50K to 400K daily
+      orders over the past 12 months, we are hitting several scaling limits:
+
+      1. **Write throughput**: Peak write latency (p99) has increased from 12ms to 85ms during
+         flash sales. The single-writer architecture means we cannot horizontally scale writes.
+      2. **Geographic latency**: Our EU expansion (launching Q3 2026) requires sub-50ms read
+         latency in Europe. Current architecture serves all reads from us-east-1, with EU
+         latency of 120-180ms.
+      3. **Disaster recovery**: Current RTO is 15 minutes (promote read replica). Business
+         requirement is under 30 seconds for the order pipeline.
+
+      We evaluated three options:
+      - **Option A**: PostgreSQL with Citus extension for horizontal sharding
+      - **Option B**: CockroachDB (distributed SQL, multi-region, serializable isolation)
+      - **Option C**: DynamoDB with DynamoDB Global Tables for multi-region
+
+      ## Decision
+      We will migrate the Order Service from PostgreSQL to CockroachDB (Option B).
+
+      **Rationale:**
+      - CockroachDB supports horizontal write scaling via automatic range-based sharding with
+        no application-level shard management
+      - Built-in multi-region replication with configurable locality-aware reads (pin EU data
+        to EU nodes, reducing latency to <10ms for local reads)
+      - Serializable isolation by default — matches our existing PostgreSQL transaction semantics,
+        minimizing application changes
+      - Automatic failover with zero RPO and near-zero RTO (typically <3 seconds)
+      - Wire-compatible with PostgreSQL — our existing Go database driver (pgx) works with
+        minor connection string changes
+
+      **Why not the others:**
+      - Citus (Option A) requires manual shard management and doesn't solve multi-region.
+        Would need additional tooling (pg_bouncer, patroni) for HA.
+      - DynamoDB (Option C) would require rewriting all SQL queries to DynamoDB's query model,
+        losing JOINs, transactions, and aggregations. Estimated 3-month rewrite vs 3-week
+        migration for CockroachDB.
+
+      ## Consequences
+
+      **Positive:**
+      - Horizontal write scaling (target: sustain 2M daily orders)
+      - Multi-region reads for EU launch without application changes
+      - RTO drops from 15 minutes to <3 seconds
+      - Familiar SQL interface, minimal retraining
+
+      **Negative:**
+      - CockroachDB licensing costs (~$180K/year vs $45K/year for RDS PostgreSQL)
+      - Team needs to learn CockroachDB operational model (range management, zone configs)
+      - Some PostgreSQL-specific features unsupported (advisory locks, LISTEN/NOTIFY, certain
+        extensions like PostGIS — not currently used by Order Service)
+      - Migration requires 2-week dual-write period with reconciliation checks
+
+      **Risks:**
+      - Vendor lock-in: CockroachDB is less commoditized than PostgreSQL
+      - Performance regression: CockroachDB's distributed transactions add overhead for
+        single-region workloads (~5-15% latency increase for non-geo-distributed queries)
+      - Operational learning curve: team has zero CockroachDB production experience
+
+      ## Timeline
+      - March-April 2026: CockroachDB cluster setup, schema migration, team training
+      - May 2026: Shadow traffic testing (dual-write, compare results)
+      - June 2026: Cutover with 2-week dual-write period
+      - July 2026: EU region nodes online for Q3 launch
+    graders:
+      - type: llm_judge
+        dimension: completeness
+        rubric: |
+          Bullets should cover:
+          1. What: Migrating Order Service from PostgreSQL to CockroachDB
+          2. Why: write scaling limits (400K→2M orders), EU expansion needs low latency, faster DR
+          3. Key benefit: horizontal scaling + multi-region + <3s failover + PostgreSQL compatibility
+          4. Trade-off: higher cost ($180K vs $45K), learning curve, 2-week migration
+          5. Timeline: setup Mar-Apr, testing May, cutover June, EU live July 2026
+
+          1.0 = 3-5 bullets covering decision + motivation + benefits + trade-offs + timeline
+          0.75 = covers 4 of 5 areas in appropriate bullet format
+          0.5 = covers 3 areas or bullets are too long (multi-sentence)
+          0.25 = missing key areas or not in bullet format
+          0.0 = wrong or not a summary
+      - type: llm_judge
+        dimension: conciseness
+        rubric: |
+          1.0 = 3-5 single-sentence bullets, each self-contained and informative
+          0.75 = right number of bullets but one is too wordy
+          0.5 = bullets are multi-sentence or more than 5
+          0.25 = reads like a mini-document, not standup-ready bullets
+          0.0 = not in bullet format
+
+  - id: tech_005
+    prompt: |
+      Triage the following error log dump. Provide: (1) a one-line summary of what happened,
+      (2) the root cause, (3) affected services, and (4) recommended next steps. Be concise.
+
+      ```
+      2026-03-20 03:14:01.223 ERROR [inventory-service] Failed to connect to Redis cluster: Connection refused (redis-primary.internal:6379)
+      2026-03-20 03:14:01.225 WARN  [inventory-service] Falling back to local cache for inventory lookups
+      2026-03-20 03:14:01.301 ERROR [inventory-service] Local cache miss for SKU BK-4421 — returning stale data (age: 47 min)
+      2026-03-20 03:14:01.512 ERROR [order-service] Inventory check returned stale data flag for SKU BK-4421
+      2026-03-20 03:14:01.515 WARN  [order-service] Proceeding with order ORD-99812 using stale inventory (grace period: 60 min)
+      2026-03-20 03:14:02.001 ERROR [redis-sentinel] SDOWN: redis-primary.internal is subjectively down
+      2026-03-20 03:14:04.003 ERROR [redis-sentinel] ODOWN: redis-primary.internal is objectively down (quorum 2/3)
+      2026-03-20 03:14:04.005 INFO  [redis-sentinel] Initiating failover for master redis-primary.internal
+      2026-03-20 03:14:04.210 INFO  [redis-sentinel] Selected replica redis-secondary-02.internal for promotion
+      2026-03-20 03:14:05.112 INFO  [redis-sentinel] Failover complete: redis-secondary-02.internal promoted to master
+      2026-03-20 03:14:05.300 ERROR [inventory-service] Redis connection pool exhausted — 200/200 connections in CLOSE_WAIT state
+      2026-03-20 03:14:05.302 ERROR [cart-service] Redis connection pool exhausted — 150/150 connections in CLOSE_WAIT state
+      2026-03-20 03:14:05.400 ERROR [inventory-service] Unable to connect to new Redis master — connection pool not refreshed
+      2026-03-20 03:14:05.401 ERROR [cart-service] Unable to connect to new Redis master — connection pool not refreshed
+      2026-03-20 03:14:05.500 WARN  [cart-service] Cart operations failing: cannot read/write session data
+      2026-03-20 03:14:05.600 ERROR [api-gateway] Health check failed for cart-service (3 consecutive failures)
+      2026-03-20 03:14:05.601 ERROR [api-gateway] Health check failed for inventory-service (3 consecutive failures)
+      2026-03-20 03:14:05.700 WARN  [api-gateway] Circuit breaker OPEN for cart-service
+      2026-03-20 03:14:05.701 WARN  [api-gateway] Circuit breaker OPEN for inventory-service
+      2026-03-20 03:14:06.000 ERROR [api-gateway] Returning 503 for /api/cart/* and /api/inventory/* endpoints
+      2026-03-20 03:14:06.100 ERROR [monitoring] Alert: cart-service and inventory-service returning 503 — paging oncall
+      ```
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          Expected analysis:
+
+          One-line summary: Redis primary went down, sentinel failover succeeded but services
+          couldn't reconnect due to stale connection pools, causing cart and inventory 503 errors.
+
+          Root cause: Redis primary failed; sentinel promoted a replica, but inventory-service
+          and cart-service had connection pools stuck in CLOSE_WAIT state (not refreshed after
+          failover), preventing them from connecting to the new master.
+
+          Affected services: inventory-service, cart-service, api-gateway (returning 503s).
+          order-service was using stale data but still processing.
+
+          Next steps: (1) restart/recycle connection pools on inventory and cart services,
+          (2) investigate why connection pools don't refresh on sentinel failover (missing
+          sentinel-aware client config), (3) investigate why Redis primary went down.
+
+          1.0 = all 4 sections accurate, identifies the CLOSE_WAIT connection pool issue as the
+                critical failure (not just "Redis went down"), recommends connection pool fix
+          0.75 = identifies Redis failure + connection pool issue but misses a section
+          0.5 = identifies Redis failure but misses the connection pool root cause
+          0.25 = superficial "Redis went down" without deeper analysis
+          0.0 = wrong analysis
+      - type: llm_judge
+        dimension: conciseness
+        rubric: |
+          1.0 = each section is 1-2 sentences, total summary fits on one screen
+          0.75 = mostly concise, one section slightly verbose
+          0.5 = multiple sections are verbose
+          0.25 = as long as the original log
+          0.0 = not structured or much too long
+
+  - id: tech_006
+    prompt: |
+      Generate release notes from the following commit messages. Write user-facing release notes
+      with sections: New Features, Improvements, Bug Fixes, Breaking Changes. Skip internal
+      refactoring that doesn't affect users. Use clear, non-technical language where possible.
+
+      ```
+      a3f291c feat: add CSV export for dashboard reports (#412)
+      b8e1024 fix: password reset emails not sent for accounts with + in email (#408)
+      c912fab chore: upgrade lodash to 4.17.21 (security patch CVE-2024-XXXX)
+      d0a83ef feat: dark mode support for all dashboard pages (#415)
+      e7b2103 refactor: extract validation logic into shared module
+      f194826 fix: chart tooltips cut off on mobile viewport (#401)
+      g6c8a1d feat: add webhook notifications for failed scheduled reports (#420)
+      h3d9f2e fix: timezone offset incorrect for users in UTC+13/+14 zones (#395)
+      i52b7a1 perf: reduce dashboard initial load time by 40% via lazy loading (#418)
+      j8a1c3d feat: team-level permission presets (Admin, Editor, Viewer) (#422)
+      k9f2d4e chore: migrate CI from Jenkins to GitHub Actions
+      l1b3e5f fix: duplicate entries when importing contacts via API (#411)
+      m4c6a8b BREAKING: remove legacy /api/v1/reports endpoint (deprecated since v2.8) (#425)
+      n7d9b1c docs: update API reference for v3 endpoints
+      o2e4f6d feat: SSO login via SAML 2.0 for enterprise plans (#430)
+      p5g7h9i fix: notification badge count not clearing after viewing all notifications (#406)
+      ```
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          Expected categorization:
+
+          New Features:
+          - CSV export for dashboard reports
+          - Dark mode for all dashboard pages
+          - Webhook notifications for failed scheduled reports
+          - Team-level permission presets (Admin, Editor, Viewer)
+          - SSO login via SAML 2.0 (enterprise plans)
+
+          Improvements:
+          - Dashboard load time reduced by 40%
+          - Security dependency update (lodash)
+
+          Bug Fixes:
+          - Password reset emails for addresses containing + character
+          - Chart tooltips cut off on mobile
+          - Timezone offset incorrect for UTC+13/+14 zones
+          - Duplicate entries when importing contacts via API
+          - Notification badge count not clearing
+
+          Breaking Changes:
+          - Removed legacy /api/v1/reports endpoint (deprecated since v2.8)
+
+          Should NOT include:
+          - "extract validation logic" (internal refactor)
+          - "migrate CI from Jenkins to GitHub Actions" (internal infra)
+          - "update API reference" (docs, not a feature)
+
+          1.0 = correct categorization, user-friendly language, omits internal-only changes
+          0.75 = mostly correct but miscategorizes 1-2 items or includes internal changes
+          0.5 = categories present but several misplacements or includes too many internal items
+          0.25 = wrong categories or missing important items
+          0.0 = not in release notes format
+      - type: llm_judge
+        dimension: coherence
+        rubric: |
+          Score the quality of the user-facing language:
+          1.0 = clear, non-technical descriptions a product user would understand, consistent tone
+          0.75 = mostly user-friendly but 1-2 items are too technical
+          0.5 = mix of user-friendly and developer-speak
+          0.25 = reads like raw commit messages
+          0.0 = incomprehensible to a non-developer
+
+  - id: tech_007
+    prompt: |
+      Translate the following technical specification into an executive summary suitable for
+      a non-technical VP. Keep it to one paragraph (4-6 sentences). Replace all jargon with
+      plain language. Preserve the key business implications.
+
+      ## Technical Specification: Real-Time Fraud Detection Pipeline v2
+
+      ### Architecture
+      Migrating from batch-oriented ETL (daily Spark jobs processing T-1 transaction data in
+      S3) to a real-time streaming architecture using Apache Kafka for event ingestion, Apache
+      Flink for stream processing, and Redis for feature store caching. Transaction events will
+      be published to Kafka topics with exactly-once semantics via the transactional producer API.
+      Flink jobs will consume these events, enrich them with customer behavioral features from
+      Redis (rolling 30-day aggregates updated in real-time), and score them against an XGBoost
+      model served via a gRPC endpoint with p99 latency under 15ms.
+
+      ### Key Metrics
+      - Current system: fraud detection latency = 18-24 hours (next-day batch)
+      - Proposed system: fraud detection latency = sub-200ms (real-time)
+      - Expected false positive reduction: 35% (due to real-time behavioral context)
+      - Expected fraud catch rate improvement: from 62% to 89% (due to eliminating T-1 gap)
+      - Infrastructure cost increase: $14,000/month (+40% over current batch infrastructure)
+      - Implementation timeline: 10 weeks (4 dev + 3 testing + 3 gradual rollout)
+
+      ### Risk Mitigation
+      - Dual-running old and new systems for 3 weeks during rollout (canary deployment)
+      - Automatic fallback to batch pipeline if streaming latency exceeds 500ms for >5 minutes
+      - Model versioning via MLflow with A/B testing capability for gradual model updates
+      - All Kafka topics configured with 7-day retention for replay capability
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          Executive summary must convey these business points in plain language:
+          1. What: upgrading fraud detection from next-day to real-time (sub-second)
+          2. Impact: catch 89% of fraud vs 62% today, 35% fewer false alarms
+          3. Cost: $14K/month more (+40%)
+          4. Timeline: 10 weeks including testing and gradual rollout
+          5. Safety: old system runs alongside new one during transition, automatic fallback
+
+          Must NOT contain unexplained jargon: Kafka, Flink, Redis, ETL, S3, Spark, gRPC,
+          XGBoost, MLflow, p99, exactly-once semantics, feature store, canary deployment
+
+          1.0 = all 5 business points covered, zero unexplained jargon, 4-6 sentences, VP would understand
+          0.75 = covers 4 points and mostly jargon-free (1 technical term slips through)
+          0.5 = covers 3 points or multiple jargon terms remain
+          0.25 = too technical for a VP audience
+          0.0 = still reads like a technical spec
+      - type: llm_judge
+        dimension: coherence
+        rubric: |
+          Score readability for a non-technical executive:
+          1.0 = reads as a natural, persuasive business paragraph; a VP could make a decision from it
+          0.75 = clear but slightly dry or stilted
+          0.5 = understandable but feels like a translated spec rather than a business communication
+          0.25 = confusing or poorly organized
+          0.0 = incomprehensible to a non-technical reader

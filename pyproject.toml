@@ -4,7 +4,10 @@ version = "0.1.0"
 description = "protoLabs AI Lab — models, evals, training, and infrastructure"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "deepeval>=3.9.2",
+    "ragas>=0.4.3",
+]
 
 [tool.uv.workspace]
 members = [

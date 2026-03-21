@@ -1,25 +1,21 @@
 # Full Model Evaluation Profile
-# ~60-90 min, 3 trials — comprehensive evaluation for model selection
+# ~90-120 min, 3 trials — comprehensive evaluation for model selection
 # Usage: ./run.sh profile --name full --model local
 
 name: "Full Evaluation"
 description: "Comprehensive cross-domain evaluation. 3 trials, pass^3 scoring, all suites."
 trials: 3
 
-# Claw-eval agent tasks — 20 English tasks across all categories
+# Claw-eval agent tasks — 30 tasks, deterministic slice across all categories
 claw:
-  tasks: "T02,T04,T06,T08,T10_contact_lookup,T12,T14,T16,T18,T20,T22,T24,T26,T28,T30,T32,T34,T36,T38,T40"
+  tasks: "T02,T04,T06,T08,T10_contact_lookup,T12,T14,T16,T18,T20,T22,T24,T26,T28,T30,T32,T34,T36,T38,T40,T42,T44,T46,T48,T50,T86,T87,T88,T93,T99"
   port_offset: 200
-  # T02: email triage          T22: newsletter curation
-  # T04: calendar scheduling    T24: crm data export
-  # T06: email reply draft      T26: ambiguous contact email
-  # T08: todo management        T28: api config audit
-  # T10: contact lookup         T30: cross-service meeting
-  # T12: expense report         T32: escalation budget triage
-  # T14: meeting notes          T34: ops review dashboard
-  # T16: kb search              T36: vendor procurement
-  # T18: ticket triage          T38: incident postmortem
-  # T20: inventory check        T40: onboarding coordinator
+  # Core agentic (T02-T10): email, calendar, drafts, todo, contacts
+  # Business ops (T12-T24): expenses, meeting notes, kb, tickets, inventory, newsletter, crm
+  # Complex reasoning (T26-T40): ambiguous contacts, api audit, cross-service, escalation,
+  #                               ops dashboard, procurement, postmortem, onboarding
+  # Research & analysis (T42-T50): scheduled tasks, outage research, cve, oss comparison, regulatory
+  # Pinbench (T86-T99): calendar creation, market brief, project bootstrap, email triage, recall
 
 # All custom suites — full runs
 custom:
@@ -38,7 +34,6 @@ custom:
 function_call:
   suites: ["basic", "edge_cases"]
 
-# Inspect AI (when installed)
-# inspect:
-#   benchmarks: ["humaneval", "gsm8k", "arc"]
-#   limit: 50
+# RAG evaluation
+# rag:
+#   test_file: "rag/test_cases_expanded.yaml"

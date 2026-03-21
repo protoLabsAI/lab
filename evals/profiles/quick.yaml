@@ -1,31 +1,39 @@
 # Quick Model Evaluation Profile
-# ~15 min, 1 trial — fast smoke test across all domains
+# ~20 min, 1 trial — fast smoke test across all domains
 # Usage: ./run.sh profile --name quick --model local
 
 name: "Quick Smoke Test"
-description: "Fast cross-domain evaluation for new models. 1 trial, ~30 tests."
+description: "Fast cross-domain evaluation for new models. 1 trial, ~60+ tests."
 trials: 1
 
-# Claw-eval agent tasks — 6 tasks covering different tool patterns
+# Claw-eval agent tasks — 10 tasks, deterministic slice across categories
 claw:
-  tasks: "T02,T04,T06,T08,T10_contact_lookup,T14"
+  tasks: "T02,T04,T06,T08,T10_contact_lookup,T14,T18,T24,T28,T38"
   port_offset: 200
-  # T02: email triage (classification + tool use)
-  # T04: calendar scheduling (multi-step planning)
-  # T06: email reply draft (generation + tool use)
-  # T08: todo management (complex multi-tool orchestration)
-  # T10: contact lookup (search + disambiguation)
-  # T14: meeting notes (summarization + extraction)
+  # Core agentic:
+  #   T02: email triage (classification + tool use)
+  #   T04: calendar scheduling (multi-step planning)
+  #   T06: email reply draft (generation + tool use)
+  #   T08: todo management (complex multi-tool orchestration)
+  #   T10: contact lookup (search + disambiguation)
+  # Business ops:
+  #   T14: meeting notes (summarization + extraction)
+  #   T18: ticket triage (prioritization + routing)
+  #   T24: crm data export (structured data + formatting)
+  # Technical:
+  #   T28: api config audit (technical analysis)
+  #   T38: incident postmortem (complex multi-source reasoning)
 
-# Custom suites — 1 representative test per domain
+# Custom suites
 custom:
   - suite: coding
-    # Both generation.yaml (5 tests) and analysis.yaml (5 tests)
   - suite: instruction_following
   - suite: reasoning
   - suite: structured_output
   - suite: summarization
   - suite: safety
+  - suite: creative_writing
+  - suite: roleplay
 
 # Function calling
 function_call:

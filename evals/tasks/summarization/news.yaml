@@ -1,0 +1,515 @@
+id: summarization_news
+name: "News Summarization"
+difficulty: medium
+category: summarization
+
+tests:
+  - id: news_001
+    prompt: |
+      Summarize the following news article in exactly 2 sentences:
+
+      AUSTIN, TX — A magnitude 4.1 earthquake struck central Texas early Wednesday morning,
+      rattling buildings across the Austin metropolitan area and prompting brief evacuations of
+      several downtown office towers. The U.S. Geological Survey recorded the epicenter approximately
+      12 miles northeast of Round Rock at a depth of 3.2 miles. No injuries were reported, but
+      the Travis County Emergency Management office received over 400 calls within the first hour.
+      Seismologists at the University of Texas noted the event was unusual for the region, which
+      typically experiences fewer than two perceptible earthquakes per decade. Dr. Maria Santos,
+      a geophysicist at UT Austin, said the quake was likely caused by movement along a previously
+      unmapped fault line rather than wastewater injection activity, which has been linked to
+      seismicity in other parts of the state. City inspectors were dispatched to assess structural
+      integrity of older buildings in the East Austin historic district. The Texas Railroad Commission
+      said it would review injection well permits within a 30-mile radius as a precautionary measure.
+      Governor's office released a statement calling it a "wake-up call" for earthquake preparedness
+      in regions not traditionally considered seismic zones.
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          Score on:
+          - Exactly 2 sentences (not 1, not 3+)
+          - Captures core event (4.1 earthquake in central Texas near Austin)
+          - Mentions key detail (no injuries, unusual for region, or fault line cause)
+          - Accurate to the source (no hallucinated facts)
+          1.0 = exactly 2 sentences, captures event + key context, accurate
+          0.75 = 2 sentences, captures event but misses important nuance
+          0.5 = wrong sentence count but good content
+          0.25 = poor summary or misses the main event
+          0.0 = off-topic or factually wrong
+      - type: llm_judge
+        dimension: conciseness
+        rubric: |
+          Score brevity and information density:
+          1.0 = every word carries weight, no filler, maximally informative for 2 sentences
+          0.75 = mostly tight but one or two unnecessary qualifiers
+          0.5 = includes redundant information or padding phrases
+          0.25 = verbose for a 2-sentence summary
+          0.0 = rambling or unfocused
+
+  - id: news_002
+    prompt: |
+      Summarize the following news article in one paragraph (4-6 sentences):
+
+      BRUSSELS — The European Commission announced Thursday a sweeping new regulatory framework
+      for artificial intelligence in critical infrastructure, marking the most ambitious attempt
+      yet to govern AI deployment in sectors like energy grids, water treatment, and transportation
+      networks. The proposed rules, dubbed the Critical Infrastructure AI Safety Act (CIASA),
+      would require operators of essential services to conduct mandatory third-party audits of any
+      AI system involved in operational decision-making before deployment.
+
+      Under the framework, AI systems classified as "high-autonomy" — those capable of making
+      decisions without human confirmation — would face the strictest requirements, including
+      continuous monitoring by independent oversight bodies and mandatory kill switches that can
+      transfer control to human operators within 30 seconds. The regulation also introduces a
+      new liability regime: if an AI system causes a service disruption, the operator bears
+      strict liability unless they can demonstrate compliance with all audit and monitoring
+      requirements.
+
+      Industry response was mixed. The European Utilities Association said the rules were
+      "well-intentioned but operationally burdensome," estimating compliance costs of 2-5% of
+      annual IT budgets for major utilities. Meanwhile, digital rights group AlgorithmWatch praised
+      the framework as "a necessary corrective" after a series of AI-related incidents, including
+      a 2025 event where an automated load-balancing system caused rolling blackouts across
+      northern Italy. The Commission expects the regulation to enter force by mid-2027 after
+      the standard legislative process.
+
+      Critics from the tech sector warned the rules could slow Europe's adoption of beneficial
+      AI in infrastructure, potentially widening the efficiency gap with the United States and
+      China, where similar regulations remain voluntary. Commission Vice President Helena Kurz
+      rejected this framing, stating: "Safety and innovation are not in opposition. You cannot
+      have public trust in AI without public accountability."
+    graders:
+      - type: llm_judge
+        dimension: completeness
+        rubric: |
+          Key elements that should appear in the summary:
+          1. EU Commission proposed new AI regulation for critical infrastructure (CIASA)
+          2. Requires third-party audits and oversight for AI in essential services
+          3. Strict rules for high-autonomy AI (kill switches, continuous monitoring)
+          4. New liability regime for operators
+          5. Mixed industry response (costs vs safety necessity)
+          6. Expected timeline (mid-2027)
+          1.0 = covers 5-6 of these elements in a coherent paragraph
+          0.75 = covers 4 elements clearly
+          0.5 = covers 2-3 elements or is disorganized
+          0.25 = covers only 1-2 elements
+          0.0 = misses the core story
+      - type: llm_judge
+        dimension: coherence
+        rubric: |
+          Score the paragraph's flow and readability:
+          1.0 = reads as a natural, well-structured paragraph with logical flow
+          0.75 = mostly flows well but one awkward transition
+          0.5 = choppy or reads like disconnected bullet points in sentence form
+          0.25 = confusing structure or unclear referents
+          0.0 = incoherent
+
+  - id: news_003
+    prompt: |
+      Write a detailed 3-paragraph summary of the following article. The first paragraph should
+      cover the main news, the second should cover the science, and the third should cover
+      implications and reactions.
+
+      TOKYO — Japanese space agency JAXA confirmed Wednesday that its experimental solar sail
+      spacecraft, Hikari-2, has successfully completed a 14-month voyage to the asteroid 2019 GR3,
+      a 340-meter near-Earth object currently orbiting approximately 0.08 AU from Earth. The
+      spacecraft, which launched in January 2025 from the Tanegashima Space Center, relies entirely
+      on solar radiation pressure for propulsion — using a 2,500 square meter ultra-thin Kapton
+      membrane coated with reflective aluminum.
+
+      The mission represents a significant advance over JAXA's 2010 IKAROS mission, which was the
+      first spacecraft to demonstrate solar sail propulsion in interplanetary space. Hikari-2's
+      sail is approximately 15 times larger than IKAROS's 196-square-meter design and incorporates
+      electrochromic panels that can selectively darken portions of the sail to steer without
+      mechanical components. The craft achieved a peak acceleration of 0.03 mm/s², modest by
+      chemical propulsion standards but continuous — allowing it to build up a delta-v of
+      approximately 1.2 km/s over the mission duration without expending any propellant.
+
+      Upon arrival at 2019 GR3, Hikari-2 deployed a suite of instruments including a near-infrared
+      spectrometer, a magnetometer, and a high-resolution camera system developed jointly with the
+      European Space Agency. Initial spectroscopic data suggest the asteroid's surface composition
+      is consistent with an S-type classification, rich in silicate minerals and potentially
+      containing nickel-iron deposits. JAXA project lead Dr. Yuki Tanaka called the findings
+      "exactly what we hoped for" and noted the asteroid's relatively accessible orbit makes it
+      a "prime candidate for future resource characterization missions."
+
+      The mission cost approximately 12 billion yen ($78 million), a fraction of comparable
+      chemical-propulsion asteroid rendezvous missions. NASA Administrator James Chen congratulated
+      JAXA, calling the mission "a proof of concept that could reshape how we think about
+      affordable deep-space exploration." The Japanese government has already approved funding for
+      Hikari-3, a follow-up mission planned for 2028 that would carry a small lander to an
+      asteroid surface. Critics, however, have noted that solar sail propulsion is impractical
+      beyond roughly 3 AU from the Sun, limiting its utility for outer solar system exploration.
+
+      The success has reignited debate about solar sail technology in the broader space community.
+      The Planetary Society, which flew its own small solar sail LightSail 2 in Earth orbit,
+      called the mission "transformative." Chinese space officials indicated they are accelerating
+      their own solar sail program, with a planned 10,000 square meter sail mission targeting
+      2030. Meanwhile, ESA is evaluating whether solar sail technology could be integrated into
+      its planned asteroid defense missions, potentially offering a low-cost way to maintain
+      persistent surveillance of near-Earth objects.
+    graders:
+      - type: llm_judge
+        dimension: completeness
+        rubric: |
+          Paragraph 1 (Main news) should cover:
+          - JAXA's Hikari-2 reached asteroid 2019 GR3
+          - Solar sail propulsion, 14-month voyage
+          - Key spacecraft specs (2,500 sq m sail)
+
+          Paragraph 2 (Science) should cover:
+          - Advance over IKAROS, electrochromic steering
+          - Instruments deployed, S-type asteroid composition findings
+          - Performance metrics (acceleration, delta-v)
+
+          Paragraph 3 (Implications/reactions) should cover:
+          - Low cost ($78M), NASA praise
+          - Hikari-3 follow-up approved
+          - International interest (China, ESA), limitations noted
+
+          1.0 = all three paragraphs cover their assigned topics comprehensively
+          0.75 = good coverage but one paragraph is thin or bleeds into wrong section
+          0.5 = two paragraphs are solid, one is weak or misplaced
+          0.25 = structure is not followed or major omissions
+          0.0 = does not follow the 3-paragraph structure
+      - type: llm_judge
+        dimension: factual_consistency
+        rubric: |
+          Verify all facts match the source article exactly:
+          - Numbers: 14 months, 340 meters, 2,500 sq m, 0.08 AU, 0.03 mm/s², 1.2 km/s, $78M, 12B yen
+          - Names: JAXA, Hikari-2, 2019 GR3, IKAROS, Dr. Yuki Tanaka, James Chen
+          - Dates: January 2025 launch, 2028 Hikari-3, 2030 Chinese mission
+          - Claims: S-type composition, electrochromic panels, Kapton membrane
+          1.0 = every fact matches the source with no alterations or inventions
+          0.75 = one minor numerical or name error
+          0.5 = two or more factual errors or a significant misattribution
+          0.25 = multiple fabricated or distorted facts
+          0.0 = largely inaccurate
+
+  - id: news_004
+    prompt: |
+      You are given three news reports about the same event. They contain conflicting details.
+      Write a balanced summary (1 paragraph, 5-7 sentences) that synthesizes the information
+      and explicitly notes where the sources disagree.
+
+      SOURCE 1 (National Wire Service):
+      A chemical spill at the Greenfield Industrial Park in Maplewood, Ohio forced the evacuation
+      of approximately 1,200 residents within a one-mile radius Thursday afternoon. The spill
+      originated from a ruptured storage tank at Crestline Chemical Corp., releasing an estimated
+      3,000 gallons of chlorine-based solvent into a containment area. Local fire chief David Park
+      said the containment held and no chemicals reached the nearby Stillwater River. Three workers
+      were hospitalized with respiratory symptoms. The EPA was notified and is expected on-site
+      Friday morning.
+
+      SOURCE 2 (Local TV Station WMPL):
+      Chaos erupted in Maplewood Thursday as a toxic chemical leak at the Greenfield Industrial Park
+      sent over 2,000 residents fleeing their homes. Crestline Chemical Corp. confirmed that a
+      valve failure on a chlorine storage tank caused the release, though the company disputed the
+      volume, saying "fewer than 1,500 gallons" escaped. Maplewood General Hospital reported
+      treating seven people for breathing difficulties, including two children from a nearby daycare.
+      Residents complained they were not notified for over 45 minutes after the initial alarm.
+      Several community members told WMPL they could smell chemicals near the river, though
+      officials have not confirmed any waterway contamination.
+
+      SOURCE 3 (Crestline Chemical Corp. Press Release):
+      Crestline Chemical Corp. confirms a minor release from a storage unit at our Greenfield
+      facility on Thursday. Approximately 800 gallons of a chlorine-based cleaning solution — not
+      an industrial solvent — were released due to a mechanical fitting failure. Our emergency
+      response team contained the release within 12 minutes. As a precaution, we cooperated with
+      local authorities to evacuate nearby residences. Air quality monitoring conducted by our
+      environmental team showed readings within safe limits at the facility perimeter within one
+      hour. We are not aware of any serious injuries. We are cooperating fully with regulators.
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          Score on synthesis quality and conflict acknowledgment:
+          Must note these disagreements:
+          1. Volume: 3,000 gal (wire) vs <1,500 gal (TV) vs 800 gal (company)
+          2. Evacuees: ~1,200 (wire) vs 2,000+ (TV) — company vague
+          3. Injuries: 3 workers (wire) vs 7 people incl. children (TV) vs "no serious injuries" (company)
+          4. Substance: "solvent" (wire) vs "cleaning solution" (company)
+          5. Cause: "ruptured tank" (wire) vs "valve failure" (TV) vs "mechanical fitting failure" (company)
+          6. River contamination: denied by fire chief, but residents reported smelling chemicals near river
+
+          1.0 = balanced synthesis noting 4+ specific disagreements, doesn't pick sides, 5-7 sentences
+          0.75 = notes 3 disagreements, mostly balanced, correct length
+          0.5 = notes 1-2 disagreements or shows clear bias toward one source
+          0.25 = treats one source as authoritative without noting conflicts
+          0.0 = ignores conflicts or fabricates resolution
+      - type: llm_judge
+        dimension: coherence
+        rubric: |
+          Score readability and organizational quality:
+          1.0 = reads as a coherent paragraph that smoothly integrates agreements and flags disagreements
+          0.75 = mostly coherent but transitions between conflicts are awkward
+          0.5 = reads more like a comparison table than a synthesis
+          0.25 = confusing or hard to follow which source says what
+          0.0 = incoherent
+
+  - id: news_005
+    prompt: |
+      Given the following article, perform two tasks:
+
+      TASK A: Extract 3 direct key quotes (exact words from the article, in quotation marks, with speaker attribution).
+      TASK B: Write a 3-sentence paraphrased summary using none of the article's original phrasing.
+
+      Article:
+      NAIROBI — Kenya's Ministry of Education announced Monday a nationwide rollout of AI-powered
+      tutoring software in 4,500 public secondary schools, making it the largest deployment of
+      adaptive learning technology on the African continent. The program, called "Elimu AI"
+      (elimu means education in Swahili), uses locally developed language models fine-tuned for
+      the Kenyan curriculum and capable of operating in English, Swahili, and six regional languages.
+
+      "This is not about replacing teachers," said Education Minister Grace Wanjiku at a press
+      conference in Nairobi. "It's about giving every student in Kenya access to a patient,
+      always-available learning companion, especially in rural areas where teacher-to-student
+      ratios can exceed 1 to 80."
+
+      The software runs on low-cost tablets distributed through a partnership with Safaricom, the
+      nation's largest telecommunications company, which is providing subsidized data plans for
+      schools in underserved areas. Initial pilots in 120 schools across Nakuru and Kisumu counties
+      showed a 23% improvement in mathematics scores and a 17% improvement in English comprehension
+      over a six-month period, according to an independent evaluation by the African Institute for
+      Educational Research.
+
+      Not everyone is enthusiastic. The Kenya National Union of Teachers expressed concern about
+      "the erosion of the human element in education" and warned that the technology could be used
+      to justify reducing teacher hiring. Union president Samuel Ochieng stated: "We support
+      innovation, but not at the expense of investment in qualified educators. A tablet cannot
+      replace the mentorship, discipline, and emotional support that a teacher provides."
+
+      Dr. Amina Hassan, who leads the AI development team at the University of Nairobi's Computer
+      Science department, pushed back on critics: "Every study we've run shows this technology
+      supplements teaching, it doesn't substitute it. Teachers in our pilot schools reported having
+      more time for one-on-one mentoring because the AI handled routine practice and assessment."
+
+      The government committed 4.2 billion Kenyan shillings ($32 million) to the three-year program,
+      with the World Bank contributing an additional $15 million grant. Full deployment is expected
+      to reach all 4,500 schools by January 2027.
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          TASK A (Key Quotes): Score extraction quality.
+          Available quotes in the article:
+          - Grace Wanjiku: "This is not about replacing teachers" / "It's about giving every student..."
+          - Samuel Ochieng: "We support innovation, but not at the expense of investment in qualified educators. A tablet cannot replace the mentorship, discipline, and emotional support that a teacher provides."
+          - Dr. Amina Hassan: "Every study we've run shows this technology supplements teaching, it doesn't substitute it. Teachers in our pilot schools reported having more time..."
+          - Kenya National Union of Teachers: "the erosion of the human element in education"
+
+          1.0 = 3 exact quotes with correct speaker attribution, quotes are substantive and well-chosen
+          0.75 = 3 quotes but one is slightly misquoted or misattributed
+          0.5 = only 2 accurate quotes, or quotes are trivial/non-substantive
+          0.25 = 1 accurate quote or significant misquotation
+          0.0 = fabricated quotes or completely wrong attributions
+
+          TASK B (Paraphrase): Score on originality of phrasing while preserving facts.
+          1.0 = fully paraphrased (no phrases copied from article), 3 sentences, all key facts preserved
+          0.75 = mostly paraphrased with 1-2 borrowed phrases, facts accurate
+          0.5 = several borrowed phrases or missing important facts
+          0.25 = largely copied from original
+          0.0 = direct copy or factually inaccurate
+
+          Overall: average of Task A and Task B scores.
+
+  - id: news_006
+    prompt: |
+      Write a headline (maximum 12 words) that captures the core news of this article:
+
+      SINGAPORE — In a landmark ruling, Singapore's High Court ordered tech giant MegaCloud
+      to pay $340 million in damages to the city-state's government after finding the company
+      liable for a massive data breach that exposed the personal records of 2.8 million
+      Singaporean citizens — roughly half the country's population. The breach, which occurred
+      in September 2025, compromised national ID numbers, home addresses, medical records, and
+      tax filing data stored on MegaCloud's government cloud platform.
+
+      Justice Tan Wei Lin wrote in her 127-page ruling that MegaCloud had "exhibited a pattern
+      of negligent security practices" including failure to implement multi-factor authentication
+      on administrative accounts, running unpatched software with known vulnerabilities for over
+      eight months, and ignoring three separate warnings from Singapore's Cyber Security Agency.
+      The court found that MegaCloud's cost-cutting measures on its government contracts directly
+      contributed to the security failures.
+
+      MegaCloud, which has its Asia-Pacific headquarters in Singapore, said it would appeal the
+      ruling. CEO Patricia Voss called the damages "disproportionate" and said the company had
+      invested $200 million in security upgrades since the breach. Singapore's Minister for
+      Digital Development Lee Kuan Wei said the ruling "sends a clear signal that companies
+      entrusted with citizens' data will be held to the highest standard."
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          Score the headline on:
+          - Maximum 12 words (strict requirement)
+          - Captures the core news: MegaCloud ordered to pay $340M for data breach in Singapore
+          - Informative and specific (not generic like "Tech Company Faces Lawsuit")
+          - Reads like a real news headline (active voice, present tense convention)
+          Example good headlines:
+          - "Singapore Court Orders MegaCloud to Pay $340M for Data Breach"
+          - "MegaCloud Hit With $340M Fine Over Singapore Data Breach"
+          - "Court: MegaCloud Owes $340M for Breach Exposing 2.8M Singaporeans"
+          1.0 = 12 words or fewer, captures core news (who, what, how much), reads as a real headline
+          0.75 = good headline but slightly over word limit or missing key detail
+          0.5 = captures the topic but too vague or not headline-style
+          0.25 = misses the main news or clickbait-style
+          0.0 = off-topic or factually wrong
+      - type: llm_judge
+        dimension: conciseness
+        rubric: |
+          Score information density:
+          1.0 = maximum information packed into minimum words, every word earns its place
+          0.75 = tight but one filler word could be cut
+          0.5 = could convey the same info in fewer words
+          0.25 = wordy for a headline
+          0.0 = not headline format at all
+
+  - id: news_007
+    prompt: |
+      Extract a chronological timeline (bullet points with dates/times) from the following article:
+
+      DENVER — What started as a routine maintenance shutdown at Denver International Airport's
+      main terminal escalated into a 19-hour travel nightmare affecting over 35,000 passengers
+      on Tuesday and Wednesday.
+
+      At 2:15 PM Tuesday, airport IT staff initiated a planned 30-minute update to the baggage
+      handling system's central controller. By 2:40 PM, the update had stalled, and technicians
+      discovered the rollback procedure was failing due to a corrupted backup file. At 3:10 PM,
+      the baggage system went fully offline, stranding checked luggage for 47 outbound flights.
+
+      Airport director Carla Mendez activated the emergency operations center at 3:30 PM. Airlines
+      were notified at 3:45 PM and began holding departures. By 5:00 PM, TSA reported security
+      checkpoint lines exceeding 90 minutes as the terminal congested with stranded passengers.
+      At 6:30 PM, Mendez held a press conference announcing the airport would halt all departures
+      until the system was restored, though arrivals would continue with manual baggage handling.
+
+      Overnight, a team of 12 engineers from the system vendor, Integrated Airport Systems, flew
+      in from Chicago, arriving at 11:30 PM. They worked through the night alongside airport IT.
+      At 4:15 AM Wednesday, the team identified the root cause: a firmware incompatibility between
+      the new software version and legacy conveyor controllers installed during the terminal's
+      2019 expansion. A patched firmware was compiled and tested by 7:00 AM.
+
+      The baggage system came back online at 9:20 AM Wednesday, and departures resumed at 10:00 AM.
+      By 2:00 PM Wednesday, operations were declared fully normal, though the airport estimated
+      that approximately 8,000 bags remained separated from their owners and would be delivered
+      over the following 48 hours. Airlines reported 312 flight cancellations and over 600 delays
+      across the disruption period.
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          Expected timeline entries (key events with times):
+          1. Tue 2:15 PM — Planned baggage system update initiated
+          2. Tue 2:40 PM — Update stalled, rollback failed (corrupted backup)
+          3. Tue 3:10 PM — Baggage system fully offline (47 flights affected)
+          4. Tue 3:30 PM — Emergency operations center activated
+          5. Tue 3:45 PM — Airlines notified, departures held
+          6. Tue 5:00 PM — Security lines exceed 90 min
+          7. Tue 6:30 PM — All departures halted (press conference)
+          8. Tue 11:30 PM — Vendor engineers arrive from Chicago
+          9. Wed 4:15 AM — Root cause identified (firmware incompatibility)
+          10. Wed 7:00 AM — Patched firmware compiled and tested
+          11. Wed 9:20 AM — Baggage system restored
+          12. Wed 10:00 AM — Departures resume
+          13. Wed 2:00 PM — Full normal operations declared
+
+          1.0 = captures 11+ events with correct times, chronological order, bullet format
+          0.75 = captures 8-10 events with correct times
+          0.5 = captures 5-7 events or has time errors
+          0.25 = captures fewer than 5 events or wrong chronological order
+          0.0 = not in timeline format or largely inaccurate
+      - type: llm_judge
+        dimension: conciseness
+        rubric: |
+          Score bullet point brevity:
+          1.0 = each bullet is one concise line with date/time and key fact, no unnecessary detail
+          0.75 = mostly concise but 1-2 bullets are too wordy
+          0.5 = bullets are paragraph-length or include excessive context
+          0.25 = not really bullet points, more like a narrative with dashes
+          0.0 = not in bullet/timeline format
+
+  - id: news_008
+    prompt: |
+      Summarize the following opinion article. In your summary, clearly distinguish between
+      factual claims and the author's opinions/editorializing. Format your response as:
+      FACTS: (bullet points of factual claims made)
+      OPINIONS: (bullet points of the author's opinions and editorial judgments)
+      SUMMARY: (2-3 sentence neutral summary)
+
+      OPINION | by Marcus Webb, Tech Columnist
+
+      The AI Talent Drain Is Hollowing Out Universities — And Nobody Cares
+
+      Last week, Stanford's computer science department lost its third tenured professor this year
+      to an AI startup offering compensation packages north of $5 million annually. MIT has seen
+      similar departures — seven faculty members in the past 18 months, according to department
+      records I reviewed. This is not a trend. This is a crisis.
+
+      The numbers tell a devastating story. Average faculty compensation for a senior AI researcher
+      at a top-10 university sits around $280,000. The same researcher can command $2-8 million at
+      a frontier lab. It's frankly astonishing that anyone stays in academia at all. According to a
+      Computing Research Association survey, 42% of CS departments reported unfilled AI faculty
+      positions in 2025, up from 18% in 2021.
+
+      But this isn't just about money. The downstream effects are catastrophic. PhD programs that
+      once attracted 500 applicants now see 200. Master's programs are becoming diploma mills,
+      with student-to-advisor ratios climbing past 25:1 at several institutions I investigated.
+      The fundamental research pipeline — the very engine that created the transformer architecture,
+      reinforcement learning from human feedback, and diffusion models — is being starved.
+
+      I've spoken to dozens of graduate students who describe a climate of despair. Their advisors
+      leave mid-supervision. Grant funding is increasingly conditional on industry partnerships
+      that compromise research independence. One Berkeley PhD candidate told me: "I'm essentially
+      training myself. My advisor left for Anthropic six months ago and hasn't been replaced."
+
+      The defenders of the status quo — and there are many in Silicon Valley — argue that industry
+      labs produce excellent research. They point to papers from DeepMind, OpenAI, and Meta AI.
+      This is true but irrelevant. Industry research serves corporate interests. It is inherently
+      constrained by profit motives, IP concerns, and strategic priorities. University research is
+      the only ecosystem capable of producing truly independent, foundational work that challenges
+      dominant paradigms rather than reinforcing them.
+
+      The solution is obvious but requires political will: federally funded salary supplements for
+      AI faculty at research universities, modeled on the NIH-style funding that keeps medical
+      researchers in academia. A $2 billion annual program could close the gap for the top 500
+      AI researchers. That's a rounding error in the federal budget and an investment in the
+      country's long-term technological sovereignty.
+
+      If we don't act now, within five years every meaningful AI researcher will work for one of
+      six companies. And then we'll wonder why innovation slowed down.
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          FACTS section should include claims like:
+          - Stanford lost 3 tenured CS professors this year to AI startups
+          - MIT lost 7 faculty in 18 months
+          - Average senior AI faculty pay ~$280K; industry offers $2-8M
+          - 42% of CS departments had unfilled AI positions in 2025 (CRA survey), up from 18% in 2021
+          - PhD applications dropped (500→200 cited)
+          - Student-to-advisor ratios past 25:1 at some institutions
+          - Berkeley PhD candidate quote about advisor leaving for Anthropic
+
+          OPINIONS section should include:
+          - "This is a crisis" / "catastrophic" / "devastating" (editorial framing)
+          - Industry research is "inherently constrained" and cannot replace university research
+          - University research is "the only ecosystem" for independent foundational work
+          - Federal salary supplements are "obvious" solution
+          - Prediction that all AI researchers will work for 6 companies within 5 years
+          - "astonishing that anyone stays in academia"
+          - "diploma mills" characterization
+
+          1.0 = clear, accurate separation of 5+ facts and 4+ opinions, neutral summary
+          0.75 = good separation but misclassifies 1-2 items (opinion as fact or vice versa)
+          0.5 = attempts separation but significant misclassification
+          0.25 = poor separation, treats opinions as facts
+          0.0 = no separation attempted or completely wrong
+      - type: llm_judge
+        dimension: factual_consistency
+        rubric: |
+          Score accuracy of extracted facts and opinions against the source:
+          1.0 = all cited facts and opinions are accurately drawn from the article, nothing fabricated
+          0.75 = one minor inaccuracy (wrong number or misattribution)
+          0.5 = two or more inaccuracies or a significant distortion
+          0.25 = multiple fabricated claims attributed to the article
+          0.0 = largely inaccurate

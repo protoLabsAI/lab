@@ -1,0 +1,104 @@
+id: creative_character
+name: "Character & Voice"
+difficulty: medium
+category: creative_writing
+
+tests:
+  - id: cc_001
+    prompt: "Write a 150-word passage describing a man fishing alone at dawn. Write it THREE times: (1) in the style of Ernest Hemingway — short declarative sentences, concrete nouns, understated emotion, no adjectives that editorialize; (2) in the style of J.R.R. Tolkien — lush environmental description, elevated diction, a sense of ancient grandeur even in a mundane moment; (3) in the style of Toni Morrison — lyrical rhythm, metaphor rooted in the body, sentences that circle back on themselves. Label each version."
+    graders:
+      - type: llm_judge
+        dimension: character_voice
+        rubric: |
+          1.0  — All three versions are immediately recognizable as their target style without reading the labels. Sentence structure, diction, rhythm, and thematic emphasis are distinct and faithful. None read as parody or surface imitation — they capture the deeper logic of each author's prose.
+          0.75 — All three versions are distinguishable and show clear effort to match style. One version may lean on surface markers (e.g., Tolkien is just long sentences) without capturing deeper patterns. Overall convincing.
+          0.5  — Two of three versions capture the target style. The third is generic or confused with another style. Some passages feel like the model is describing the style rather than writing in it.
+          0.25 — Only one version is recognizably distinct. The others are generic prose with minor cosmetic differences. Little evidence of understanding the authors' actual craft.
+          0.0  — All three versions read essentially the same, or the task is refused/misunderstood.
+      - { type: llm_judge, dimension: narrative_quality }
+      - { type: llm_judge, dimension: originality }
+
+  - id: cc_002
+    prompt: |
+      You are writing a character named Davi: a 34-year-old Brazilian-Portuguese marine mechanic who is blunt, superstitious about the sea, and fiercely loyal. He speaks in short bursts, peppers in Portuguese words when emotional, and deflects vulnerability with dark humor.
+
+      Write Davi's response in each of these three situations (100 words each):
+      (1) His captain tells him the boat failed inspection and they can't sail tomorrow.
+      (2) A new crew member asks Davi why he has a saint's medal welded to the engine block.
+      (3) Davi's ex-wife calls to say their daughter won a school science prize.
+
+      Davi should sound like the SAME person in all three, but show different emotional facets.
+    graders:
+      - { type: llm_judge, dimension: character_voice }
+      - { type: llm_judge, dimension: emotional_impact }
+      - { type: llm_judge, dimension: engagement }
+
+  - id: cc_003
+    prompt: "Write a 250-word villain monologue delivered to the captured hero. The villain should NOT be cartoonishly evil. By the end of the monologue, the reader should genuinely understand — and perhaps partially agree with — the villain's reasoning, even while recognizing they've gone too far. The villain should be articulate, specific about their grievances, and reveal something about the hero that the hero hasn't confronted."
+    graders:
+      - { type: llm_judge, dimension: character_voice }
+      - { type: llm_judge, dimension: emotional_impact }
+      - { type: llm_judge, dimension: narrative_quality }
+      - { type: llm_judge, dimension: originality }
+
+  - id: cc_004
+    prompt: "Write a 200-word scene from the perspective of a 6-year-old child at their parents' divorce mediation session. The child doesn't fully understand what's happening but picks up on emotional undercurrents. Use vocabulary, logic, and observations appropriate to a 6-year-old — they notice wrong things, misinterpret adult behavior, and care about things adults overlook. Do NOT write a precocious child who sounds like a small adult."
+    graders:
+      - { type: llm_judge, dimension: character_voice }
+      - { type: llm_judge, dimension: emotional_impact }
+      - { type: llm_judge, dimension: narrative_quality }
+
+  - id: cc_005
+    prompt: "Write a diary entry (250 words) from a Roman legionary stationed on Hadrian's Wall in 128 AD. He has been posted there for two years, it is February, and he has just received a letter from his brother saying their mother is ill. The entry should feel like a real person writing for themselves — not a history textbook. Include period-appropriate concerns, references, and complaints, but keep it emotionally immediate."
+    graders:
+      - { type: llm_judge, dimension: character_voice }
+      - { type: llm_judge, dimension: world_building }
+      - { type: llm_judge, dimension: emotional_impact }
+
+  - id: cc_006
+    prompt: |
+      Write a 250-word dialogue scene between two characters at a late-night laundromat:
+      - Character A: a retired high school English teacher, precise with language, dry wit, quietly lonely.
+      - Character B: a 20-year-old rideshare driver, speaks in fragments and slang, nervous energy, surprisingly perceptive.
+
+      The reader should be able to tell who is speaking even without dialogue tags. Each character should have a distinct rhythm, vocabulary, and way of constructing thoughts. They are strangers making small talk that becomes unexpectedly real.
+    graders:
+      - { type: llm_judge, dimension: character_voice }
+      - { type: llm_judge, dimension: engagement }
+      - { type: llm_judge, dimension: narrative_quality }
+
+  - id: cc_007
+    prompt: "Write 200 words of internal monologue from a surgeon whose hand just slipped during an operation. Stream of consciousness — fragmented thoughts, time distortion, the body's panic responses, professional training fighting against primal fear. Capture the way the mind races and loops in a genuine crisis moment. Do not resolve the situation; end mid-crisis."
+    graders:
+      - { type: llm_judge, dimension: character_voice }
+      - { type: llm_judge, dimension: emotional_impact }
+      - { type: llm_judge, dimension: engagement }
+
+  - id: cc_008
+    prompt: "Introduce a character in 150 words WITHOUT describing their appearance, stating their occupation, or telling us their personality traits. Instead, show them in the middle of a specific action. By the end of the 150 words, the reader should have a strong sense of who this person is — their temperament, competence, social class, and at least one contradiction — purely from what they do and how they do it."
+    graders:
+      - { type: llm_judge, dimension: character_voice }
+      - { type: llm_judge, dimension: narrative_quality }
+      - { type: llm_judge, dimension: originality }
+
+  - id: cc_009
+    prompt: |
+      Write the same 150-word scene — a person buying bread at a bakery — three times, each in a different cultural and period voice:
+      (1) A flapper in 1920s Chicago speakeasy culture
+      (2) A medieval peasant in 14th-century England
+      (3) A corporate drone in a 2080s cyberpunk megacity
+
+      Each version should reflect its era in diction, concerns, social dynamics, and sensory texture. The scene itself (buying bread) stays the same; the world around it changes everything.
+    graders:
+      - { type: llm_judge, dimension: character_voice }
+      - { type: llm_judge, dimension: world_building }
+      - { type: llm_judge, dimension: originality }
+
+  - id: cc_010
+    prompt: |
+      Write a 200-word dialogue between a married couple discussing what to have for dinner. On the surface, they are only talking about food. Beneath the surface, they are actually fighting about something much bigger — but neither one says what it really is. The subtext should be clear to the reader through word choice, rhythm, what they avoid saying, and how they respond to each other. Do not break the surface-level pretense; no character should explicitly name the real conflict.
+    graders:
+      - { type: llm_judge, dimension: character_voice }
+      - { type: llm_judge, dimension: emotional_impact }
+      - { type: llm_judge, dimension: narrative_quality }
+      - { type: llm_judge, dimension: engagement }

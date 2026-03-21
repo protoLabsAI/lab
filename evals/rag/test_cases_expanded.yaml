@@ -1,0 +1,666 @@
+name: "RAG Quality Evaluation — Expanded"
+description: "20 test cases across faithfulness, multi-document reasoning, domain-specific (homelab/DevOps), and edge cases"
+
+tests:
+  # ============================================================
+  # FAITHFULNESS / GROUNDEDNESS (5 tests)
+  # ============================================================
+
+  - question: "What are the main causes of coral reef decline?"
+    context: |
+      A 2024 study by the Australian Institute of Marine Science found that
+      rising sea surface temperatures are the primary driver of coral bleaching
+      on the Great Barrier Reef, responsible for 62% of observed bleaching
+      events between 2016 and 2024. Agricultural runoff containing nitrogen
+      and phosphorus was the second largest factor at 23%, while crown-of-thorns
+      starfish outbreaks accounted for 11%. The remaining 4% was attributed
+      to localized storm damage. The study did not examine ocean acidification
+      as a separate factor due to methodological constraints.
+    expected_answer: "According to the study, the main causes are rising sea surface temperatures (62% of bleaching events), agricultural runoff with nitrogen and phosphorus (23%), crown-of-thorns starfish outbreaks (11%), and localized storm damage (4%). The study did not examine ocean acidification separately."
+    metadata:
+      category: faithfulness
+      difficulty: medium
+      tests: "Answer must ONLY use info from provided context, no external knowledge"
+
+  - question: "What were the quarterly revenue figures for Northwind Electronics in fiscal year 2025?"
+    context: |
+      Northwind Electronics reported the following quarterly revenues for
+      fiscal year 2025 (ending March 31, 2025):
+        Q1 (Apr-Jun 2024): $142.7 million
+        Q2 (Jul-Sep 2024): $158.3 million
+        Q3 (Oct-Dec 2024): $201.9 million
+        Q4 (Jan-Mar 2025): $187.4 million
+      Total annual revenue was $690.3 million, a 14.2% increase over FY2024.
+      The Q3 spike was attributed to strong holiday consumer electronics demand.
+      Gross margin averaged 34.6% across all four quarters.
+    expected_answer: "Northwind Electronics' FY2025 quarterly revenues were: Q1 $142.7M, Q2 $158.3M, Q3 $201.9M, Q4 $187.4M, totaling $690.3M (up 14.2% YoY). Q3 was the highest due to holiday demand."
+    metadata:
+      category: faithfulness
+      difficulty: easy
+      tests: "Context has specific numbers/dates — answer must preserve them exactly"
+
+  - question: "Who developed the Orion and Gemini spacecraft?"
+    context: |
+      The Orion Multi-Purpose Crew Vehicle is developed by Lockheed Martin
+      under contract to NASA. Its first uncrewed test flight, Artemis I,
+      launched on November 16, 2022. The European Service Module that provides
+      propulsion and life support for Orion is built by Airbus Defence and Space.
+      The Gemini program ran from 1961 to 1966 and used spacecraft built by
+      McDonnell Aircraft Corporation. Gemini missions carried two astronauts
+      and tested orbital rendezvous techniques essential for the later Apollo
+      missions. SpaceX's Gemini is an internal codename for a next-generation
+      cargo routing system and is unrelated to NASA's Gemini program.
+    expected_answer: "The Orion spacecraft is developed by Lockheed Martin (with the European Service Module by Airbus). The NASA Gemini spacecraft (1961-1966) was built by McDonnell Aircraft Corporation. SpaceX also uses 'Gemini' as an internal codename for a cargo routing system, but that is unrelated to the NASA program."
+    metadata:
+      category: faithfulness
+      difficulty: hard
+      tests: "Context has multiple entities — answer must not confuse attributions"
+
+  - question: "Is remote work more productive than in-office work?"
+    context: |
+      A Stanford study led by Nicholas Bloom tracked 16,000 workers over
+      9 months and found that remote workers were 13% more productive than
+      their in-office counterparts, primarily due to fewer breaks and sick
+      days. However, a 2024 meta-analysis published in the Journal of
+      Organizational Behavior covering 78 studies found no statistically
+      significant difference in productivity between remote and in-office
+      workers (effect size d=0.04, p=0.31). The meta-analysis noted that
+      results vary substantially by industry, role type, and how productivity
+      is measured. A third study from Microsoft Research found that remote
+      work increased asynchronous communication by 25% but reduced
+      cross-team collaboration by 17%, making productivity comparisons
+      context-dependent.
+    expected_answer: "The evidence is mixed and context-dependent. One Stanford study found remote workers 13% more productive, but a larger 2024 meta-analysis of 78 studies found no statistically significant difference (p=0.31). Microsoft Research noted tradeoffs: remote work increases async communication but reduces cross-team collaboration. The answer depends on industry, role, and how productivity is measured."
+    metadata:
+      category: faithfulness
+      difficulty: hard
+      tests: "Context is ambiguous — answer should acknowledge ambiguity, not pick a side"
+
+  - question: "What is the recommended dosage of metformin for type 2 diabetes?"
+    context: |
+      The James Webb Space Telescope (JWST) was launched on December 25, 2021,
+      aboard an Ariane 5 rocket from Kourou, French Guiana. It orbits the
+      Sun-Earth L2 Lagrange point, approximately 1.5 million kilometers from
+      Earth. The telescope's primary mirror is 6.5 meters in diameter, composed
+      of 18 gold-coated beryllium hexagonal segments. JWST observes in the
+      infrared spectrum, from 0.6 to 28.3 micrometers, enabling it to see
+      through dust clouds and observe the earliest galaxies in the universe.
+    expected_answer: "The provided context is about the James Webb Space Telescope and does not contain any information about metformin or diabetes treatment. I cannot answer this question from the given context."
+    metadata:
+      category: faithfulness
+      difficulty: easy
+      tests: "Context is irrelevant to the question — model should say it cannot answer"
+
+  # ============================================================
+  # MULTI-DOCUMENT REASONING (5 tests)
+  # ============================================================
+
+  - question: "What is Kubernetes pod autoscaling and how do you configure it?"
+    contexts:
+      - |
+        Kubernetes Horizontal Pod Autoscaler (HPA) automatically scales the
+        number of pod replicas in a Deployment, ReplicaSet, or StatefulSet
+        based on observed CPU utilization or custom metrics. The HPA controller
+        checks metrics every 15 seconds by default (configurable via
+        --horizontal-pod-autoscaler-sync-period). It uses the formula:
+        desiredReplicas = ceil(currentReplicas * (currentMetric / targetMetric)).
+      - |
+        To create an HPA, use: kubectl autoscale deployment my-app --cpu-percent=50
+        --min=2 --max=10. This sets a target CPU utilization of 50% with a
+        minimum of 2 and maximum of 10 replicas. You can also define an HPA
+        as a YAML manifest with apiVersion: autoscaling/v2, which supports
+        multiple metrics including memory, custom metrics from Prometheus,
+        and external metrics.
+      - |
+        Vertical Pod Autoscaler (VPA) adjusts CPU and memory requests for
+        containers automatically. Unlike HPA which scales horizontally (more
+        pods), VPA scales vertically (bigger pods). VPA has three modes:
+        "Auto" applies recommendations and evicts pods, "Recreate" is similar
+        but only updates on restart, and "Off" only generates recommendations
+        without applying them. VPA and HPA should not target the same CPU
+        metric simultaneously to avoid conflicts.
+    expected_answer: "Kubernetes supports two types of pod autoscaling. HPA (Horizontal Pod Autoscaler) adds or removes pod replicas based on CPU, memory, or custom metrics, checking every 15 seconds. Configure it with 'kubectl autoscale' or a YAML manifest (autoscaling/v2). VPA (Vertical Pod Autoscaler) adjusts CPU/memory requests per container in Auto, Recreate, or Off modes. Avoid using both HPA and VPA on the same CPU metric to prevent conflicts."
+    metadata:
+      category: multi_document
+      difficulty: medium
+      tests: "3 documents with complementary info — synthesize into complete answer"
+
+  - question: "What is the expected lifespan of an SSD under normal use?"
+    contexts:
+      - |
+        Samsung's whitepaper on the 990 PRO NVMe SSD states an endurance
+        rating of 600 TBW (terabytes written) for the 1TB model, with a
+        Mean Time Between Failures (MTBF) of 1.5 million hours. Samsung
+        estimates this translates to approximately 5-7 years of normal
+        consumer use, assuming 100-150 GB of writes per day. The NAND flash
+        cells are rated for 1,500 program-erase cycles.
+      - |
+        A 2024 Backblaze reliability report covering 250,000 drives found
+        that SSDs in their data center environment had an annualized failure
+        rate (AFR) of 1.05% after 4 years, compared to 1.83% for HDDs. The
+        report noted that SSDs showed lower failure rates in years 1-3 but
+        the gap narrowed by year 5. Backblaze cautioned that their workload
+        (continuous reads, moderate writes for boot drives) may not represent
+        typical consumer or enterprise write-heavy scenarios, and that 10+
+        year lifespan estimates from manufacturers remain unproven at scale.
+    expected_answer: "The expected lifespan depends on workload and varies by source. Samsung rates the 990 PRO at 600 TBW / 1.5M hours MTBF, estimating 5-7 years at typical consumer write levels. However, Backblaze's large-scale data center study found SSD failure rates around 1.05% AFR after 4 years, but cautioned that manufacturer claims of 10+ year lifespans are unproven at scale and results depend heavily on workload type."
+    metadata:
+      category: multi_document
+      difficulty: hard
+      tests: "2 documents that contradict each other — answer should note the disagreement"
+
+  - question: "What is the default isolation level in PostgreSQL?"
+    contexts:
+      - |
+        Redis is an in-memory data structure store commonly used as a cache,
+        message broker, and session store. It supports strings, hashes, lists,
+        sets, and sorted sets. Redis persistence options include RDB snapshots
+        and AOF (Append Only File) logging. By default, Redis saves an RDB
+        snapshot every 60 seconds if at least 1000 keys changed.
+      - |
+        PostgreSQL uses Multi-Version Concurrency Control (MVCC) to handle
+        concurrent access. The default transaction isolation level is Read
+        Committed, meaning each statement within a transaction sees a snapshot
+        of the database as of the start of that statement. PostgreSQL also
+        supports Repeatable Read and Serializable isolation levels, which
+        provide stronger consistency guarantees at the cost of potential
+        serialization failures that require application-level retry logic.
+      - |
+        MongoDB supports multi-document ACID transactions starting from
+        version 4.0 for replica sets and 4.2 for sharded clusters. The
+        default read concern is "local" and the default write concern is
+        "majority" in MongoDB 5.0+. Transactions have a default lifetime
+        of 60 seconds before automatic abort.
+      - |
+        SQLite uses a file-level locking mechanism with five lock states:
+        UNLOCKED, SHARED, RESERVED, PENDING, and EXCLUSIVE. Its default
+        journal mode is "delete" but WAL (Write-Ahead Logging) mode is
+        recommended for concurrent read/write workloads. SQLite's default
+        isolation level is Serializable.
+    expected_answer: "The default isolation level in PostgreSQL is Read Committed. Under this level, each statement in a transaction sees a snapshot of the database as of the start of that statement. PostgreSQL also supports Repeatable Read and Serializable for stronger consistency, though these may require retry logic for serialization failures."
+    metadata:
+      category: multi_document
+      difficulty: medium
+      tests: "4 documents where only 1 is relevant — answer should use only the relevant one"
+
+  - question: "What are the system requirements for running Stable Diffusion locally?"
+    contexts:
+      - |
+        The official Stable Diffusion documentation recommends a GPU with at
+        least 8 GB VRAM for generating 512x512 images. An NVIDIA GPU with
+        CUDA support is strongly recommended. The model weights for SD 1.5
+        require approximately 4 GB of disk space, while SDXL requires about
+        6.5 GB. System RAM of 16 GB or more is recommended. Python 3.10+
+        is required, along with PyTorch 2.0 or later compiled with CUDA support.
+      - |
+        Community benchmarks on the Stable Diffusion subreddit show that GPUs
+        with 8 GB VRAM (like the RTX 3060 Ti or RTX 4060) can generate 512x512
+        images in about 5-8 seconds per image. GPUs with 12+ GB VRAM (RTX 3060 12GB,
+        RTX 4070) can handle 1024x1024 SDXL generation. Users report that 16 GB
+        system RAM is the practical minimum, with 32 GB recommended if running
+        other applications alongside. An SSD is strongly recommended over HDD
+        for model loading times — loading from HDD takes 45-60 seconds vs
+        3-5 seconds from NVMe SSD.
+      - |
+        For Apple Silicon Macs, Stable Diffusion can run via the MLX framework
+        or Core ML optimized models. An M1 with 16 GB unified memory can
+        generate 512x512 images in about 15-20 seconds. M2 Pro/Max chips
+        with 32+ GB are recommended for SDXL. Python 3.10+ and the
+        diffusers library from HuggingFace are required. Note that MPS
+        (Metal Performance Shaders) backend has some operator limitations
+        compared to CUDA.
+    expected_answer: "To run Stable Diffusion locally, you need: a GPU with at least 8 GB VRAM (NVIDIA with CUDA recommended, or Apple Silicon via MLX/CoreML), 16 GB system RAM minimum (32 GB recommended), Python 3.10+, and PyTorch 2.0+ with CUDA. Disk space is 4 GB for SD 1.5 or 6.5 GB for SDXL, and an SSD is strongly recommended (3-5s load vs 45-60s on HDD). For SDXL at 1024x1024, 12+ GB VRAM is needed. Apple Silicon M1 with 16 GB can run SD 1.5 but M2 Pro/Max with 32 GB is recommended for SDXL."
+    metadata:
+      category: multi_document
+      difficulty: medium
+      tests: "3 documents with overlapping info — answer should deduplicate"
+
+  - question: "What HTTP methods does the payments API support for refunds?"
+    contexts:
+      - |
+        ## Payments API — Refunds
+
+        Supported operations:
+        - POST /v2/refunds — Create a new refund
+        - GET /v2/refunds/{id} — Retrieve refund status
+        - GET /v2/refunds — List refunds (supports pagination)
+
+        Required headers: Authorization: Bearer {token}, Content-Type: application/json
+      - |
+        The payments API refund endpoint accepts POST requests to create refunds
+        and GET requests to retrieve them. To create a refund, send a POST to
+        /v2/refunds with a JSON body containing payment_id (required), amount
+        (optional, defaults to full refund), and reason (optional, string).
+        The response includes a refund_id, status (pending/completed/failed),
+        and created_at timestamp. Refunds typically process within 5-10
+        business days. There is no DELETE endpoint — refunds cannot be cancelled
+        once submitted.
+      - |
+        | Endpoint | Method | Description | Rate Limit |
+        |----------|--------|-------------|------------|
+        | /v2/refunds | POST | Create refund | 100/min |
+        | /v2/refunds/{id} | GET | Get refund | 500/min |
+        | /v2/refunds | GET | List refunds | 200/min |
+        | /v2/refunds/{id} | PATCH | Update reason | 100/min |
+    expected_answer: "The payments API supports POST (create refund, 100/min limit), GET (retrieve single refund or list with pagination, 200-500/min), and PATCH (update refund reason, 100/min) for the /v2/refunds endpoints. There is no DELETE endpoint — refunds cannot be cancelled once submitted. POST requires payment_id in the body; amount and reason are optional."
+    metadata:
+      category: multi_document
+      difficulty: medium
+      tests: "Documents in different formats (bullets, prose, table) — answer should normalize"
+
+  # ============================================================
+  # DOMAIN-SPECIFIC — HOMELAB / DEVOPS (5 tests)
+  # ============================================================
+
+  - question: "How do I set up Tailscale subnet routing on a Proxmox node?"
+    context: |
+      Tailscale Subnet Router Configuration for Proxmox
+
+      1. Install Tailscale on the Proxmox host:
+         curl -fsSL https://tailscale.com/install.sh | sh
+
+      2. Enable IP forwarding (required for subnet routing):
+         echo 'net.ipv4.ip_forward = 1' >> /etc/sysctl.d/99-tailscale.conf
+         echo 'net.ipv6.conf.all.forwarding = 1' >> /etc/sysctl.d/99-tailscale.conf
+         sysctl -p /etc/sysctl.d/99-tailscale.conf
+
+      3. Authenticate and advertise routes:
+         tailscale up --advertise-routes=10.10.0.0/24,10.10.1.0/24 --accept-dns=false
+
+         Replace the CIDR ranges with your Proxmox VM/container subnets.
+         Use --accept-dns=false to avoid overriding Proxmox's DNS config.
+
+      4. Approve the routes in the Tailscale admin console:
+         Go to https://login.tailscale.com/admin/machines
+         Find the Proxmox node, click "..." > "Edit route settings"
+         Toggle on the advertised subnets.
+
+      5. On client devices, enable the subnet routes:
+         tailscale up --accept-routes
+
+      Firewall note: If using Proxmox's built-in firewall, add rules to
+      allow traffic on the tailscale0 interface. In /etc/pve/firewall/cluster.fw:
+         [RULES]
+         IN ACCEPT -i tailscale0
+         OUT ACCEPT -o tailscale0
+
+      Persistence: Tailscale survives reboots via its systemd service. The
+      IP forwarding sysctl settings persist via the conf file. No additional
+      cron jobs or startup scripts are needed.
+    expected_answer: "Install Tailscale (curl installer), enable IPv4/IPv6 forwarding in sysctl, then run 'tailscale up --advertise-routes=<your-subnets> --accept-dns=false'. Approve the routes in the Tailscale admin console under the machine's route settings. On clients, use 'tailscale up --accept-routes'. If using Proxmox's firewall, add ACCEPT rules for the tailscale0 interface. Everything persists across reboots via systemd and sysctl conf files."
+    metadata:
+      category: domain_specific
+      difficulty: medium
+      tests: "Given server config docs, answer 'how do I set up X?'"
+
+  - question: "What went wrong with this server?"
+    context: |
+      === journalctl -u vllm.service --since "2026-03-20 14:00" ===
+
+      Mar 20 14:02:11 ava-ai vllm[4821]: INFO: Starting vLLM engine...
+      Mar 20 14:02:11 ava-ai vllm[4821]: INFO: Model: Qwen/Qwen3.5-122B-A10B-FP8
+      Mar 20 14:02:11 ava-ai vllm[4821]: INFO: Tensor parallel size: 2
+      Mar 20 14:02:12 ava-ai vllm[4821]: INFO: Loading model weights...
+      Mar 20 14:03:45 ava-ai vllm[4821]: INFO: Model loaded successfully on GPU 0,1
+      Mar 20 14:03:46 ava-ai vllm[4821]: INFO: Starting API server on 0.0.0.0:8000
+      Mar 20 14:03:47 ava-ai vllm[4821]: INFO: Server ready. Serving Qwen3.5-122B-A10B-FP8
+      Mar 20 14:15:22 ava-ai vllm[4821]: WARNING: KV cache utilization at 89%
+      Mar 20 14:15:23 ava-ai vllm[4821]: WARNING: 3 requests queued, cache pressure high
+      Mar 20 14:18:07 ava-ai vllm[4821]: ERROR: CUDA error: an illegal memory access was encountered
+      Mar 20 14:18:07 ava-ai vllm[4821]: ERROR: Error in model execution on GPU 1
+      Mar 20 14:18:07 ava-ai vllm[4821]: ERROR: Traceback (most recent call last):
+      Mar 20 14:18:07 ava-ai vllm[4821]: ERROR:   File "/home/ava/dev/vllm-env/lib/python3.12/site-packages/vllm/worker/worker.py", line 342, in execute_model
+      Mar 20 14:18:07 ava-ai vllm[4821]: ERROR:     output = self.model_runner.execute_model(execute_model_req)
+      Mar 20 14:18:07 ava-ai vllm[4821]: ERROR:   File "/home/ava/dev/vllm-env/lib/python3.12/site-packages/vllm/worker/model_runner.py", line 1456, in execute_model
+      Mar 20 14:18:07 ava-ai vllm[4821]: ERROR:     raise RuntimeError("CUDA error: illegal memory access") from e
+      Mar 20 14:18:08 ava-ai vllm[4821]: ERROR: RuntimeError: CUDA error: illegal memory access on device 1
+      Mar 20 14:18:08 ava-ai systemd[1]: vllm.service: Main process exited, code=exited, status=1/FAILURE
+      Mar 20 14:18:08 ava-ai systemd[1]: vllm.service: Failed with result 'exit-code'.
+
+      === nvidia-smi (captured at 14:19) ===
+      GPU 0: RTX PRO 6000 Blackwell  | 91°C | 92432MiB / 98304MiB | 0% util
+      GPU 1: RTX PRO 6000 Blackwell  | 88°C | ERR! / 98304MiB     | N/A
+
+      === dmesg (relevant lines) ===
+      [483921.442] NVRM: Xid (PCI:0000:61:00): 31, pid=4821, Ch 00000010, errorString "Ctx 00000003"
+      [483921.443] NVRM: Xid (PCI:0000:61:00): 31, pid=4821, Stopped DMA for channel 0x00000010
+    expected_answer: "The vLLM service crashed due to a CUDA illegal memory access error on GPU 1. The sequence was: KV cache hit 89% utilization with queued requests, then GPU 1 threw an illegal memory access during model execution. The nvidia-smi output shows GPU 1 in an error state (ERR! for memory), and dmesg shows Xid error 31 (GPU memory page fault). This is consistent with memory corruption under sustained TP=2 load on Blackwell GPUs — the fix is to ensure --enforce-eager is used with tensor-parallel=2, or reduce --gpu-memory-utilization below 0.90."
+    metadata:
+      category: domain_specific
+      difficulty: hard
+      tests: "Given error logs as context, answer 'what went wrong?'"
+
+  - question: "How do I authenticate with the Infisical API to retrieve secrets?"
+    context: |
+      Infisical API Authentication — Machine Identity (v0.46+)
+
+      Machine Identity is the recommended auth method for server-to-server
+      secret retrieval. It replaces the older Service Token method (deprecated
+      in v0.42).
+
+      Step 1: Create a Machine Identity in the Infisical dashboard.
+        - Go to Organization Settings > Machine Identities > Create
+        - Name it (e.g., "ava-ai-prod")
+        - Select "Universal Auth" as the authentication method
+        - Note the Client ID and Client Secret
+
+      Step 2: Authenticate and obtain an access token.
+        POST https://secrets.proto-labs.ai/api/v1/auth/universal-auth/login
+        Content-Type: application/json
+
+        {
+          "clientId": "your-client-id",
+          "clientSecret": "your-client-secret"
+        }
+
+        Response:
+        {
+          "accessToken": "eyJhbG...",
+          "expiresIn": 7200,
+          "tokenType": "Bearer"
+        }
+
+      Step 3: Use the access token to fetch secrets.
+        GET https://secrets.proto-labs.ai/api/v3/secrets/raw?environment=prod&workspaceId=<project-id>&secretPath=/
+        Authorization: Bearer eyJhbG...
+
+        Response contains an array of { secretKey, secretValue } objects.
+
+      Token refresh: Access tokens expire after 2 hours (7200s). Re-call
+      the login endpoint to get a new token. There is no refresh token flow.
+
+      Rate limits: 120 requests/minute per Machine Identity.
+    expected_answer: "Create a Machine Identity in Infisical with Universal Auth, note the Client ID and Client Secret. POST to /api/v1/auth/universal-auth/login with those credentials to get a Bearer access token (expires in 2 hours). Then use that token in the Authorization header to GET secrets from /api/v3/secrets/raw with environment, workspaceId, and secretPath parameters. Re-authenticate when the token expires — there is no refresh token flow. Rate limit is 120 req/min."
+    metadata:
+      category: domain_specific
+      difficulty: medium
+      tests: "Given API docs, answer 'how do I authenticate?'"
+
+  - question: "What services does this Docker Compose stack run and how are they connected?"
+    context: |
+      # docker-compose.yml
+      version: "3.8"
+      services:
+        traefik:
+          image: traefik:v3.0
+          ports:
+            - "80:80"
+            - "443:443"
+            - "8080:8080"
+          volumes:
+            - /var/run/docker.sock:/var/run/docker.sock:ro
+            - ./traefik/config:/etc/traefik
+            - ./traefik/certs:/certs
+          networks:
+            - web
+          restart: unless-stopped
+
+        gitea:
+          image: gitea/gitea:1.22
+          environment:
+            - GITEA__database__DB_TYPE=postgres
+            - GITEA__database__HOST=db:5432
+            - GITEA__database__NAME=gitea
+            - GITEA__database__USER=gitea
+            - GITEA__database__PASSWD=${GITEA_DB_PASS}
+          volumes:
+            - gitea_data:/data
+          labels:
+            - "traefik.http.routers.gitea.rule=Host(`git.proto-labs.ai`)"
+            - "traefik.http.services.gitea.loadbalancer.server.port=3000"
+          depends_on:
+            - db
+          networks:
+            - web
+            - internal
+          restart: unless-stopped
+
+        drone:
+          image: drone/drone:2
+          environment:
+            - DRONE_GITEA_SERVER=http://gitea:3000
+            - DRONE_GITEA_CLIENT_ID=${DRONE_GITEA_ID}
+            - DRONE_GITEA_CLIENT_SECRET=${DRONE_GITEA_SECRET}
+            - DRONE_SERVER_HOST=ci.proto-labs.ai
+            - DRONE_SERVER_PROTO=https
+            - DRONE_DATABASE_DRIVER=postgres
+            - DRONE_DATABASE_DATASOURCE=postgres://drone:${DRONE_DB_PASS}@db:5432/drone?sslmode=disable
+          labels:
+            - "traefik.http.routers.drone.rule=Host(`ci.proto-labs.ai`)"
+            - "traefik.http.services.drone.loadbalancer.server.port=80"
+          depends_on:
+            - gitea
+            - db
+          networks:
+            - web
+            - internal
+          restart: unless-stopped
+
+        db:
+          image: postgres:16-alpine
+          environment:
+            - POSTGRES_MULTIPLE_DATABASES=gitea,drone
+            - POSTGRES_USER=postgres
+            - POSTGRES_PASSWORD=${POSTGRES_PASS}
+          volumes:
+            - postgres_data:/var/lib/postgresql/data
+            - ./init-multi-db.sh:/docker-entrypoint-initdb.d/init-multi-db.sh
+          networks:
+            - internal
+          restart: unless-stopped
+
+      volumes:
+        gitea_data:
+        postgres_data:
+
+      networks:
+        web:
+        internal:
+    expected_answer: "This stack runs 4 services: Traefik (reverse proxy on ports 80/443/8080), Gitea (Git server at git.proto-labs.ai), Drone CI (at ci.proto-labs.ai, integrated with Gitea for source code), and PostgreSQL 16 (shared database). Gitea and Drone both depend on the Postgres database (separate databases initialized via init script). Drone connects to Gitea internally over HTTP. Traefik routes external HTTPS traffic to Gitea (port 3000) and Drone (port 80) based on hostname. Two networks isolate traffic: 'web' for Traefik-facing services and 'internal' for database connections."
+    metadata:
+      category: domain_specific
+      difficulty: medium
+      tests: "Given Dockerfile and compose file, answer 'what services does this run?'"
+
+  - question: "How do I create a ZFS mirror pool and set up automatic snapshots?"
+    context: |
+      $ zpool create --help
+      usage: zpool create [-fnd] [-o property=value] ... [-O file-system-property=value] ...
+             [-m mountpoint] [-R root] pool vdev ...
+
+      Create a new storage pool with the given name and vdev specification.
+
+        -f    Force creation, even if devices are in use
+        -n    Dry run — display config without creating
+        -d    Do not enable any features by default
+        -o    Set pool property (e.g., -o ashift=12)
+        -O    Set filesystem property (e.g., -O compression=lz4)
+        -m    Set mountpoint (default: /poolname)
+        -R    Set altroot for pool
+
+      vdev types:
+        mirror    Two or more devices in a mirror (n-way redundancy)
+        raidz     RAID-Z with single parity (raidz1), double (raidz2), triple (raidz3)
+        spare     Hot spare device
+        log       ZIL log device (for sync writes)
+        cache     L2ARC cache device (for reads)
+
+      Example:
+        zpool create -o ashift=12 -O compression=lz4 tank mirror /dev/sda /dev/sdb
+
+      $ zfs-auto-snapshot --help
+      Usage: zfs-auto-snapshot [options] [-l label] [-k keep] pool/dataset
+
+      Automatically create and rotate ZFS snapshots.
+
+        -l label   Snapshot label: frequent, hourly, daily, weekly, monthly
+        -k keep    Number of snapshots to retain per label
+        -r         Recurse into child datasets
+        --prefix   Snapshot name prefix (default: zfs-auto-snap)
+        --default-exclude  Exclude datasets unless com.sun:auto-snapshot=true
+
+      Typically installed as cron jobs:
+        */15 * * * * zfs-auto-snapshot -q -l frequent -k 4 pool
+        0 * * * *    zfs-auto-snapshot -q -l hourly -k 24 pool
+        0 0 * * *    zfs-auto-snapshot -q -l daily -k 30 pool
+        0 0 * * 0    zfs-auto-snapshot -q -l weekly -k 8 pool
+        0 0 1 * *    zfs-auto-snapshot -q -l monthly -k 12 pool
+    expected_answer: "Create a ZFS mirror with: zpool create -o ashift=12 -O compression=lz4 <pool-name> mirror /dev/sdX /dev/sdY. For automatic snapshots, install zfs-auto-snapshot and add cron jobs for each retention tier: frequent (every 15 min, keep 4), hourly (keep 24), daily (keep 30), weekly (keep 8), monthly (keep 12). Use -r to recurse into child datasets. Example cron: '0 0 * * * zfs-auto-snapshot -q -l daily -k 30 pool'."
+    metadata:
+      category: domain_specific
+      difficulty: easy
+      tests: "Given CLI help output, answer 'how do I do X?'"
+
+  # ============================================================
+  # EDGE CASES (5 tests)
+  # ============================================================
+
+  - question: "What are the visiting hours for the National Museum of History?"
+    context: ""
+    expected_answer: "No context was provided, so I have no information to answer this question. Please provide relevant documentation or details about the museum's visiting hours."
+    metadata:
+      category: edge_case
+      difficulty: easy
+      tests: "Empty context — model should say it has no information"
+
+  - question: "What is the maximum concurrent connection limit for the WebSocket gateway?"
+    context: |
+      The Proto-Labs WebSocket Gateway is a high-performance message routing
+      layer built on top of the uWebSockets library. It handles real-time
+      bidirectional communication between client applications and backend
+      microservices. The gateway supports automatic reconnection with
+      exponential backoff, starting at 500ms and capping at 30 seconds.
+      Messages are serialized using MessagePack for bandwidth efficiency,
+      with an average message size of 127 bytes compared to 340 bytes for
+      equivalent JSON payloads. The gateway runs as a cluster of Node.js
+      worker processes, one per CPU core, behind an HAProxy layer that
+      handles TLS termination and sticky sessions based on the client's
+      connection ID. Health checks run every 10 seconds on the /healthz
+      endpoint. The gateway publishes metrics to Prometheus including
+      message throughput, latency percentiles, connection counts, and
+      error rates. In production, the gateway typically handles between
+      2,000 and 5,000 active connections during peak hours. Memory usage
+      averages 450 MB per worker process, with each worker maintaining
+      its own connection pool to Redis for pub/sub message distribution.
+      Redis is configured with a maxmemory of 2 GB and eviction policy
+      allkeys-lru. The authentication flow requires clients to send a
+      JWT token in the initial WebSocket upgrade request, which the
+      gateway validates against the auth service before establishing the
+      connection. Tokens expire after 24 hours and clients must
+      reconnect with a fresh token. Rate limiting is applied at 100
+      messages per second per connection. For group messaging, the
+      gateway supports rooms with a maximum of 500 members per room.
+      The gateway was originally deployed in March 2024 and has maintained
+      99.97% uptime since launch. During a load test conducted in January
+      2025, the cluster successfully handled 47,000 simultaneous
+      connections across 8 worker processes before hitting the configured
+      maximum concurrent connection limit of 50,000 per cluster. Beyond
+      this threshold, new connections receive a 503 Service Unavailable
+      response with a Retry-After header. The load test also revealed
+      that message latency p99 increased from 12ms to 89ms at 45,000
+      connections, prompting an optimization of the Redis pub/sub
+      fan-out pattern that reduced p99 to 34ms at the same load. Client
+      libraries are available for JavaScript/TypeScript, Python, Go,
+      and Rust. The Python client requires Python 3.9+ and uses asyncio
+      for non-blocking I/O. Each client library implements the same
+      retry logic and MessagePack serialization. The gateway supports
+      protocol versioning through the Sec-WebSocket-Protocol header,
+      currently serving v2 and v3 simultaneously with v1 deprecated
+      since September 2024. Binary message support was added in v3,
+      enabling efficient transfer of small files up to 1 MB. Messages
+      larger than 1 MB are rejected with error code 1009. Logging uses
+      structured JSON format sent to a Loki instance for aggregation
+      and search. Alert rules are configured in Grafana for connection
+      spike detection (>40,000 in 5 minutes), error rate threshold
+      (>1% of messages), and worker process crashes.
+    expected_answer: "The maximum concurrent connection limit is 50,000 per cluster. Beyond that, new connections receive a 503 Service Unavailable with a Retry-After header. This was confirmed in a January 2025 load test that reached 47,000 connections across 8 workers."
+    metadata:
+      category: edge_case
+      difficulty: hard
+      tests: "Very long context (2000+ words) with answer buried in the middle"
+
+  - question: "What are the hours of operation for the Kyoto branch office?"
+    context: |
+      京都支店の営業案内
+
+      営業時間：月曜日～金曜日 午前9時～午後5時30分
+      土曜日：午前10時～午後2時（第2・第4土曜日のみ）
+      日曜日・祝日：休業
+
+      所在地：〒600-8216 京都府京都市下京区烏丸通七条下ル東塩小路町735-1
+      京都駅前ビル 8階
+
+      電話番号：075-555-0142
+      FAX：075-555-0143
+
+      アクセス：JR京都駅中央口より徒歩3分。烏丸中央口を出て烏丸通を
+      北へ直進、最初の信号を過ぎた右手のビル8階です。
+
+      駐車場：提携駐車場あり（京都駅前パーキング、1時間無料サービス券
+      をお渡しします）。
+
+      備考：
+      - 年末年始休業：12月29日～1月3日
+      - お盆休業：8月13日～8月15日
+      - 来店予約はお電話またはウェブサイトより承ります
+    expected_answer: "The Kyoto branch is open Monday through Friday from 9:00 AM to 5:30 PM, and on the 2nd and 4th Saturdays from 10:00 AM to 2:00 PM. It is closed on Sundays and national holidays. Additional closures include year-end/New Year (Dec 29 - Jan 3) and Obon (Aug 13-15). The office is located on the 8th floor of the Kyoto Ekimae Building, a 3-minute walk from JR Kyoto Station's central exit."
+    metadata:
+      category: edge_case
+      difficulty: hard
+      tests: "Context in a different language (Japanese) than the question (English)"
+
+  - question: "What backup strategy does the team use for their production databases?"
+    context: |
+      Our production infrastructure runs on three PostgreSQL 16 clusters in
+      an active-passive configuration. The primary cluster handles all write
+      operations and streams WAL (Write-Ahead Log) segments to two standby
+      nodes using synchronous replication with a maximum lag tolerance of
+      100ms. Each database is approximately 340 GB in size.
+
+      For backups, we use pgBackRest configured with full backups every
+      Sunday at 02:00 UTC and incremental backups every 6 hours. Full
+      backups are retained for 30 days and incrementals for 14 days.
+      Backups are stored in an S3-compatible bucket (MinIO cluster on
+      pve01) with server-side AES-256 encryption. We verified restore
+      time is approximately 45 minutes for a full restore from the most
+      recent backup.
+
+      WAL archiving is continuous to the same S3 bucket, enabling
+      point-in-time recovery (PITR) to any moment within the 14-day
+      window. We have not yet implemented cross-region backup replication
+      or tested disaster recovery for a scenario where both the primary
+      database and the MinIO cluster fail simultaneously.
+    expected_answer: "The team uses pgBackRest with full backups every Sunday at 02:00 UTC and incremental backups every 6 hours. Retention is 30 days for full and 14 days for incremental backups, stored in S3-compatible MinIO with AES-256 encryption. Continuous WAL archiving enables point-in-time recovery within 14 days, and full restore takes about 45 minutes. However, there are gaps: cross-region backup replication is not yet implemented, and disaster recovery for simultaneous primary database and MinIO failure has not been tested."
+    metadata:
+      category: edge_case
+      difficulty: medium
+      tests: "Context partially answers — model should answer what it can and flag gaps"
+
+  - question: "Will the team likely need to scale their database infrastructure in the next year?"
+    context: |
+      Quarterly database metrics for the Analytics Platform:
+
+      Q1 2025: 340 GB total size, 1,200 avg queries/sec, 12ms avg latency,
+      peak connections: 180/200 max.
+
+      Q2 2025: 410 GB total size, 1,850 avg queries/sec, 18ms avg latency,
+      peak connections: 195/200 max.
+
+      Q3 2025: 520 GB total size, 2,600 avg queries/sec, 31ms avg latency,
+      peak connections: 200/200 max. NOTE: 3 connection pool exhaustion
+      events logged, each lasting 2-5 minutes.
+
+      Q4 2025 (projected): 640 GB total size, 3,200 avg queries/sec.
+
+      Current hardware: 64 GB RAM, 32 vCPU, 2 TB NVMe storage.
+      Connection pool max: 200 (PgBouncer).
+
+      Budget note: The infrastructure budget for 2026 has been approved
+      at the same level as 2025 — no increase. The team has been asked
+      to evaluate managed database options (RDS, Cloud SQL) as an
+      alternative to self-hosted scaling.
+    expected_answer: "Based on the trends in the data, scaling appears necessary. Database size is growing roughly 50-60% per quarter (340 GB to projected 640 GB in Q4 2025), query volume has nearly tripled, latency has increased from 12ms to 31ms, and the connection pool has already hit its 200-connection max with exhaustion events in Q3. At this growth rate, the 2 TB storage could be exhausted within 2-3 quarters. However, the 2026 budget has no increase, so the team may need to pursue cost-neutral options like optimizing queries, adding read replicas, or evaluating managed databases as directed. The context does not state an explicit scaling plan or timeline."
+    metadata:
+      category: edge_case
+      difficulty: hard
+      tests: "Question requires inference beyond what is explicitly stated in context"
