@@ -1,129 +1,196 @@
-# Session Handoff — 2026-03-21
+# Session Handoff — 2026-03-21 (Afternoon)
 
-## What We Built Today
+## What We Did This Session
 
-### 1. Eval Laboratory (`protoLabsAI/lab`)
-Built a comprehensive LLM evaluation monorepo from scratch:
-- **uv workspaces** with 5 packages: `lab-core`, `evals`, `models`, `training`, `experiments`
-- **Pydantic models** for ModelSpec, BenchmarkResult, EvalResult, TrainingConfig
-- **8 eval suites**: claw-eval (104 agent tasks), function-call, RAG, creative writing, roleplay/GM, research synthesis, coding, SVG generation
-- **Grading framework**: outcome (deterministic), LLM-as-judge (model-based), function-call, RAG (4 dimensions), creative (narrative, character voice, world building, engagement)
-- **Parallel model comparison** with `--port-offset` to avoid mock service port conflicts
+### 1. Qwen3.5 Small Model Evaluation (0.8B → 9B)
+Evaluated the full Qwen3.5 family for fine-tuning base selection:
 
-### 2. Gateway Expansion (`infra/gateway/`)
-- Added 14+ new models: GPT-5.4 family, Gemini 3.x, DeepSeek V3.2, GLM 5 Turbo, Kimi K2.5, MiMo V2 Flash, GPT-OSS, Grok (via OpenRouter)
-- Fixed Gemini model IDs (preview → GA)
-- Fixed vLLM routing (`openai/auto` → `openai/local` with `--served-model-name local`)
-- Removed Ollama (tool calling doesn't work through LiteLLM)
-- All Grok models moved to OpenRouter (no xAI API key)
+- **Qwen3.5-9B** selected as fine-tune base over OmniCoder-9B (same arch, better tool use)
+- **Qwen3.5-4B** is the breakout — matches 9B on 6/8 eval dimensions
+- **4B INT4 (AWQ)** runs at 294 tok/s, 3GB, quality intact
+- **Capability cliff at 4B→2B**: sub-4B models can't reliably call tools (0/4 claw pass^3)
+- **2B surprised on reasoning**: 5/5 on logic/math, matching 9B — can think but can't act
+- OmniCoder-9B nuked (inferior), Qwen3.5-27B bf16 nuked (redundant with INT4)
+- Base models (0.8B, 2B, 4B) downloaded for pretraining experiments
 
-### 3. protoClaw Observability
-- **Langfuse tracing**: every LLM call + tool execution traced with session grouping
-- **Prometheus metrics**: 6 collectors (`protoclaw_llm_calls_total`, latency, tokens, tool calls, etc.)
-- **`/metrics` endpoint** on :7865 for Grafana scraping
-- **Enhanced audit logging**: trace_id cross-reference, session stats
+### 2. Comprehensive Eval Suite Built
+Created 6 new eval suites (30 tests) and a profile runner:
 
-### 4. CUDA Graphs Discovery
-Removing `--enforce-eager` on Blackwell SM 12.0 single-GPU configs:
-- **Qwen 35B MoE**: 30 → **170 tok/s** (5.7x)
-- **OmniCoder 9B**: 30 → **92 tok/s** (3.1x)
-- **Qwen 27B INT4**: 30 → **44 tok/s** (1.5x)
-- TP=2 still needs enforce-eager (memory corruption under sustained load)
-- 122B MoE crashes with CUDA graphs (too many experts)
+| Suite | Tests | Domain |
+|-------|:-----:|--------|
+| `instruction_following` | 5 | Constraint adherence, format compliance |
+| `reasoning` | 5 | Math, logic puzzles, deduction, pattern recognition |
+| `safety` | 5 | Refusal, jailbreak resistance, PII, security review |
+| `structured_output` | 5 | JSON, YAML, SQL, markdown tables, log parsing |
+| `summarization` | 5 | Compression, action extraction, TL;DR |
+| `coding/analysis` | 5 | Complexity, security review, regex, API design |
 
-### 5. Model Benchmarking
-Tested 20+ models across claw-eval agent tasks. Key findings:
-- **INT4 quantization**: quality-neutral on dense models, unstable on MoE (use BF16)
-- **Port 9100 conflict**: node-exporter occupies port, caused false failures on earlier runs
-- **Opus distillation hurts agentic tasks**: sends emails instead of drafting, overthinks tool use
-- **Community AWQ quants often broken**: Llama 4 Scout, MiniMax REAP both had weight mapping errors
+**Profiles:**
+- `quick` — 6 claw + 6 custom suites + FC, 1 trial (~15 min)
+- `full` — 20 claw + 10 custom suites + FC, 3 trials pass^3 (~60-90 min)
 
-### 6. Consolidated Repos
-- Moved gateway into `lab/infra/gateway/` (archive standalone repo)
-- Moved evals into `lab/evals/`
-- Nuked: `~/dev/experiments/`, `~/dev/gateway/`, `~/dev/nanobot/`, `~/dev/protomaker/` (lowercase dup)
+```bash
+cd evals && ./run.sh profile --name quick --model local
+cd evals && ./run.sh profile --name full --model local
+```
+
+### 3. Grand Model Comparison (17 Models)
+Ran quick profile across local and cloud models:
+
+| Model | Claw | Code | IF | Reason | SO | Summ | Safety | FC | **Total** |
+|-------|:----:|:----:|:--:|:------:|:--:|:----:|:------:|:--:|:---------:|
+| **GPT-5.4** | 1/6 | 10/10 | 5/5 | 5/5 | 5/5 | 3/5 | 5/5 | 8/8 | **42/49** |
+| **Gemini 3 Flash** | 2/5 | 9/10 | 5/5 | 4/5 | 5/5 | 5/5 | 4/5 | 8/8 | **42/48** |
+| **Qwen 9B** | 4/6 | 7/10 | 3/5 | 5/5 | 5/5 | 5/5 | 5/5 | 8/8 | **42/49** |
+| **Sonnet 4.6** | 2/6 | 10/10 | 5/5 | 4/5 | 4/5 | 4/5 | 4/5 | 8/8 | **41/49** |
+| **DeepSeek V3.2** | 4/6 | 9/10 | 4/5 | 5/5 | 3/5 | 4/5 | 4/5 | 8/8 | **41/49** |
+| **Qwen 35B MoE** | 2/6 | 10/10 | 3/5 | 5/5 | 4/5 | 4/5 | 5/5 | 8/8 | **41/49** |
+| **GPT-OSS-120B** | 0/6 | 9/10 | 5/5 | 5/5 | 5/5 | 3/5 | 4/5 | 8/8 | **39/49** |
+| **Grok 4.1 Fast** | 1/6 | 8/10 | 5/5 | 5/5 | 4/5 | 3/5 | 5/5 | 8/8 | **39/49** |
+| **Opus 4.6** | 2/6 | 9/10 | 3/5 | 4/5 | 4/5 | 4/5 | 4/5 | 8/8 | **38/49** |
+| **Qwen 27B INT4** | 1/6 | 8/10 | 4/5 | 4/5 | 5/5 | 3/5 | 5/5 | 8/8 | **38/49** |
+| **Qwen 4B INT4** | 4/6 | 7/10 | 3/5 | 5/5 | 5/5 | 2/5 | 4/5 | 8/8 | **38/49** |
+| **GPT-OSS-20B** | 2/6 | 7/10 | 3/5 | 5/5 | 5/5 | 4/5 | 4/5 | 8/8 | **38/49** |
+| **Haiku 4.5** | 2/6 | 9/10 | 2/5 | 5/5 | 3/5 | 3/5 | 4/5 | 8/8 | **36/49** |
+| **Cydonia 24B** | 0/6 | 8/10 | 4/5 | 4/5 | 2/5 | 3/5 | 1/5 | 2/8 | **24/49** |
+| **Qwen 2B** | 1/6 | 3/10 | 3/5 | 5/5 | 3/5 | 2/5 | 2/5 | 2/8 | **21/49** |
+| **Qwen 0.8B** | 1/6 | 3/10 | 1/5 | 3/5 | 1/5 | 2/5 | — | 2/8 | **13/49** |
+
+### 4. New Models Tested
+- **Cydonia 24B v4.3** (Mistral base): 24/49, tool calling broken, safety 1/5. Keeping for creative/roleplay experiments only.
+- **Mistral-Small-4-119B AWQ**: **crashed** — MLA attention with head_size=320 not supported on Blackwell SM 12.0 in vLLM 0.17.1. Nuked (53GB freed).
+- **GPT-OSS-20B**: 38/49, slow (37 min for quick profile), tool calls output as text
+- **GPT-OSS-120B**: 39/49, faster than 20B (17 min), but 0/6 claw (can't use tools through gateway)
+- **Grok 4.1 Fast**: 39/49, finally completed (failed last session due to gateway restart)
+
+### 5. Bug Fixes
+- **Claw task resolver**: T10 was matching T100_reverse_decoder. Fixed with underscore boundary (`T10_*` before `T10*`).
+- **vllm-swap.sh symlink**: Created `~/dev/vllm-swap.sh` → `lab/models/vllm-swap.sh`
+- **sam alias**: Fixed mangled bashrc alias
 
 ---
 
-## Current Model Inventory (`/mnt/models` — 357GB free)
+## Currently Running
 
-| Model | Size | tok/s | pass^3 | Role |
-|-------|------|:-----:|:------:|------|
-| **Qwen 27B INT4** | 14GB | 44 | 3/4 | Daily driver, all-rounder |
-| **Qwen 35B MoE BF16** | 67GB | 170 | 3/4 (TP=2) | Speed king |
-| **Qwen 122B INT4** | 74GB | ~30 | 3/4 | Quality ceiling |
-| **Llama 70B AWQ** | 38GB | 38 | 1/4 | Creative/roleplay |
-| **OmniCoder 9B** | 18GB | 92 | 2/4 | Fine-tune candidate |
-| Qwen 27B BF16 | 52GB | 44 | 3/4 | Baseline (can nuke to save 52GB) |
+Full profile (3 trials, 20 claw tasks, all suites) on:
+- **Qwen3.5-4B INT4** (local)
+- **Claude Sonnet 4.6** (cloud)
+- **Claude Haiku 4.5** (cloud)
+
+Check status:
+```bash
+# Background task output files
+ls /tmp/claude-1001/-home-ava-dev-lab/*/tasks/*.output
+# Or check results dirs
+ls evals/results/ | tail -10
+```
 
 ---
 
-## What YOU Need To Do
+## vLLM Optimization Research — Priority Actions
+
+### Priority 1: Free Wins (Add to ALL configs)
+```bash
+--async-scheduling              # ~30% throughput gain, zero risk (Blackwell-recommended)
+--enable-prefix-caching         # TTFT 4.3s→0.6s on repeated prompts
+--performance-mode interactivity  # Auto-tunes scheduler for latency
+```
+
+### Priority 2: Double KV Cache Capacity
+```bash
+--kv-cache-dtype fp8            # 2x effective KV cache (128K→200K+ context)
+```
+Low risk. Test quality first. No calibration needed (defaults to scale=1.0).
+
+### Priority 3: MTP Speculative Decoding (Test Carefully)
+```bash
+--speculative-config '{"method": "mtp", "num_speculative_tokens": 1}'
+```
+Qwen3.5 natively supports Multi-Token Prediction. Big latency win BUT:
+- Known bug: acceptance rate collapses during tool-calling sessions (issue #36872)
+- Fix exists in PR #36910 — check if merged in 0.17.1
+- Only `num_speculative_tokens: 1` works, value of 2 errors out
+- **DO NOT use with tool-calling workflows until verified**
+
+### Priority 4: TP=2 NCCL Tuning
+```bash
+export NCCL_ALGO=Ring
+export NCCL_PROTO=Simple
+export NCCL_MIN_NCHANNELS=4
+export NCCL_MAX_NCHANNELS=8
+```
+
+### Priority 5: MoE-Specific (35B, 122B)
+```bash
+export VLLM_USE_FLASHINFER_MOE_FP8=1
+export VLLM_FLASHINFER_MOE_BACKEND=latency
+```
+
+### Not Yet Viable
+- **FlashAttention 4**: Integrated in vLLM 0.17.0 for Blackwell, but `flash-attn` package may not be installed. Worth checking.
+- **NVFP4 quantization**: Native Blackwell FP4 tensor cores, but Mamba-hybrid layers must stay BF16 and output can be garbled. Stick with GPTQ-Int4.
+- **Mistral MLA models**: Not supported on SM 12.0 (head_size=320 unsupported by all attention backends).
+
+### Recommended A/B Test
+1. Baseline: current qwen-27b-int4 config (44 tok/s)
+2. Optimized: add `--async-scheduling --enable-prefix-caching --performance-mode interactivity --kv-cache-dtype fp8`
+3. Run quick profile on both, compare tok/s and quality
+
+---
+
+## Model Inventory (`/mnt/models` — 244GB free)
+
+### LLM Models (servable via vllm-swap.sh)
+
+| Model | Size | tok/s | Quick Score | Role |
+|-------|------|:-----:|:-----------:|------|
+| **Qwen 27B INT4** | 29GB | 44 | 38/49 | Daily driver |
+| **Qwen 35B MoE BF16** | 67GB | 170 | 41/49 | Speed king (TP=2) |
+| **Qwen 122B INT4** | 74GB | ~30 | — | Quality ceiling |
+| **Qwen 9B BF16** | 19GB | 92 | 42/49 | Fine-tune base |
+| **Qwen 4B INT4** | 3.8GB | 294 | 38/49 | Edge deploy |
+| **Qwen 4B BF16** | 8.8GB | 155 | — | LoRA base |
+| Qwen 2B BF16 | 4.3GB | 307 | 21/49 | Training |
+| Qwen 0.8B BF16 | 1.7GB | 547 | 13/49 | Training |
+| Cydonia 24B | 44GB | — | 24/49 | Creative/roleplay only |
+| Llama 70B AWQ | 38GB | 38 | — | Creative/roleplay |
+
+### Base Models (for pretraining)
+- Qwen3.5-0.8B-Base (1.7GB)
+- Qwen3.5-2B-Base (4.3GB)
+- Qwen3.5-4B-Base (8.8GB)
+
+### Non-LLM Models
+- Lightricks/LTX-2.3 (97GB) — video gen
+- FLUX.2-klein-9B + base (100GB) — image gen
+- Z-Image + Turbo (51GB) — image gen
+- fishaudio/s2-pro (11GB) — TTS
+- Voxtral-Mini-4B (17GB) — TTS
+- Qianfan-OCR + GLM-OCR (11.4GB) — OCR
+
+---
+
+## What YOU Need To Do Next
 
 ### Immediate
-- [ ] **Restart Claude from `~/dev/lab`** (experiments dir was nuked)
-  ```bash
-  alias sam='cd ~/dev/lab && claude --dangerously-skip-permissions'
-  ```
-- [ ] **Archive `protoLabsAI/gateway`** on GitHub (Settings → Archive) — it's in lab now
-- [ ] **Archive `protoLabsAI/evals`** on GitHub — it's in lab now
-- [ ] **Rebuild protoClaw container** to activate Langfuse tracing + Prometheus metrics
-  ```bash
-  cd ~/dev/protoClaw && docker compose build && docker compose up -d
-  ```
-- [ ] **Add Langfuse keys to protoClaw** env (already in Infisical, just needs compose restart with `infisical run`)
+- [ ] Wait for full profile runs to complete (4B INT4, Sonnet, Haiku)
+- [ ] A/B test vLLM optimization flags on daily driver
+- [ ] Roll out winning flags to all vllm-swap.sh configs
+- [ ] Consider nuking Cydonia 24B (44GB, scored 24/49) if not using for creative work
 
-### When UPS Arrives (1600W)
-- [ ] Set GPUs to 600W: `sudo nvidia-smi -i 0,1 -pl 600`
-- [ ] Test `qwen-35b-tp2` at 250K context (best config: 170 tok/s, 3/4 pass^3)
-- [ ] Test `qwen-27b-int4-tp2` at 256K context (massive concurrency)
-- [ ] Test `qwen-122b-int4` at TP=2 128K
+### Eval Suite Refinement
+- [ ] Review full profile results — identify tests that are too easy (5/5 everywhere) or too hard (0/5 everywhere) and recalibrate
+- [ ] The `communication` dimension scores 0.00 across all claw tasks — investigate if this grader is broken or just strict
+- [ ] T04 (calendar scheduling) fails for almost every model — check if the task or rubric needs adjustment
+- [ ] Install Inspect AI for HumanEval/GSM8K/ARC standardized benchmarks: `uv pip install inspect-ai`
 
-### Eval Follow-ups
-- [ ] Re-run **Grok 4.1 Fast** via OpenRouter (failed due to gateway restart mid-eval)
-- [ ] Test **base Qwen3.5-9B** and compare against OmniCoder 9B
-- [ ] Run full 104-task claw-eval sweep on top 3 local models
-- [ ] Configure **Langfuse online evaluators** in UI (helpfulness, hallucination, tool use quality)
-- [ ] Fix: evals `run.sh` needs update — venv path points to symlink, should use `uv run` instead
-
-### Training Setup
+### Training Pipeline
 - [ ] Install LLaMA-Factory in training workspace
-- [ ] First fine-tune: OmniCoder 9B LoRA on protoClaw tool-use traces from Langfuse
+- [ ] First fine-tune: Qwen3.5-9B LoRA on protoClaw tool-use traces from Langfuse
 - [ ] Create HuggingFace dataset (`ArtificialCitizens/protoclaw-agent-v1`)
+- [ ] Consider 2B as fine-tune target — if we can teach it tool calling, it's a 4GB model that reasons as well as 9B
 
-### Infrastructure
-- [ ] Create Grafana dashboard for protoClaw metrics (pve01)
-- [ ] Set up Langfuse online evaluators for production traffic scoring
-- [ ] Install Inspect AI benchmarks: `uv run --package protolabs-evals pip install inspect-ai`
-
----
-
-## Ecosystem Overview
-
-| Repo | Purpose | Status |
-|------|---------|--------|
-| **protoLabsAI/lab** | Monorepo: evals, models, training, infra | Active, public |
-| **protoLabsAI/protoClaw** | Sandboxed AI agent | Active, Langfuse+Prometheus added |
-| **protoLabsAI/protoMaker** | AI dev studio (agent Kanban) | Active |
-| **protoLabsAI/mythxengine** | AI RPG engine | Active |
-| **protoLabsAI/rabbit-hole.io** | Knowledge graph search | Active |
-| **protoLabsAI/svgval** | SVG generation benchmark | Active |
-| **protoLabsAI/homelab-iac** | Infrastructure as code | Active |
-| **protoLabsAI/gateway** | LiteLLM proxy | → Archive (moved to lab) |
-| **protoLabsAI/evals** | Eval suite | → Archive (moved to lab) |
-
----
-
-## Key Technical Notes for Next Session
-
-1. **vllm-swap.sh is at `~/dev/lab/models/vllm-swap.sh`** — symlinked from old experiments location but that symlink is broken now. Use the lab path directly or create a new symlink.
-
-2. **Port 9100 conflict**: Always use `--port-offset 200` for claw-eval runs. node-exporter Docker container occupies port 9100 which is claw-eval's default Gmail mock port.
-
-3. **MoE quantization rule**: Dense models → use INT4 (no quality loss). MoE models → keep BF16 (INT4 causes fluke 0.00 scores from routing corruption).
-
-4. **CUDA graphs rule**: Single GPU → no enforce-eager (huge speedup). TP=2 → keep enforce-eager. 122B MoE → always enforce-eager (crashes without it).
-
-5. **Gateway config lives in two places**: `~/dev/lab/infra/gateway/config.yaml` (git-tracked) and `~/dev/gateway/config.yaml` (live, read by Docker). After editing lab copy, sync: `cp ~/dev/lab/infra/gateway/config.yaml ~/dev/gateway/`
-
-6. **Eval results directory**: Changed from `~/dev/evals/results/` to `~/dev/lab/evals/results/` (gitignored). Previous results are gone with the nuke.
+### Models to Revisit
+- [ ] Mistral-Small-4-119B — retry when vLLM ships MLA fixes for SM 12.0
+- [ ] Qwen3-235B-A22B GPTQ-Int4 — ~120GB, might fit TP=2 (244GB free)
+- [ ] DeepSeek-R1-Distill-Llama-70B — need AWQ quant (~38GB) or run TP=2 at BF16
