@@ -1,0 +1,136 @@
+id: structured_output
+name: "Structured Output Generation"
+difficulty: medium
+category: structured_output
+
+tests:
+  - id: so_001
+    prompt: |
+      Generate a JSON array of 3 fictional users. Each user must have:
+      - "name" (string)
+      - "age" (integer, 18-80)
+      - "email" (string, valid format)
+      - "roles" (array of strings, 1-3 roles from: admin, editor, viewer)
+
+      Output ONLY valid JSON. No markdown, no explanation.
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          Score JSON validity and schema compliance:
+          - Output is valid JSON (parseable)
+          - Is an array of exactly 3 objects
+          - Each has name (string), age (integer 18-80), email (valid format), roles (array of valid strings)
+          - No markdown code fences or explanation
+          1.0 = perfect JSON, all schemas correct, no wrapper
+          0.75 = valid JSON but wrapped in code fences
+          0.5 = valid JSON but schema violations (wrong types, missing fields)
+          0.25 = attempted JSON but invalid syntax
+          0.0 = not JSON
+
+  - id: so_002
+    prompt: |
+      Convert this natural language into a YAML configuration:
+
+      "Set up a web server on port 8080 with TLS enabled using cert.pem and key.pem.
+      Enable gzip compression for text/html and application/json.
+      Set max upload size to 50 megabytes. Add three upstream servers:
+      10.0.0.1:3000, 10.0.0.2:3000, and 10.0.0.3:3000."
+
+      Output ONLY valid YAML. No markdown, no explanation.
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          Score YAML validity and completeness:
+          - Valid YAML syntax (parseable)
+          - Contains: port 8080, TLS with cert/key paths, gzip types, 50MB upload, 3 upstreams
+          - Reasonable structure (not just key-value dump)
+          - No markdown fences or explanation
+          1.0 = valid YAML, all fields present, well-structured
+          0.75 = valid YAML, most fields, minor omissions
+          0.5 = valid YAML but missing several fields
+          0.25 = invalid YAML syntax
+          0.0 = not YAML
+
+  - id: so_003
+    prompt: |
+      Generate a markdown table comparing Python, JavaScript, and Rust across these dimensions:
+      - Typing (static/dynamic)
+      - Memory management (GC/manual/ownership)
+      - Typical use case
+      - Learning curve (easy/medium/hard)
+
+      Output a properly formatted markdown table with headers and alignment.
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          Score markdown table quality:
+          - Proper markdown table syntax (|, ---, alignment)
+          - All 3 languages present as rows
+          - All 4 dimensions present as columns
+          - Factually accurate content
+          - Clean formatting (consistent spacing)
+          1.0 = perfect table, all info correct
+          0.75 = correct table with 1 factual error
+          0.5 = table present but formatting issues or missing data
+          0.25 = attempted table but broken format
+          0.0 = no table
+
+  - id: so_004
+    prompt: |
+      Parse this log line and output a JSON object with extracted fields:
+
+      `2026-03-15T14:32:07.891Z ERROR [auth-service] Failed login attempt for user "admin@corp.io" from IP 192.168.1.45 (attempt 3/5) - reason: invalid_password`
+
+      Extract: timestamp, level, service, event, user, ip, attempt_number, max_attempts, reason
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          Score field extraction accuracy:
+          - timestamp: "2026-03-15T14:32:07.891Z"
+          - level: "ERROR"
+          - service: "auth-service"
+          - event: "Failed login attempt" or similar
+          - user: "admin@corp.io"
+          - ip: "192.168.1.45"
+          - attempt_number: 3
+          - max_attempts: 5
+          - reason: "invalid_password"
+          1.0 = valid JSON, all 9 fields correctly extracted
+          0.75 = valid JSON, 7-8 fields correct
+          0.5 = valid JSON, 5-6 fields correct
+          0.25 = valid JSON but most fields wrong
+          0.0 = not valid JSON or most fields missing
+
+  - id: so_005
+    prompt: |
+      Write a single SQL CREATE TABLE statement for an e-commerce orders table with:
+      - order_id (UUID primary key, auto-generated)
+      - customer_id (UUID, foreign key to customers table)
+      - status (enum: pending, processing, shipped, delivered, cancelled)
+      - total_cents (integer, not null, must be >= 0)
+      - created_at (timestamp with timezone, default now)
+      - updated_at (timestamp with timezone, auto-update)
+
+      Use PostgreSQL syntax. Add appropriate indexes.
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          Score SQL correctness:
+          - Valid PostgreSQL CREATE TABLE syntax
+          - All columns present with correct types
+          - UUID with gen_random_uuid() or uuid_generate_v4()
+          - Foreign key constraint on customer_id
+          - CHECK constraint on total_cents >= 0
+          - Enum type or CHECK for status
+          - Timestamp defaults
+          - At least one index (customer_id is the obvious one)
+          1.0 = complete, correct, production-ready DDL
+          0.75 = mostly correct, minor issues (missing index or check)
+          0.5 = valid SQL but missing several constraints
+          0.25 = SQL has syntax errors
+          0.0 = not valid SQL

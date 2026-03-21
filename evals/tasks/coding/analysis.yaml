@@ -1,0 +1,157 @@
+id: code_analysis
+name: "Code Analysis & Review"
+difficulty: medium
+category: coding
+
+tests:
+  - id: ca_001
+    prompt: |
+      What is the time complexity of this function? Explain why.
+
+      ```python
+      def mystery(arr):
+          n = len(arr)
+          result = 0
+          for i in range(n):
+              for j in range(i, n):
+                  for k in range(j, n):
+                      result += arr[i] * arr[j] * arr[k]
+          return result
+      ```
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          Answer: O(n³) — three nested loops, each iterating up to n times.
+          More precisely: n * (n-i) * (n-j) iterations = n choose 3 with replacement ≈ O(n³/6) = O(n³).
+          1.0 = correctly identifies O(n³) with clear explanation of the nested loop structure
+          0.75 = correct answer but weak explanation
+          0.5 = says O(n³) but wrong reasoning, or says O(n²) with plausible reasoning
+          0.0 = wrong answer and wrong reasoning
+
+  - id: ca_002
+    prompt: |
+      Review this code for bugs, security issues, and improvements. Be specific.
+
+      ```javascript
+      const express = require('express');
+      const app = express();
+
+      app.get('/user/:id', async (req, res) => {
+        const user = await db.query(`SELECT * FROM users WHERE id = ${req.params.id}`);
+        res.json(user);
+      });
+
+      app.post('/upload', (req, res) => {
+        const filename = req.body.filename;
+        const path = `/uploads/${filename}`;
+        fs.writeFileSync(path, req.body.data);
+        res.json({ path });
+      });
+
+      app.get('/file', (req, res) => {
+        const filepath = req.query.path;
+        res.sendFile(filepath);
+      });
+
+      app.listen(3000);
+      ```
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          Critical issues that MUST be identified:
+          1. SQL injection in /user/:id (string interpolation in query)
+          2. Path traversal in /upload (filename could be ../../etc/passwd)
+          3. Path traversal in /file (arbitrary file read via query param)
+          4. No input validation anywhere
+          5. No error handling (async without try/catch)
+          Additional good catches: no body parser middleware, sync file write blocks event loop,
+          no auth, SELECT * is wasteful.
+          1.0 = identifies all 3 critical vulns (SQLi, both path traversals) + suggests fixes
+          0.75 = identifies 2 of 3 critical vulns
+          0.5 = identifies 1 critical vuln + some minor issues
+          0.25 = only identifies minor style issues, misses security
+          0.0 = says code looks fine or only cosmetic feedback
+
+  - id: ca_003
+    prompt: |
+      Explain what this regex does. Then suggest a simpler or more readable alternative.
+
+      ```
+      ^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$
+      ```
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          Correct explanation: Password validation regex requiring:
+          - At least one uppercase letter
+          - At least one lowercase letter
+          - At least one digit
+          - At least one special character from @$!%*?&
+          - Minimum 8 characters total
+          - Only allows the specified character classes
+          Alternative could be: separate validation checks in code (more readable),
+          or use a password strength library.
+          1.0 = correctly explains all 5 constraints + offers readable alternative
+          0.75 = explains most constraints correctly, decent alternative
+          0.5 = partially correct explanation
+          0.25 = mostly wrong explanation
+          0.0 = cannot explain the regex
+
+  - id: ca_004
+    prompt: |
+      Design a REST API for a simple task management system. Define the endpoints,
+      HTTP methods, request/response bodies, and status codes. Support:
+      - Creating tasks with title, description, and due date
+      - Listing tasks with filtering by status (todo/in_progress/done)
+      - Updating task status
+      - Deleting tasks
+      - Assigning tasks to users
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          Score API design quality:
+          - RESTful conventions (proper verbs: POST create, GET list, PATCH/PUT update, DELETE)
+          - All 5 operations covered
+          - Proper status codes (201 created, 200 ok, 204 no content, 404 not found)
+          - Request/response bodies defined
+          - Filter via query params (GET /tasks?status=done)
+          - Resource naming (/tasks, /tasks/:id, not /createTask)
+          1.0 = complete, RESTful, proper status codes, all operations, well-documented
+          0.75 = all operations but minor REST violations
+          0.5 = missing operations or RPC-style endpoints
+          0.25 = incomplete or badly structured
+          0.0 = not a REST API design
+
+  - id: ca_005
+    prompt: |
+      What does this function do? Explain in plain English, then suggest a better name.
+
+      ```python
+      def f(s):
+          stack = []
+          m = {')': '(', ']': '[', '}': '{'}
+          for c in s:
+              if c in m.values():
+                  stack.append(c)
+              elif c in m:
+                  if not stack or stack[-1] != m[c]:
+                      return False
+                  stack.pop()
+          return len(stack) == 0
+      ```
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          Correct answer: checks if brackets/parentheses in a string are balanced and properly nested.
+          Uses a stack — pushes opening brackets, pops when matching closing bracket found.
+          Returns False if mismatch or unbalanced.
+          Good names: is_balanced_brackets, has_valid_brackets, check_bracket_balance, are_brackets_matched
+          1.0 = correct explanation (balanced bracket checker) + descriptive name
+          0.75 = correct explanation but vague name
+          0.5 = partially correct explanation
+          0.0 = wrong explanation

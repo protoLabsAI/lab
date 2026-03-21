@@ -4,6 +4,8 @@
 # Usage:
 #   ./run.sh claw --model local --tasks T01,T02
 #   ./run.sh custom --suite tool_use --model local --submit-langfuse
+#   ./run.sh profile --name quick --model local
+#   ./run.sh profile --name full --model local
 #   ./run.sh compare results/model_a results/model_b
 #   ./run.sh --setup       # configure machine identity (first time)
 #   ./run.sh --local ...   # use local .env instead of Infisical

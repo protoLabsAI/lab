@@ -1,0 +1,44 @@
+# Full Model Evaluation Profile
+# ~60-90 min, 3 trials — comprehensive evaluation for model selection
+# Usage: ./run.sh profile --name full --model local
+
+name: "Full Evaluation"
+description: "Comprehensive cross-domain evaluation. 3 trials, pass^3 scoring, all suites."
+trials: 3
+
+# Claw-eval agent tasks — 20 English tasks across all categories
+claw:
+  tasks: "T02,T04,T06,T08,T10_contact_lookup,T12,T14,T16,T18,T20,T22,T24,T26,T28,T30,T32,T34,T36,T38,T40"
+  port_offset: 200
+  # T02: email triage          T22: newsletter curation
+  # T04: calendar scheduling    T24: crm data export
+  # T06: email reply draft      T26: ambiguous contact email
+  # T08: todo management        T28: api config audit
+  # T10: contact lookup         T30: cross-service meeting
+  # T12: expense report         T32: escalation budget triage
+  # T14: meeting notes          T34: ops review dashboard
+  # T16: kb search              T36: vendor procurement
+  # T18: ticket triage          T38: incident postmortem
+  # T20: inventory check        T40: onboarding coordinator
+
+# All custom suites — full runs
+custom:
+  - suite: coding
+  - suite: instruction_following
+  - suite: reasoning
+  - suite: structured_output
+  - suite: summarization
+  - suite: safety
+  - suite: creative_writing
+  - suite: roleplay
+  - suite: svg_generation
+  - suite: research
+
+# Function calling — all suites
+function_call:
+  suites: ["basic", "edge_cases"]
+
+# Inspect AI (when installed)
+# inspect:
+#   benchmarks: ["humaneval", "gsm8k", "arc"]
+#   limit: 50

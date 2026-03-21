@@ -1,0 +1,97 @@
+id: instruction_following
+name: "Instruction Following & Constraints"
+difficulty: medium
+category: instruction_following
+
+tests:
+  - id: if_001
+    prompt: "List exactly 5 benefits of remote work. Number them 1-5. Each benefit must be a single sentence of no more than 15 words."
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          Score strict constraint adherence:
+          - Exactly 5 items (not 4, not 6)
+          - Numbered 1-5
+          - Each is a single sentence
+          - Each is ≤15 words
+          1.0 = all constraints met perfectly
+          0.75 = 5 items, numbered, but 1-2 exceed word limit
+          0.5 = right count but formatting wrong
+          0.25 = partially follows instructions
+          0.0 = ignores constraints entirely
+
+  - id: if_002
+    prompt: "Explain what a database index is. Your response must: (1) be exactly 3 paragraphs, (2) never use the word 'fast' or 'speed', (3) include an analogy to a physical object, (4) end with a question."
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          Check each constraint independently:
+          - Exactly 3 paragraphs (not 2, not 4)
+          - Never uses 'fast' or 'speed' (case-insensitive)
+          - Contains a clear analogy to a physical object
+          - Final sentence is a question (ends with ?)
+          1.0 = all 4 constraints met
+          0.75 = 3 of 4 met
+          0.5 = 2 of 4 met
+          0.25 = 1 of 4 met
+          0.0 = 0 met or off-topic
+
+  - id: if_003
+    prompt: "Write a haiku (5-7-5 syllable structure) about machine learning. Then write a limerick about the same topic. Label each poem clearly."
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          Score format adherence:
+          - Haiku present with ~5-7-5 syllable structure (±1 syllable tolerance)
+          - Limerick present with AABBA rhyme scheme and correct meter
+          - Both are about machine learning
+          - Both clearly labeled
+          1.0 = both poems correct form and on-topic
+          0.75 = both present, one has form issues
+          0.5 = both present but significant form issues
+          0.25 = only one poem or wrong forms
+          0.0 = neither poem is correct
+
+  - id: if_004
+    prompt: "Respond to this message in valid JSON only. No markdown, no explanation, no code blocks. The JSON should have keys: 'animal', 'color', 'count' — pick any values you like but 'count' must be an integer."
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          Score JSON compliance:
+          - Output is raw valid JSON (parseable)
+          - No markdown code fences (``` or ```)
+          - No explanation text before or after
+          - Has exactly keys: animal, color, count
+          - 'count' value is an integer, not a string
+          1.0 = perfect valid JSON with correct schema
+          0.75 = valid JSON but wrapped in code fences
+          0.5 = valid JSON but wrong keys or types
+          0.25 = attempted JSON but invalid
+          0.0 = not JSON at all
+
+  - id: if_005
+    prompt: |
+      Answer the following question, but you must follow these rules:
+      - Every sentence must start with a different letter of the alphabet
+      - Use at least 6 sentences
+      - Do not use any sentence longer than 20 words
+
+      Question: Why is version control important in software development?
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          Score constraint adherence:
+          - At least 6 sentences present
+          - Each sentence starts with a different letter (no repeated starting letters)
+          - No sentence exceeds 20 words
+          - Actually answers the question about version control
+          1.0 = all constraints met, good answer
+          0.75 = minor violations (1 repeated letter or 1 long sentence)
+          0.5 = answers well but ignores half the constraints
+          0.25 = attempts constraints but mostly fails
+          0.0 = ignores constraints entirely

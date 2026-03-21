@@ -26,77 +26,86 @@ The user wants to evaluate: $ARGUMENTS
 ## Step 2: Download & Configure
 
 1. Download with: `source ~/dev/vllm-env/bin/activate && HF_HOME=/mnt/models/huggingface huggingface-cli download <model-id>`
-2. Add a swap config to `~/dev/experiments/vllm-swap.sh`:
+2. Add a swap config to `~/dev/lab/models/vllm-swap.sh`:
    - Use `--served-model-name local` (required for gateway routing)
    - Pick the right tool-call parser:
      - Qwen3/3.5 models: `--reasoning-parser qwen3 --enable-auto-tool-choice --tool-call-parser qwen3_xml`
      - Llama 3.x: `--enable-auto-tool-choice --tool-call-parser llama3_json`
      - Llama 4: `--enable-auto-tool-choice --tool-call-parser llama4_json`
      - Hermes-format: `--enable-auto-tool-choice --tool-call-parser hermes`
+   - Qwen3.5 VLM models need `--language-model-only` for text-only serving
    - Single GPU: `CUDA_VISIBLE_DEVICES=0`, no `--enforce-eager` (CUDA graphs work on Blackwell SM 12.0)
    - TP=2: `--tensor-parallel-size 2 --disable-custom-all-reduce --enforce-eager`
    - Don't use `--attention-backend flashinfer` (crashes on SM 12.0)
 
 ## Step 3: Swap & Verify
 
-1. Run `./vllm-swap.sh <config-name>` and verify it starts
+1. Run `bash ~/dev/lab/models/vllm-swap.sh <config-name>` and verify it starts
 2. Check VRAM: `nvidia-smi --query-gpu=index,memory.used,memory.total --format=csv,noheader`
-3. Quick smoke test: `curl -s http://localhost:8000/v1/chat/completions -H "Content-Type: application/json" -d '{"model":"local","messages":[{"role":"user","content":"hello"}],"max_tokens":50}'`
+3. Quick smoke test: `curl -s http://localhost:8000/v1/chat/completions -H "Content-Type: application/json" -d '{"model":"local","messages":[{"role":"user","content":"hello"}],"max_tokens":200}'`
 4. Verify tool calling works with a tool-bearing request
 
-## Step 4: Claw-Eval Benchmark (Agent Tasks)
+## Step 4: Quick Profile (Smoke Test)
 
-Run the standard 4-task benchmark with port offset (port 9100 conflicts with node-exporter):
-
-```bash
-cd ~/dev/evals && ./run.sh claw --model local --tasks T02,T04,T06,T08 --port-offset 200
-```
-
-Record: task_score per trial, pass^3, wall time per trial.
-
-**Baseline comparison (corrected, with CUDA graphs):**
-
-| Model | T02 | T04 | T06 | T08 | Avg | pass^3 | tok/s |
-|-------|-----|-----|-----|-----|-----|--------|-------|
-| Qwen 35B MoE BF16 TP=2 | 0.87 | 0.53 | 0.85 | 0.86 | 0.78 | 3/4 | 170 |
-| Qwen 27B INT4 | 0.87 | 0.53 | 0.86 | 0.86 | 0.78 | 3/4 | 44 |
-| Qwen 122B INT4 1GPU | 0.87 | 0.52 | 0.85 | 0.88 | 0.78 | 3/4 | ~30 |
-| OmniCoder 9B | 0.79 | 0.54 | 0.86 | 0.85 | 0.76 | 2/4 | 92 |
-| Llama 70B AWQ | 0.71 | 0.52 | 0.58 | 0.79 | 0.65 | 1/4 | 38 |
-
-## Step 5: Custom Suite Benchmarks
-
-Run creative writing, roleplay, research, function calling:
+Run the quick evaluation profile — covers all domains in ~15 min with 1 trial:
 
 ```bash
-cd ~/dev/evals
-./run.sh custom --suite creative_writing --model local --trials 1
-./run.sh custom --suite roleplay --model local --trials 1
-./run.sh custom --suite research --model local --trials 1
-./run.sh custom --suite coding --model local --trials 1
-./run.sh custom --suite svg_generation --model local --trials 1
-./run.sh function-call --model local --all-suites
+cd ~/dev/lab/evals && ./run.sh profile --name quick --model local
 ```
+
+This runs:
+- **Claw-eval**: 6 agent tasks (T02,T04,T06,T08,T10,T14)
+- **Custom suites**: coding (10 tests), instruction_following (5), reasoning (5), structured_output (5), summarization (5), safety (5)
+- **Function calling**: basic + edge cases (8 tests)
+
+## Step 5: Full Profile (Comprehensive)
+
+If the quick profile looks promising, run the full evaluation:
+
+```bash
+cd ~/dev/lab/evals && ./run.sh profile --name full --model local
+```
+
+This runs:
+- **Claw-eval**: 20 agent tasks (3 trials each, pass^3 scoring)
+- **All 10 custom suites**: coding, instruction_following, reasoning, structured_output, summarization, safety, creative_writing, roleplay, svg_generation, research
+- **Function calling**: all suites
 
 ## Step 6: Speed Benchmark
 
 ```bash
-API_KEY="${GATEWAY_API_KEY}"
-PROMPT='{"model":"local","messages":[{"role":"user","content":"Write a 500-word essay about computing history."}],"max_tokens":800}'
-# Warmup, then 3 timed runs
+# Timed generation (disable thinking for pure speed test)
+START=$(date +%s%N)
+curl -s http://localhost:8000/v1/chat/completions -H "Content-Type: application/json" \
+  -d '{"model":"local","messages":[{"role":"user","content":"Write a 500-word essay about computing history. Do not think, just write."}],"max_tokens":800,"chat_template_kwargs":{"enable_thinking":false}}'
+END=$(date +%s%N)
+# Calculate tok/s from completion_tokens / elapsed
 ```
 
 ## Step 7: Report & Decision
 
 Compile results into a comparison table. Decide:
-- **Keep**: Add to vllm-swap.sh permanently, update CLAUDE.md
+- **Keep**: Add to vllm-swap.sh permanently, update CLAUDE.md model inventory
 - **Nuke**: `rm -rf /mnt/models/huggingface/hub/models--<org>--<model>/`
+
+## Baseline Comparison (Qwen3.5 Family)
+
+| Model | Size | tok/s | Claw pass^3 | Coding | Role |
+|-------|------|:-----:|:-----------:|:------:|------|
+| **4B INT4** | 3GB | 294 | 2-3/4 | 2/5 | Edge deploy speed demon |
+| **4B BF16** | 8GB | 155 | 3/4 | 2/5 | Edge deploy, LoRA base |
+| **9B BF16** | 19GB | 92 | 2/4 | 3/5 | Fine-tune base (best coding) |
+| **27B INT4** | 14GB | 44 | 3/4 | — | Daily driver, all-rounder |
+| **35B MoE BF16** | 67GB | 170 | 3/4 | — | Speed king (TP=2) |
+| **122B INT4** | 74GB | ~30 | 3/4 | — | Quality ceiling |
+| 2B BF16 | 4GB | 307 | 0/4 | 1/5 | Training experiments only |
+| 0.8B BF16 | 1.5GB | 547 | 0/4 | 0/5 | Training experiments only |
 
 ## Key Findings from Our Testing
 
 ### What works on Blackwell (SM 12.0):
 - CUDA graphs on single GPU: ~37-470% speedup depending on model (MoE benefits most)
-- GPTQ-Int4 quantization: no quality loss on dense models (Qwen 27B)
+- GPTQ/AWQ-Int4 quantization: no quality loss on dense models (tested 27B + 4B)
 - INT4 MoE: causes instability (fluke 0.00 scores) — use BF16 for MoE models
 - `--disable-custom-all-reduce` always needed for TP=2 (PCIe, not NVLink)
 
@@ -110,13 +119,13 @@ Compile results into a comparison table. Decide:
 
 ### Port 9100 conflict:
 Claw-eval Gmail mock defaults to port 9100 which conflicts with node-exporter.
-**Always use `--port-offset 200`** for claw-eval runs.
+**Always use `--port-offset 200`** for claw-eval runs (profiles handle this automatically).
 
 ### MoE vs Dense quantization:
-- Dense models (27B): INT4 is quality-neutral, faster, smaller — always use INT4
+- Dense models (27B, 9B, 4B): INT4 is quality-neutral, faster, smaller — always use INT4
 - MoE models (35B, 122B): INT4 causes routing instability — use BF16 or FP8
 
-### Power management:
-- Inference draws 300-340W per GPU regardless of power limit (up to 500W)
-- Safe to run TP=2 at 300W per card on current 1000W UPS
-- 1600W UPS coming — can set both to 600W and forget
+### Capability cliff:
+- 4B+ models handle agentic tasks reliably (pass^3 2-3/4)
+- 2B and below cannot reliably execute tool calls (pass^3 0/4)
+- The 4B→2B drop is a cliff, not a slope

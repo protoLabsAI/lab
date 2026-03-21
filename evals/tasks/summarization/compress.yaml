@@ -1,0 +1,151 @@
+id: summarization
+name: "Summarization & Compression"
+difficulty: medium
+category: summarization
+
+tests:
+  - id: sum_001
+    prompt: |
+      Summarize the following in exactly 2 sentences:
+
+      The transformer architecture, introduced in the 2017 paper "Attention Is All You Need,"
+      revolutionized natural language processing by replacing recurrence with self-attention
+      mechanisms. This allowed for much greater parallelization during training, leading to
+      dramatic speedups. The architecture consists of an encoder-decoder structure, though
+      many modern models use only the decoder (like GPT) or only the encoder (like BERT).
+      Key innovations include multi-head attention, positional encodings, and layer normalization.
+      The model scales well with data and compute, following predictable scaling laws discovered
+      by Kaplan et al. This scalability led to the large language model revolution, with models
+      growing from millions to trillions of parameters. Despite their success, transformers
+      suffer from quadratic attention complexity with sequence length, motivating research into
+      linear attention, sparse attention, and hybrid architectures like Mamba that use state-space
+      models for O(n) sequence processing.
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          Score on:
+          - Exactly 2 sentences (not 1, not 3+)
+          - Captures core idea (self-attention replaced recurrence, enabled scaling)
+          - Mentions a key limitation or evolution (quadratic complexity, alternatives)
+          - Accurate (no hallucinated facts)
+          1.0 = exactly 2 sentences, captures essence + limitation, accurate
+          0.75 = 2 sentences, captures essence but misses nuance
+          0.5 = wrong sentence count but good content
+          0.25 = poor summary
+          0.0 = off-topic or factually wrong
+
+  - id: sum_002
+    prompt: |
+      Extract the 3 most important action items from these meeting notes:
+
+      "Team sync 2026-03-10. Present: Alice, Bob, Carol, Dave.
+      Alice reported the Q1 metrics dashboard is 80% done, needs design review from Carol by Friday.
+      Bob flagged that the staging deploy pipeline has been flaky — failed 3 times this week.
+      He'll create a ticket and try to fix it by next Tuesday. Carol mentioned the new client
+      onboarding flow got positive feedback in user testing but needs accessibility fixes before
+      launch. Dave will handle the a11y audit by end of month. The team agreed to skip the
+      Thursday standup since half the team is at the offsite. Bob also mentioned we need to
+      renew the Datadog license before April 1 — nobody owns this yet. Alice volunteered to
+      handle it. General discussion about moving to bi-weekly sprints, no decision made."
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          Key action items (most important, with owners and deadlines):
+          1. Carol: design review of Q1 dashboard by Friday (March 13)
+          2. Bob: fix staging deploy pipeline by Tuesday (March 17) — blocking deploys
+          3. Dave: accessibility audit of onboarding flow by end of March
+          Also notable: Alice to renew Datadog license before April 1.
+          1.0 = identifies 3 most critical action items with owners and deadlines
+          0.75 = 3 items but missing owners or deadlines
+          0.5 = only 2 action items or includes non-action items
+          0.25 = vague summary instead of action items
+          0.0 = off-topic or misses all action items
+
+  - id: sum_003
+    prompt: |
+      TL;DR this error log in one line (under 100 characters):
+
+      ```
+      2026-03-15 14:32:07 ERROR  [PaymentService] Transaction 7f3a2b failed
+      2026-03-15 14:32:07 ERROR  [PaymentService] Stripe API returned 429: rate limit exceeded
+      2026-03-15 14:32:07 WARN   [PaymentService] Retry attempt 1/3 for txn 7f3a2b
+      2026-03-15 14:32:08 WARN   [PaymentService] Retry attempt 2/3 for txn 7f3a2b
+      2026-03-15 14:32:10 ERROR  [PaymentService] Retry attempt 3/3 failed for txn 7f3a2b
+      2026-03-15 14:32:10 ERROR  [PaymentService] Transaction 7f3a2b permanently failed: RATE_LIMITED
+      2026-03-15 14:32:10 ERROR  [AlertManager] Paging oncall: payment failures > threshold
+      ```
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          Score the TL;DR:
+          - Under 100 characters
+          - Captures root cause (Stripe rate limit)
+          - Mentions impact (payment failed, oncall paged)
+          - Is actually one line
+          Example good answers:
+          - "Payment txn failed after 3 retries due to Stripe rate limit; oncall paged"
+          - "Stripe 429 rate limit → payment 7f3a2b failed after 3 retries, oncall alerted"
+          1.0 = one line, <100 chars, captures cause + impact
+          0.75 = good summary but slightly over 100 chars
+          0.5 = captures cause but misses impact (or vice versa)
+          0.25 = too verbose or misses root cause
+          0.0 = wrong or off-topic
+
+  - id: sum_004
+    prompt: |
+      Compare and contrast these two approaches in a bullet-point format (max 6 bullets):
+
+      Approach A — Microservices: Each feature is a separate deployable service with its own
+      database. Teams own individual services. Communication via HTTP/gRPC. Scales independently.
+      Complex to operate — need service mesh, distributed tracing, eventual consistency patterns.
+      Works well at scale (Netflix, Uber). Hard for small teams.
+
+      Approach B — Modular Monolith: Single deployable unit but internally organized into
+      well-defined modules with clear boundaries. Shared database with schema-per-module.
+      Simpler operations — one deploy, one log stream. Can extract to microservices later if
+      needed. Enforces boundaries through code, not network. Works well for most teams until
+      ~50 engineers.
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          Score comparison quality:
+          - Max 6 bullets (not more)
+          - Covers key differences: deployment, data, operations, team size, scaling
+          - Balanced (not biased toward one approach)
+          - Accurate to the source material
+          - Clear, concise bullets (not paragraphs)
+          1.0 = 6 or fewer clear bullets covering key trade-offs, balanced and accurate
+          0.75 = good bullets but slightly biased or missing a dimension
+          0.5 = too many bullets or paragraph-style
+          0.25 = only covers one approach
+          0.0 = off-topic
+
+  - id: sum_005
+    prompt: |
+      Rewrite this paragraph at a 5th-grade reading level. Keep all the key facts.
+
+      "The mitochondria are membrane-bound organelles found in the cytoplasm of eukaryotic
+      cells. They are responsible for aerobic respiration, the metabolic process by which
+      adenosine triphosphate (ATP) is synthesized from glucose and oxygen. This process
+      involves the electron transport chain and oxidative phosphorylation, occurring across
+      the inner mitochondrial membrane. Mitochondria possess their own circular DNA,
+      supporting the endosymbiotic theory that they originated as free-living prokaryotes
+      that were engulfed by ancestral eukaryotic cells."
+    graders:
+      - type: llm_judge
+        dimension: correctness
+        rubric: |
+          Score readability and accuracy:
+          - Uses simple words a 10-year-old would understand
+          - No jargon left unexplained (ATP, eukaryotic, prokaryotes, phosphorylation)
+          - Keeps key facts: mitochondria make energy, use glucose + oxygen, have own DNA, may have been separate organisms
+          - Doesn't add false information
+          1.0 = simple language, all key facts preserved, a 5th grader could understand
+          0.75 = mostly simple but 1-2 unexplained terms remain
+          0.5 = still too complex for a 5th grader
+          0.25 = oversimplified to the point of losing key facts
+          0.0 = not simplified at all

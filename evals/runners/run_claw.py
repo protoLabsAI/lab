@@ -34,7 +34,11 @@ def resolve_task(task_id: str) -> str:
     if exact.exists():
         return str(exact)
     # Try prefix match (T02 -> T02_email_triage)
-    matches = sorted(TASKS_DIR.glob(f"{task_id}*"))
+    # Use underscore boundary to prevent T10 matching T100, T101, etc.
+    matches = sorted(TASKS_DIR.glob(f"{task_id}_*"))
+    if not matches:
+        # Fallback: try without underscore for exact numeric matches like T100
+        matches = sorted(TASKS_DIR.glob(f"{task_id}*"))
     if len(matches) == 1:
         task_yaml = matches[0] / "task.yaml"
         if task_yaml.exists():

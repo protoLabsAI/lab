@@ -165,6 +165,54 @@ case "$1" in
             --language-model-only \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
+    qwen-4b-int4)
+        echo "Starting Qwen3.5-4B-AWQ-4bit (GPU 0, 262K)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve cyankiwi/Qwen3.5-4B-AWQ-4bit \
+            --host 0.0.0.0 --port $PORT \
+            --max-model-len 262144 \
+            --served-model-name local \
+            --reasoning-parser qwen3 \
+            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
+            --gpu-memory-utilization 0.90 \
+            --language-model-only \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+    qwen-4b)
+        echo "Starting Qwen3.5-4B (GPU 0, 262K)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-4B \
+            --host 0.0.0.0 --port $PORT \
+            --max-model-len 262144 \
+            --served-model-name local \
+            --reasoning-parser qwen3 \
+            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
+            --gpu-memory-utilization 0.90 \
+            --language-model-only \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+    qwen-2b)
+        echo "Starting Qwen3.5-2B (GPU 0, 262K)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-2B \
+            --host 0.0.0.0 --port $PORT \
+            --max-model-len 262144 \
+            --served-model-name local \
+            --reasoning-parser qwen3 \
+            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
+            --gpu-memory-utilization 0.90 \
+            --language-model-only \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+    qwen-0.8b)
+        echo "Starting Qwen3.5-0.8B (GPU 0, 262K)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-0.8B \
+            --host 0.0.0.0 --port $PORT \
+            --max-model-len 262144 \
+            --served-model-name local \
+            --reasoning-parser qwen3 \
+            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
+            --gpu-memory-utilization 0.90 \
+            --language-model-only \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
 
     # ─── Dual GPU configs (TP=2) ───────────────────────────────────
 
