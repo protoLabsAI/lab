@@ -87,6 +87,21 @@ case "$1" in
             --gpu-memory-utilization 0.90 \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
+    qwen-27b-int4-opt)
+        echo "Starting Qwen3.5-27B-GPTQ-Int4 OPTIMIZED (GPU 0, 128K, FP8 KV)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-27B-GPTQ-Int4 \
+            --host 0.0.0.0 --port $PORT \
+            --served-model-name local \
+            --max-model-len 131072 \
+            --reasoning-parser qwen3 \
+            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
+            --gpu-memory-utilization 0.90 \
+            --async-scheduling \
+            --enable-prefix-caching \
+            --performance-mode interactivity \
+            --kv-cache-dtype fp8 \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
     qwen-27b-int4-160k)
         echo "Starting Qwen3.5-27B-GPTQ-Int4 (GPU 0, 160K)..."
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-27B-GPTQ-Int4 \
@@ -177,6 +192,22 @@ case "$1" in
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.90 \
             --language-model-only \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+    qwen-4b-int4-opt)
+        echo "Starting Qwen3.5-4B-AWQ-4bit OPTIMIZED (GPU 0, 262K, FP8 KV)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve cyankiwi/Qwen3.5-4B-AWQ-4bit \
+            --host 0.0.0.0 --port $PORT \
+            --max-model-len 262144 \
+            --served-model-name local \
+            --reasoning-parser qwen3 \
+            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
+            --gpu-memory-utilization 0.90 \
+            --language-model-only \
+            --async-scheduling \
+            --enable-prefix-caching \
+            --performance-mode interactivity \
+            --kv-cache-dtype fp8 \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     qwen-4b)

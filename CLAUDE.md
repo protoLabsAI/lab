@@ -25,12 +25,40 @@ uv run ruff check .                        # lint everything
 
 ```bash
 bash models/vllm-swap.sh qwen-27b-int4     # daily driver (44 tok/s, 3/4 pass^3)
+bash models/vllm-swap.sh qwen-27b-int4-opt # daily driver + P1+P2 optimizations
 bash models/vllm-swap.sh qwen-35b          # speed king (170 tok/s MoE)
 bash models/vllm-swap.sh qwen-122b-int4-1gpu  # highest quality (30 tok/s)
 bash models/vllm-swap.sh qwen-9b           # fine-tune base (92 tok/s)
 bash models/vllm-swap.sh qwen-4b-int4      # edge deploy (294 tok/s)
+bash models/vllm-swap.sh qwen-4b-int4-opt  # edge deploy + P1+P2 optimizations
 bash models/vllm-swap.sh qwen-4b           # edge deploy bf16 (155 tok/s)
 ```
+
+## Speed Testing
+
+```bash
+bash models/speed-test.sh           # 5 runs on current model (800 tok gen)
+bash models/speed-test.sh 10        # 10 runs
+bash models/speed-test.sh 3 short   # 3 short runs (200 tokens)
+
+# A/B compare baseline vs optimized config
+cd evals && bash run-ab-speed.sh qwen-4b-int4 5
+```
+
+Reports decode tok/s (1/TPOT), wall tok/s, TTFT, and TPOT from vLLM's `/metrics` endpoint — not wall-clock estimation.
+
+### Optimization Flags (`-opt` configs)
+
+Suffix any config with `-opt` to enable:
+- `--async-scheduling` — overlap scheduling with execution (~30% throughput)
+- `--enable-prefix-caching` — reuse KV cache for repeated prefixes
+- `--performance-mode interactivity` — auto-tune scheduler for latency
+- `--kv-cache-dtype fp8` — halve KV cache memory, double context capacity
+
+Not yet enabled (test separately):
+- MTP speculative decoding: `--speculative-config '{"method":"mtp","num_speculative_tokens":1}'` — known tool-call bug
+- TP=2 NCCL tuning: `NCCL_ALGO=Ring NCCL_PROTO=Simple`
+- MoE FP8: `VLLM_USE_FLASHINFER_MOE_FP8=1 VLLM_FLASHINFER_MOE_BACKEND=latency`
 
 ## Running Evals
 

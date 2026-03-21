@@ -74,13 +74,14 @@ This runs:
 ## Step 6: Speed Benchmark
 
 ```bash
-# Timed generation (disable thinking for pure speed test)
-START=$(date +%s%N)
-curl -s http://localhost:8000/v1/chat/completions -H "Content-Type: application/json" \
-  -d '{"model":"local","messages":[{"role":"user","content":"Write a 500-word essay about computing history. Do not think, just write."}],"max_tokens":800,"chat_template_kwargs":{"enable_thinking":false}}'
-END=$(date +%s%N)
-# Calculate tok/s from completion_tokens / elapsed
+# Uses vLLM /metrics for accurate TTFT, TPOT, and decode tok/s
+bash ~/dev/lab/models/speed-test.sh        # 5 runs, 800 token gen
+bash ~/dev/lab/models/speed-test.sh 10     # 10 runs for more stable numbers
+bash ~/dev/lab/models/speed-test.sh 3 short  # quick 200-token test
 ```
+
+Reports: decode tok/s (1/TPOT), wall tok/s, avg TTFT (ms), avg TPOT (ms).
+All metrics from vLLM's `/metrics` endpoint — not wall-clock estimation.
 
 ## Step 7: Report & Decision
 
