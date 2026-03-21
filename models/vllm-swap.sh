@@ -8,8 +8,8 @@
 #   qwen-122b-int4-1gpu — Qwen3.5-122B-A10B-GPTQ-Int4, 64K ctx
 #   qwen-27b         — Qwen3.5-27B bf16, 128K ctx (baseline)
 #   qwen-35b         — Qwen3.5-35B-A3B MoE bf16, 64K ctx
-#   qwen-35b-opus    — Qwen3.5-35B-A3B-Opus-Distilled MoE, 64K ctx
 #   llama-70b        — Llama-3.3-70B-Instruct-AWQ, 128K ctx (creative/fast)
+#   qwen-27b-opus-v2 — Qwen3.5-27B-Opus-v2 bf16, 128K ctx
 #   omnicoder        — OmniCoder-9B, 262K ctx (fine-tune base)
 #
 # === Dual GPU (TP=2, needs UPS) ===
@@ -129,20 +129,6 @@ case "$1" in
             --gpu-memory-utilization 0.85 \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
-    qwen-35b-opus)
-        echo "Starting Qwen3.5-35B-A3B-Opus-Distilled MoE (GPU 0, 64K)..."
-        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Jackrong/Qwen3.5-35B-A3B-Claude-4.6-Opus-Reasoning-Distilled \
-            --host 0.0.0.0 --port $PORT \
-            --served-model-name local \
-            --tokenizer Qwen/Qwen3.5-35B-A3B \
-            --max-model-len 65536 \
-            --reasoning-parser qwen3 \
-            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
-            --gpu-memory-utilization 0.85 \
-            --trust-remote-code \
-            --language-model-only \
-            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
-        ;;
     llama-70b)
         echo "Starting Llama-3.3-70B-AWQ (GPU 0, 128K)..."
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve casperhansen/llama-3.3-70b-instruct-awq \
@@ -151,6 +137,19 @@ case "$1" in
             --max-model-len 131072 \
             --enable-auto-tool-choice --tool-call-parser llama3_json \
             --gpu-memory-utilization 0.90 \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+    qwen-27b-opus-v2)
+        echo "Starting Qwen3.5-27B-Opus-v2 bf16 (GPU 0, 128K)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled-v2 \
+            --host 0.0.0.0 --port $PORT \
+            --served-model-name local \
+            --tokenizer Qwen/Qwen3.5-27B \
+            --max-model-len 131072 \
+            --reasoning-parser qwen3 \
+            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
+            --gpu-memory-utilization 0.85 \
+            --trust-remote-code \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     omnicoder)

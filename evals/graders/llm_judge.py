@@ -61,12 +61,29 @@ class LLMJudge(Grader):
         self.client = OpenAI(base_url=base_url, api_key=api_key or "not-needed")
 
     def grade(self, task_input: dict, task_output: dict, expected: dict | None = None) -> GradeResult:
-        prompt = self.rubric.format(
-            dimension=self.dimension,
-            input=json.dumps(task_input, indent=2, default=str),
-            expected=json.dumps(expected, indent=2, default=str) if expected else "N/A",
-            output=json.dumps(task_output, indent=2, default=str),
-        )
+        input_str = json.dumps(task_input, indent=2, default=str)
+        output_str = json.dumps(task_output, indent=2, default=str)
+        expected_str = json.dumps(expected, indent=2, default=str) if expected else "N/A"
+
+        # If the custom rubric has template placeholders, use them
+        if "{input}" in self.rubric or "{output}" in self.rubric:
+            prompt = self.rubric.format(
+                dimension=self.dimension,
+                input=input_str,
+                expected=expected_str,
+                output=output_str,
+            )
+        else:
+            # Custom rubric without placeholders — wrap with context
+            prompt = (
+                f"You are evaluating an AI's output on the dimension: {self.dimension}.\n\n"
+                f"## Rubric\n{self.rubric}\n\n"
+                f"## Task Input\n{input_str}\n\n"
+                f"## AI Output\n{output_str}\n\n"
+                f"## Expected (if available)\n{expected_str}\n\n"
+                "Respond with JSON only:\n"
+                '{"score": <float 0.0-1.0>, "reasoning": "<brief explanation>"}'
+            )
 
         try:
             response = self.client.chat.completions.create(
