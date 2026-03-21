@@ -101,16 +101,16 @@ model_list:
       model: groq/llama-3.1-8b-instant
       api_key: os.environ/GROQ_API_KEY
 
-  # ─── xAI (Grok) ───────────────────────────────────────────────────
+  # ─── xAI (Grok via OpenRouter) ─────────────────────────────────────
   - model_name: grok-3
     litellm_params:
-      model: xai/grok-3
-      api_key: os.environ/XAI_API_KEY
+      model: openrouter/x-ai/grok-3
+      api_key: os.environ/OPENROUTER_API_KEY
 
   - model_name: grok-3-mini
     litellm_params:
-      model: xai/grok-3-mini
-      api_key: os.environ/XAI_API_KEY
+      model: openrouter/x-ai/grok-3-mini
+      api_key: os.environ/OPENROUTER_API_KEY
 
   # ─── OpenRouter ────────────────────────────────────────────────────
   - model_name: minimax-m2.5
@@ -153,12 +153,10 @@ model_list:
       model: openrouter/xiaomi/mimo-v2-flash
       api_key: os.environ/OPENROUTER_API_KEY
 
-  # ─── xAI (new models) ─────────────────────────────────────────────
   - model_name: grok-4.1-fast
     litellm_params:
-      model: xai/grok-4.1-fast
-      api_key: os.environ/XAI_API_KEY
-      drop_params: true
+      model: openrouter/x-ai/grok-4.1-fast
+      api_key: os.environ/OPENROUTER_API_KEY
 
 litellm_settings:
   # Langfuse tracing (auto-enabled when LANGFUSE_* keys are set)
