@@ -147,6 +147,24 @@ case "$1" in
             --gpu-memory-utilization 0.85 \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
+    qwen-35b-opt)
+        echo "Starting Qwen3.5-35B-A3B MoE OPTIMIZED (GPU 0, 64K, FP8 KV + MoE FP8)..."
+        CUDA_VISIBLE_DEVICES=0 \
+        VLLM_USE_FLASHINFER_MOE_FP8=1 \
+        VLLM_FLASHINFER_MOE_BACKEND=latency \
+        $VLLM_BIN serve Qwen/Qwen3.5-35B-A3B \
+            --host 0.0.0.0 --port $PORT \
+            --served-model-name local \
+            --max-model-len 65536 \
+            --reasoning-parser qwen3 \
+            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
+            --gpu-memory-utilization 0.85 \
+            --async-scheduling \
+            --enable-prefix-caching \
+            --performance-mode interactivity \
+            --kv-cache-dtype fp8 \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
     llama-70b)
         echo "Starting Llama-3.3-70B-AWQ (GPU 0, 128K)..."
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve casperhansen/llama-3.3-70b-instruct-awq \
@@ -269,6 +287,39 @@ case "$1" in
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
 
+    # ─── MTP configs (speculative decoding, NO tool calling) ────────
+    # MTP breaks tool calls (issue #36872) — use for creative/roleplay/summarization only
+
+    qwen-35b-mtp)
+        echo "Starting Qwen3.5-35B-A3B MoE + MTP (GPU 0, 64K, NO TOOLS)..."
+        CUDA_VISIBLE_DEVICES=0 \
+        VLLM_USE_FLASHINFER_MOE_FP8=1 \
+        VLLM_FLASHINFER_MOE_BACKEND=latency \
+        $VLLM_BIN serve Qwen/Qwen3.5-35B-A3B \
+            --host 0.0.0.0 --port $PORT \
+            --served-model-name local \
+            --max-model-len 65536 \
+            --gpu-memory-utilization 0.85 \
+            --async-scheduling \
+            --enable-prefix-caching \
+            --kv-cache-dtype fp8 \
+            --speculative-config '{"method": "mtp", "num_speculative_tokens": 1}' \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+    cydonia-24b-mtp)
+        echo "Starting Cydonia-24B + MTP (GPU 0, 32K, NO TOOLS)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve TheDrummer/Cydonia-24B-v4.3 \
+            --host 0.0.0.0 --port $PORT \
+            --served-model-name local \
+            --max-model-len 32768 \
+            --gpu-memory-utilization 0.90 \
+            --async-scheduling \
+            --enable-prefix-caching \
+            --kv-cache-dtype fp8 \
+            --speculative-config '{"method": "mtp", "num_speculative_tokens": 1}' \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+
     # ─── Dual GPU configs (TP=2) ───────────────────────────────────
 
     qwen-122b)
@@ -283,6 +334,28 @@ case "$1" in
             --gpu-memory-utilization 0.90 \
             --disable-custom-all-reduce \
             --enforce-eager \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+    qwen-122b-opt)
+        echo "Starting Qwen3.5-122B-A10B-FP8 OPTIMIZED (TP=2, 64K, NCCL tuned)..."
+        # Note: VLLM_USE_FLASHINFER_MOE_FP8 breaks on 122B FP8 (unsupported quant scheme)
+        NCCL_ALGO=Ring \
+        NCCL_PROTO=Simple \
+        NCCL_MIN_NCHANNELS=4 \
+        NCCL_MAX_NCHANNELS=8 \
+        $VLLM_BIN serve Qwen/Qwen3.5-122B-A10B-FP8 \
+            --host 0.0.0.0 --port $PORT \
+            --tensor-parallel-size 2 \
+            --served-model-name local \
+            --max-model-len 65536 \
+            --reasoning-parser qwen3 \
+            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
+            --gpu-memory-utilization 0.90 \
+            --disable-custom-all-reduce \
+            --enforce-eager \
+            --async-scheduling \
+            --enable-prefix-caching \
+            --kv-cache-dtype fp8 \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     qwen-122b-128k)
@@ -324,6 +397,28 @@ case "$1" in
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.90 \
             --disable-custom-all-reduce \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+    qwen-35b-tp2-opt)
+        echo "Starting Qwen3.5-35B-A3B MoE OPTIMIZED (TP=2, 250K, NCCL tuned)..."
+        NCCL_ALGO=Ring \
+        NCCL_PROTO=Simple \
+        NCCL_MIN_NCHANNELS=4 \
+        NCCL_MAX_NCHANNELS=8 \
+        VLLM_USE_FLASHINFER_MOE_FP8=1 \
+        VLLM_FLASHINFER_MOE_BACKEND=latency \
+        $VLLM_BIN serve Qwen/Qwen3.5-35B-A3B \
+            --host 0.0.0.0 --port $PORT \
+            --tensor-parallel-size 2 \
+            --served-model-name local \
+            --max-model-len 253952 \
+            --reasoning-parser qwen3 \
+            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
+            --gpu-memory-utilization 0.90 \
+            --disable-custom-all-reduce \
+            --async-scheduling \
+            --enable-prefix-caching \
+            --kv-cache-dtype fp8 \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     qwen-27b-int4-tp2)

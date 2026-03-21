@@ -49,16 +49,38 @@ Reports decode tok/s (1/TPOT), wall tok/s, TTFT, and TPOT from vLLM's `/metrics`
 
 ### Optimization Flags (`-opt` configs)
 
-Suffix any config with `-opt` to enable:
-- `--async-scheduling` — overlap scheduling with execution (~30% throughput)
+Suffix any config with `-opt` to enable P1+P2 flags:
+- `--async-scheduling` — overlap scheduling with execution
 - `--enable-prefix-caching` — reuse KV cache for repeated prefixes
 - `--performance-mode interactivity` — auto-tune scheduler for latency
 - `--kv-cache-dtype fp8` — halve KV cache memory, double context capacity
 
-Not yet enabled (test separately):
-- MTP speculative decoding: `--speculative-config '{"method":"mtp","num_speculative_tokens":1}'` — known tool-call bug
-- TP=2 NCCL tuning: `NCCL_ALGO=Ring NCCL_PROTO=Simple`
-- MoE FP8: `VLLM_USE_FLASHINFER_MOE_FP8=1 VLLM_FLASHINFER_MOE_BACKEND=latency`
+**Measured impact (single-request, P1+P2 only):** minimal (+1-3% tok/s). Real wins are under concurrent load and multi-turn (prefix caching). FP8 KV doubles context capacity.
+
+### MTP Speculative Decoding (`-mtp` configs)
+
+Native Qwen3.5 Multi-Token Prediction — big speed gains on dense models:
+
+| Model | Baseline | + MTP | Gain | Tool Calling |
+|-------|:--------:|:-----:|:----:|:------------:|
+| **27B INT4** | 53 tok/s | **70 tok/s** | **+32%** | Works, but T08 quality regresses |
+| **9B** | 92 tok/s | **112 tok/s** | **+22%** | Works, no quality loss |
+| **35B MoE** | 171 tok/s | 153 tok/s | -11% | N/A — slower, don't use |
+
+- MTP helps dense models, hurts MoE (routing overhead > speculation savings)
+- 9B + MTP is safe for all workloads including tool calling
+- 27B + MTP: use for chat/creative (70 tok/s), avoid for complex agentic (T08 regresses)
+- MoE FP8 env vars: `VLLM_USE_FLASHINFER_MOE_FP8=1 VLLM_FLASHINFER_MOE_BACKEND=latency`
+
+### TP=2 Tuning (122B, 35B-tp2)
+
+NCCL env vars for PCIe (no NVLink): `NCCL_ALGO=Ring NCCL_PROTO=Simple NCCL_MIN_NCHANNELS=4 NCCL_MAX_NCHANNELS=8`
+
+**Tested results:**
+- 122B: NCCL tuning has **zero impact** (18.5→18.4 tok/s, within noise)
+- 35B TP=2: prefix caching fixed 1.8s TTFT → 0.5s (**-70%**), wall tok/s +25%
+- `VLLM_USE_FLASHINFER_MOE_FP8` crashes on 122B FP8 (unsupported quant scheme) — don't use
+- Inference at 300W draws only ~140W per card — MoE is not power-bound
 
 ## Running Evals
 
@@ -100,20 +122,21 @@ cd evals
 
 ## Model Inventory (`/mnt/models`)
 
-| Model | Size | tok/s | Claw pass^3 | Role |
-|-------|------|:-----:|:-----------:|------|
-| **Qwen 27B INT4** | 14GB | 44 | 3/4 | Daily driver, all-rounder |
-| **Qwen 35B MoE BF16** | 67GB | 170 | 3/4 | Speed king (TP=2) |
-| **Qwen 122B INT4** | 74GB | ~30 | 3/4 | Quality ceiling |
-| **Qwen 9B BF16** | 19GB | 92 | 2/4 | Fine-tune base (best coding at 9B) |
-| **Qwen 4B INT4** | 3GB | 294 | 2-3/4 | Edge deploy speed demon |
-| **Qwen 4B BF16** | 8GB | 155 | 3/4 | Edge deploy, LoRA base |
-| Qwen 2B BF16 | 4GB | 307 | 0/4 | Training experiments |
-| Qwen 0.8B BF16 | 1.5GB | 547 | 0/4 | Training experiments |
-| Qwen 27B BF16 | 52GB | 44 | 3/4 | Baseline (can nuke for 52GB) |
-| Llama 70B AWQ | 38GB | 38 | 1/4 | Creative/roleplay |
+| Model | Size | tok/s | +MTP | Claw pass^3 | Role |
+|-------|------|:-----:|:----:|:-----------:|------|
+| **Qwen 27B INT4** | 29GB | 53 | **70** | 3/4 | Daily driver, all-rounder |
+| **Qwen 35B MoE BF16** | 67GB | 171 | — | 3/4 | Speed king (single GPU, 220 TP=2) |
+| **Qwen 122B FP8** | 119GB | 18.5 | — | 3/4 | Quality ceiling (TP=2 only) |
+| **Qwen 122B INT4** | 74GB | ~30 | — | 3/4 | Quality ceiling (TP=2, smaller) |
+| **Qwen 9B BF16** | 19GB | 92 | **112** | 2/4 | Fine-tune base (best coding at 9B) |
+| **Qwen 4B INT4** | 3GB | 297 | — | 2-3/4 | Edge deploy speed demon |
+| **Qwen 4B BF16** | 8GB | 155 | — | 3/4 | Edge deploy, LoRA base |
+| Cydonia 24B | 44GB | — | — | 0/4 | Creative/roleplay only |
+| Llama 70B AWQ | 38GB | 38 | — | 1/4 | Creative/roleplay |
+| Qwen 2B BF16 | 4GB | 307 | — | 0/4 | Training experiments |
+| Qwen 0.8B BF16 | 1.5GB | 547 | — | 0/4 | Training experiments |
 
-Base models (0.8B, 2B, 4B) also downloaded for pretraining.
+Base models (0.8B, 2B, 4B) also downloaded for pretraining. 126GB free on `/mnt/models`.
 
 ## Blackwell GPU Constraints
 
