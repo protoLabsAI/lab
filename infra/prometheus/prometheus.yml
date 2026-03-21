@@ -1,93 +1,9 @@
-global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
-
-rule_files:
-  - /etc/prometheus/alert-rules.yml
+# protoLabs AI Node — Prometheus scrape targets
+# These targets are for the ava-ai (Blackwell) node.
+# Add to your Prometheus config on the monitoring server.
 
 scrape_configs:
-  # === ava (A6000 — this machine) ===
-  # Prometheus runs in host network mode, so local exporters use localhost
-
-  - job_name: node-ava
-    static_configs:
-      - targets: ["localhost:9100"]
-        labels:
-          node: ava
-
-  - job_name: cadvisor-ava
-    static_configs:
-      - targets: ["localhost:8280"]
-        labels:
-          node: ava
-
-  - job_name: gpu-ava
-    static_configs:
-      - targets: ["localhost:9835"]
-        labels:
-          node: ava
-
-  - job_name: automaker
-    metrics_path: /api/metrics/prometheus
-    static_configs:
-      - targets: ["localhost:3008"]
-        labels:
-          app: automaker
-          node: ava
-
-  # === Media stack exporters (ava) ===
-
-  - job_name: sonarr
-    static_configs:
-      - targets: ["localhost:9707"]
-        labels:
-          app: sonarr
-          node: ava
-
-  - job_name: radarr
-    static_configs:
-      - targets: ["localhost:9708"]
-        labels:
-          app: radarr
-          node: ava
-
-  - job_name: lidarr
-    static_configs:
-      - targets: ["localhost:9709"]
-        labels:
-          app: lidarr
-          node: ava
-
-  - job_name: prowlarr
-    static_configs:
-      - targets: ["localhost:9710"]
-        labels:
-          app: prowlarr
-          node: ava
-
-  - job_name: qbittorrent
-    static_configs:
-      - targets: ["localhost:8200"]
-        labels:
-          app: qbittorrent
-          node: ava
-
-  # === pve01 (Proxmox control plane) ===
-
-  - job_name: node-pve01
-    static_configs:
-      - targets: ["100.85.224.82:9100"]
-        labels:
-          node: pve01
-
-  - job_name: cadvisor-pve01
-    static_configs:
-      - targets: ["100.85.224.82:8080"]
-        labels:
-          node: pve01
-
-  # === protolabs (RTX PRO 6000 Blackwell) ===
-
+  # ─── System metrics ──────────────────────────────────────────────
   - job_name: node-protolabs
     static_configs:
       - targets: ["100.109.43.57:9100"]
@@ -106,6 +22,7 @@ scrape_configs:
         labels:
           node: protolabs
 
+  # ─── AI services ─────────────────────────────────────────────────
   - job_name: vllm
     metrics_path: /metrics
     static_configs:
@@ -114,18 +31,18 @@ scrape_configs:
           app: vllm
           node: protolabs
 
-  - job_name: protoclaw
-    metrics_path: /metrics
-    static_configs:
-      - targets: ["100.109.43.57:7865"]
-        labels:
-          app: protoclaw
-          node: protolabs
-
   - job_name: gateway
     metrics_path: /metrics
     static_configs:
       - targets: ["100.109.43.57:4000"]
         labels:
           app: gateway
+          node: protolabs
+
+  - job_name: protoclaw
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["100.109.43.57:7865"]
+        labels:
+          app: protoclaw
           node: protolabs
