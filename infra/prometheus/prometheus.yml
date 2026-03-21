@@ -1,5 +1,5 @@
 # protoLabs AI Node — Prometheus scrape targets
-# These targets are for the ava-ai (Blackwell) node.
+# These targets are for the protolabs (Blackwell) node.
 # Add to your Prometheus config on the monitoring server.
 
 scrape_configs:

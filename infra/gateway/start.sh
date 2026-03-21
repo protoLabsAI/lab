@@ -45,7 +45,7 @@ cmd_setup() {
     echo ""
     echo "Create a Machine Identity in Infisical:"
     echo "  1. Go to ${INFISICAL_URL} > Organization > Machine Identities"
-    echo "  2. Create identity 'gateway-ava-ai' with Universal Auth"
+    echo "  2. Create identity 'gateway-protolabs' with Universal Auth"
     echo "  3. Attach to gateway project with 'reader' role"
     echo ""
 

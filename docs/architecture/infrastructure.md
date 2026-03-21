@@ -22,12 +22,12 @@
 
 | Node | Role | Hardware |
 |------|------|----------|
-| **ava-ai** (this machine) | AI inference, experiments, training | 2x RTX PRO 6000 Blackwell (192GB VRAM) |
+| **protolabs** (this machine) | AI inference, experiments, training | 2x RTX PRO 6000 Blackwell (192GB VRAM) |
 | **pve01** | Control plane (Infisical, Prometheus, Grafana) | — |
 
 Nodes connected via Tailscale MagicDNS.
 
-## Services on ava-ai
+## Services on protolabs
 
 | Service | Port | Runtime | Purpose |
 |---------|------|---------|---------|
