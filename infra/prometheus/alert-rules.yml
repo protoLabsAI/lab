@@ -1,0 +1,115 @@
+groups:
+  - name: node-health
+    rules:
+      - alert: NodeDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.job }} is down"
+          description: "Target {{ $labels.instance }} has been unreachable for 2 minutes."
+
+      - alert: HighCpuUsage
+        expr: 100 - (avg by(node) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU on {{ $labels.node }}"
+          description: 'CPU usage above 90% for 5 minutes (current: {{ $value | printf "%.1f" }}%).'
+
+      - alert: HighMemoryUsage
+        expr: (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory on {{ $labels.node }}"
+          description: 'Memory usage above 90% for 5 minutes (current: {{ $value | printf "%.1f" }}%).'
+
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes{mountpoint=~"/(mnt/.*)?",fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes) * 100 < 10
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Low disk space on {{ $labels.node }}:{{ $labels.mountpoint }}"
+          description: 'Only {{ $value | printf "%.1f" }}% free on {{ $labels.mountpoint }}.'
+
+  - name: gpu-health
+    rules:
+      - alert: GpuTemperatureHigh
+        expr: nvidia_gpu_temperature_celsius > 85
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High GPU temp on {{ $labels.node }}"
+          description: "GPU {{ $labels.gpu }} at {{ $value }}C for 2 minutes."
+
+      - alert: GpuMemoryHigh
+        expr: (nvidia_gpu_memory_used_bytes / nvidia_gpu_memory_total_bytes) * 100 > 95
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "GPU memory near capacity on {{ $labels.node }}"
+          description: 'GPU memory usage at {{ $value | printf "%.1f" }}%.'
+
+  - name: container-health
+    rules:
+      - alert: ContainerRestartLoop
+        expr: increase(container_restart_count[15m]) > 3
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} restarting"
+          description: "{{ $labels.name }} on {{ $labels.node }} has restarted {{ $value }} times in 15 minutes."
+
+      - alert: ContainerHighMemory
+        expr: (container_memory_usage_bytes{name!=""} / container_spec_memory_limit_bytes{name!=""}) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} high memory"
+          description: '{{ $labels.name }} using {{ $value | printf "%.1f" }}% of memory limit.'
+
+  - name: ai-services
+    rules:
+      - alert: ProtoclawHighErrorRate
+        expr: rate(protoclaw_tool_calls_total{success="False"}[5m]) / rate(protoclaw_tool_calls_total[5m]) > 0.3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "protoClaw tool error rate high"
+          description: 'Tool call error rate above 30% for 5 minutes (current: {{ $value | printf "%.1f" }}).'
+
+      - alert: ProtoclawLLMLatencyHigh
+        expr: histogram_quantile(0.95, rate(protoclaw_llm_latency_seconds_bucket[5m])) > 60
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "protoClaw LLM latency high"
+          description: 'p95 LLM latency above 60s for 5 minutes (current: {{ $value | printf "%.0f" }}s).'
+
+      - alert: VllmDown
+        expr: up{job="vllm"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "vLLM inference server down"
+          description: "vLLM has been unreachable for 2 minutes. Local model inference unavailable."
+
+      - alert: GatewayDown
+        expr: up{job="gateway"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AI Gateway (LiteLLM) down"
+          description: "Gateway has been unreachable for 2 minutes. All model routing affected."

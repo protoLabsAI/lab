@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Virtual environments (each project has its own)
+**/venv/
+**/.venv/
+
+# Secrets — NEVER commit
+.env
+*.env
+**/.env
+**/credentials*
+**/identity
+
+# Results and traces (large, ephemeral)
+**/results/
+**/*.jsonl
+
+# Model weights (on /mnt/models, not in repo)
+*.safetensors
+*.bin
+*.gguf
+*.pt
+*.pth
+
+# Training artifacts
+training/runs/
+training/datasets/*.jsonl
+training/datasets/*.parquet
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Inspect AI
+evals/inspect/logs/

@@ -1,0 +1,18 @@
+[project]
+name = "lab-experiments"
+version = "0.1.0"
+description = "ML experiments on Blackwell GPUs — loose scripts, fast iteration"
+requires-python = ">=3.12"
+dependencies = [
+    "lab-core",
+    "torch>=2.9",
+    "gradio>=5.0",
+    "transformers",
+    "accelerate",
+]
+
+[tool.ruff.lint]
+select = ["F"]  # Loose — just catch errors, no style enforcement
+
+[tool.uv.sources]
+lab-core = { workspace = true }

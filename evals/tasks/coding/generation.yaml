@@ -1,0 +1,32 @@
+id: code_generation
+name: "Code Generation Quality"
+difficulty: medium
+category: coding
+
+tests:
+  - id: code_001
+    prompt: "Write a Python function that takes a list of integers and returns the longest increasing subsequence. Include type hints and a docstring."
+    graders:
+      - { type: llm_judge, dimension: correctness, rubric: "Score whether the algorithm is correct (O(n log n) preferred, O(n^2) acceptable). 1.0 = correct and efficient, 0.5 = correct but brute force, 0.0 = incorrect." }
+      - { type: llm_judge, dimension: code_quality, rubric: "Score code quality: type hints, docstring, variable naming, edge case handling. 1.0 = production-ready, 0.5 = functional but messy, 0.0 = incomplete." }
+
+  - id: code_002
+    prompt: "Write a TypeScript Express middleware that rate-limits API requests to 100 per minute per IP using a sliding window. Use in-memory storage."
+    graders:
+      - { type: llm_judge, dimension: correctness, rubric: "Score whether the rate limiter correctly implements sliding window (not just fixed window). Handles edge cases (first request, window reset). 1.0 = correct sliding window, 0.5 = fixed window, 0.0 = broken." }
+      - { type: llm_judge, dimension: code_quality, rubric: "Score TypeScript quality: proper types, middleware signature, cleanup of old entries, no memory leaks. 1.0 = production-ready, 0.5 = works but has issues, 0.0 = won't compile." }
+
+  - id: code_003
+    prompt: "Fix this buggy Python code. Explain the bug first, then provide the corrected version.\n\n```python\ndef merge_sorted(a, b):\n    result = []\n    i = j = 0\n    while i < len(a) and j < len(b):\n        if a[i] <= b[j]:\n            result.append(a[i])\n            i += 1\n        else:\n            result.append(b[j])\n            j += 1\n    return result\n```"
+    graders:
+      - { type: llm_judge, dimension: correctness, rubric: "The bug is that remaining elements after the while loop are not appended. Score: 1.0 = correctly identifies the bug AND fixes it, 0.5 = identifies but fix is wrong, 0.0 = misidentifies the bug." }
+
+  - id: code_004
+    prompt: "Write a bash one-liner that finds all Python files modified in the last 7 days, counts the total lines of code, and prints the result."
+    graders:
+      - { type: llm_judge, dimension: correctness, rubric: "Score whether the command works correctly: finds .py files, filters by mtime 7 days, counts lines, prints total. 1.0 = correct, 0.5 = mostly correct with minor issues, 0.0 = wrong." }
+
+  - id: code_005
+    prompt: "Refactor this code to be more maintainable. Don't change the behavior.\n\n```python\ndef p(d):\n    r = []\n    for i in d:\n        if i['t'] == 'a' and i['s'] > 50 and i['s'] < 100:\n            if i['n'] not in [x['n'] for x in r]:\n                r.append({'n': i['n'], 's': i['s'], 't': i['t']})\n    r.sort(key=lambda x: x['s'], reverse=True)\n    return r[:10]\n```"
+    graders:
+      - { type: llm_judge, dimension: code_quality, rubric: "Score the refactoring: meaningful names, extracted conditions, type hints, docstring, no behavior change. 1.0 = clean, readable, well-named. 0.5 = somewhat improved. 0.0 = worse or behavior changed." }

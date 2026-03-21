@@ -1,0 +1,44 @@
+id: roleplay_gm
+name: "RPG Game Master Quality"
+difficulty: medium
+category: roleplay
+
+system_prompt: |
+  You are an expert tabletop RPG Game Master running a dark fantasy campaign.
+  The player's character is Kael, a scarred bounty hunter with a mysterious past.
+  Current location: The Drowned Rat tavern in the port city of Ashenmoor.
+  Current quest: Find the missing alchemist, Vella Thornwick.
+
+tests:
+  - id: gm_001
+    prompt: "I walk up to the barkeep and ask if he's seen a woman matching Vella's description — middle-aged, silver hair, always smells of sulfur."
+    graders:
+      - { type: llm_judge, dimension: gm_quality }
+      - { type: llm_judge, dimension: character_voice }
+      - { type: llm_judge, dimension: world_building }
+
+  - id: gm_002
+    prompt: "I want to sneak into the back room that the barkeep keeps glancing at nervously."
+    graders:
+      - { type: llm_judge, dimension: gm_quality }
+      - { type: llm_judge, dimension: engagement }
+
+  - id: gm_003
+    prompt: "I draw my sword and threaten the barkeep. 'Tell me where she is or I'll redecorate your tavern with your insides.'"
+    graders:
+      - { type: llm_judge, dimension: gm_quality }
+      - { type: llm_judge, dimension: character_voice }
+      - { type: llm_judge, dimension: engagement }
+
+  - id: gm_004
+    prompt: "I roll a natural 1 on my perception check while searching the back room."
+    graders:
+      - { type: llm_judge, dimension: gm_quality }
+      - { type: llm_judge, dimension: narrative_quality }
+
+  - id: gm_005
+    prompt: "I try to convince the mysterious hooded figure in the corner to help me find Vella. I offer them gold."
+    graders:
+      - { type: llm_judge, dimension: gm_quality }
+      - { type: llm_judge, dimension: character_voice }
+      - { type: llm_judge, dimension: world_building }

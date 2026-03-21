@@ -1,0 +1,75 @@
+id: research_synthesis
+name: "Research Synthesis Quality"
+difficulty: medium
+category: research
+
+system_prompt: |
+  You are a research assistant. Synthesize information from the provided sources
+  into a clear, well-structured analysis. Cite sources inline. Identify gaps
+  and conflicting information.
+
+tests:
+  - id: rs_001
+    prompt: |
+      Synthesize these findings about transformer architecture efficiency:
+
+      Source 1: "Mixture of Experts (MoE) models activate only a fraction of parameters per token,
+      reducing compute by 5-10x while maintaining quality. Qwen3.5-122B activates 10B of 122B params."
+
+      Source 2: "Dense models like Llama 70B use all parameters for every token, providing more
+      consistent quality but at higher compute cost. Recent quantization (INT4) reduces memory
+      by 4x with minimal quality loss."
+
+      Source 3: "Sparse attention mechanisms like DeepSeek's DSA reduce training and inference cost
+      while preserving quality in long-context scenarios."
+
+      Question: What are the most promising approaches to efficient LLM inference in 2026?
+    graders:
+      - { type: llm_judge, dimension: research_synthesis }
+
+  - id: rs_002
+    prompt: |
+      Analyze these conflicting claims about AI agent reliability:
+
+      Source 1: "Pass^3 scoring shows that most models fail to achieve consistent results across
+      3 trials, even when individual pass rates are high. Only 3 of 17 tested models passed
+      3/4 agent tasks consistently."
+
+      Source 2: "Agent benchmarks like SWE-bench Verified have been found to be heavily contaminated,
+      with 59.4% of tasks flawed. Reported improvements may reflect memorization, not capability."
+
+      Source 3: "Operational metrics (latency, cost, failure recovery) matter more than benchmark
+      scores for production agent deployment."
+
+      Question: How should teams evaluate AI agents for production deployment?
+    graders:
+      - { type: llm_judge, dimension: research_synthesis }
+
+  - id: rs_003
+    prompt: |
+      You have no sources for this question. Respond appropriately.
+
+      Question: What is the current market share of quantum computing in enterprise workloads?
+    graders:
+      - { type: llm_judge, dimension: research_synthesis }
+    expected:
+      behavior: "Should acknowledge lack of sources rather than hallucinate"
+
+  - id: rs_004
+    prompt: |
+      Synthesize into a 200-word executive summary:
+
+      Source 1: "Self-hosted LLM inference on prosumer GPUs (RTX PRO 6000, 96GB VRAM) can run
+      27B parameter models at INT4 quantization with no quality loss compared to full precision.
+      Cost is $0 per token after hardware investment."
+
+      Source 2: "Cloud LLM APIs (Claude Opus at $5/$25 per MTok, GPT-5.4 at $2.50/$15 per MTok)
+      provide higher quality but ongoing costs. For a team processing 10M tokens/day, cloud costs
+      exceed $500/day."
+
+      Source 3: "Hybrid approaches using local models for routine tasks and cloud models for
+      complex reasoning optimize both cost and quality."
+
+      Question: What is the optimal LLM deployment strategy for a small AI team?
+    graders:
+      - { type: llm_judge, dimension: research_synthesis }

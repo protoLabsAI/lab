@@ -1,0 +1,9 @@
+transformers==4.57.6
+accelerate
+torch==2.8.0
+einops
+scipy
+av
+scikit-image>=0.25.2
+flashpack==0.1.2
+torchaudio==2.8.0

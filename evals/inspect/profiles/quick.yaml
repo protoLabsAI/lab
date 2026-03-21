@@ -1,0 +1,9 @@
+# Quick smoke test — run a small subset of benchmarks
+# Usage: ./run.sh general --model local --limit 10
+
+benchmarks:
+  - humaneval
+  - gsm8k
+  - arc
+
+limit: 10  # samples per benchmark

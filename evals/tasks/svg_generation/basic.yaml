@@ -1,0 +1,40 @@
+id: svg_generation
+name: "SVG Generation Quality"
+difficulty: medium
+category: svg_generation
+
+system_prompt: |
+  Generate SVG code only. No explanation, no markdown code blocks.
+  Output raw SVG starting with <svg and ending with </svg>.
+  Use a 200x200 viewBox unless otherwise specified.
+
+tests:
+  - id: svg_001
+    prompt: "Create an SVG icon of a house with a triangular roof, rectangular body, a door, and a window."
+    graders:
+      - { type: llm_judge, dimension: svg_validity, rubric: "Score whether the output is valid SVG that would render. 1.0 = valid SVG, renders correctly. 0.5 = valid SVG with minor issues. 0.0 = invalid or no SVG output." }
+      - { type: llm_judge, dimension: svg_accuracy, rubric: "Score whether the SVG contains all requested elements: house body (rect), roof (polygon/path), door (rect), window (rect/circle). 1.0 = all elements present and recognizable. 0.5 = some missing. 0.0 = unrecognizable." }
+
+  - id: svg_002
+    prompt: "Create an SVG of a simple bar chart showing: Q1=40, Q2=65, Q3=80, Q4=55. Include axis labels."
+    graders:
+      - { type: llm_judge, dimension: svg_validity }
+      - { type: llm_judge, dimension: svg_accuracy, rubric: "Score whether the chart correctly represents the data: 4 bars with proportional heights, labeled axes, Q1-Q4 labels. 1.0 = accurate chart. 0.5 = bars present but proportions off. 0.0 = not a chart." }
+
+  - id: svg_003
+    prompt: "Create an SVG logo for a company called 'NovaStar' — a stylized star with the company name below it. Use a blue and gold color scheme."
+    graders:
+      - { type: llm_judge, dimension: svg_validity }
+      - { type: llm_judge, dimension: svg_creativity, rubric: "Score the visual design quality: is the star stylized (not just a basic polygon)? Does it look like a professional logo? Color scheme followed? Text readable? 1.0 = professional quality. 0.5 = basic but functional. 0.0 = ugly or broken." }
+
+  - id: svg_004
+    prompt: "Create an SVG animation of a bouncing ball. The ball should bounce up and down continuously using SVG animate elements."
+    graders:
+      - { type: llm_judge, dimension: svg_validity }
+      - { type: llm_judge, dimension: svg_accuracy, rubric: "Score whether the SVG contains proper animation elements (animate/animateTransform) that would create a bouncing motion. 1.0 = smooth bouncing animation. 0.5 = animation present but jerky or wrong direction. 0.0 = no animation." }
+
+  - id: svg_005
+    prompt: "Create an SVG flowchart showing: Start → Process Data → Decision (Valid?) → Yes: Save → End, No: Error → Retry → Process Data. Use rounded rectangles for processes and a diamond for the decision."
+    graders:
+      - { type: llm_judge, dimension: svg_validity }
+      - { type: llm_judge, dimension: svg_accuracy, rubric: "Score whether the flowchart has correct structure: all nodes present, proper shapes (rounded rects, diamond), arrows connecting in the right flow, labels readable. 1.0 = complete accurate flowchart. 0.5 = most elements but missing connections. 0.0 = not a flowchart." }

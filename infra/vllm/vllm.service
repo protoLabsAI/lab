@@ -1,0 +1,20 @@
+[Unit]
+Description=vLLM - OpenAI-compatible LLM API (Qwen3.5-27B)
+After=network.target
+
+[Service]
+Type=simple
+User=ava
+ExecStart=/home/ava/dev/vllm-env/bin/vllm serve Qwen/Qwen3.5-27B --host 0.0.0.0 --port 8000 --gpu-memory-utilization 0.95 --max-model-len 16384 --enforce-eager
+Restart=on-failure
+RestartSec=30
+Environment=PATH=/home/ava/dev/vllm-env/bin:/usr/local/cuda-12.8/bin:/usr/local/bin:/usr/bin
+Environment=LD_LIBRARY_PATH=/usr/local/cuda-12.8/lib64
+Environment=HF_HOME=/mnt/models/huggingface
+Environment=PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+Environment=CUDA_VISIBLE_DEVICES=0
+StandardOutput=append:/mnt/scratch/logs/vllm.log
+StandardError=append:/mnt/scratch/logs/vllm.log
+
+[Install]
+WantedBy=multi-user.target

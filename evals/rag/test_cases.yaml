@@ -1,0 +1,45 @@
+name: "RAG Quality Evaluation"
+description: "Test retrieval-augmented generation quality across dimensions"
+
+tests:
+  - question: "What is the maximum VRAM available on the RTX PRO 6000 Blackwell?"
+    context: |
+      The NVIDIA RTX PRO 6000 Blackwell GPU features 96 GB of GDDR7 VRAM.
+      It uses the Blackwell architecture with compute capability 12.0.
+      The card supports PCIe Gen5 x16 interface and has a TDP of 400W.
+    expected_answer: "96 GB of GDDR7 VRAM"
+
+  - question: "How does LiteLLM handle model routing?"
+    context: |
+      LiteLLM Proxy provides a unified OpenAI-compatible endpoint that routes
+      requests to multiple LLM providers. It supports load balancing, fallbacks,
+      and per-user API key management with budgets and rate limits. Each model
+      is configured in config.yaml with a model_name that maps to a provider-specific
+      model ID and API key.
+    expected_answer: "LiteLLM uses a config.yaml to map model names to provider-specific endpoints, providing a single OpenAI-compatible API that routes to the correct provider."
+
+  - question: "What are the benefits of FP8 quantization for LLM inference?"
+    context: |
+      FP8 (8-bit floating point) quantization reduces model weight size by roughly
+      half compared to BF16/FP16, from ~2 bytes per parameter to ~1 byte. This
+      reduces memory bandwidth requirements and allows fitting larger models or
+      longer context windows in the same GPU memory. On modern GPUs with FP8
+      tensor cores, inference throughput can improve by 30-50%. Quality degradation
+      is typically minimal for models above 7B parameters.
+    expected_answer: "FP8 halves memory usage, enables longer context windows, and can improve throughput by 30-50% with minimal quality loss on models above 7B parameters."
+
+  - question: "When was the Eiffel Tower built?"
+    context: |
+      The Colosseum in Rome was completed in 80 AD. It could hold between
+      50,000 and 80,000 spectators. The structure is made of concrete and stone.
+    expected_answer: "The provided context does not contain information about the Eiffel Tower."
+    # Tests whether the model correctly identifies irrelevant context
+
+  - question: "What programming languages does Multi-SWE-bench support?"
+    context: |
+      Multi-SWE-bench extends the original SWE-bench to support multilingual
+      software engineering evaluation. It includes 2,132 instances across
+      Java, TypeScript, JavaScript, Go, Rust, C, and C++. A mini version
+      with 400 tasks is also available. The benchmark was created by
+      ByteDance's Seed team and accepted at NeurIPS 2025.
+    expected_answer: "Java, TypeScript, JavaScript, Go, Rust, C, and C++"

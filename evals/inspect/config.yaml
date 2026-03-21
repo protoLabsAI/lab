@@ -1,0 +1,10 @@
+# Inspect AI config — gateway integration
+# Points Inspect at our LiteLLM gateway for model access
+
+# Set via environment (injected by run.sh from Infisical):
+#   OPENAI_API_KEY=$GATEWAY_API_KEY
+#   OPENAI_BASE_URL=http://localhost:4000/v1
+
+# Then run:
+#   inspect eval inspect_evals/humaneval --model openai/local
+#   inspect eval inspect_evals/gaia --model openai/claude-sonnet-4-6

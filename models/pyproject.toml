@@ -1,0 +1,16 @@
+[project]
+name = "lab-models"
+version = "0.1.0"
+description = "Model management, inventory, and benchmarks"
+requires-python = ">=3.12"
+dependencies = [
+    "lab-core",
+    "rich>=13.0",
+    "click>=8.0",
+]
+
+[project.scripts]
+models = "inventory:main"
+
+[tool.uv.sources]
+lab-core = { workspace = true }

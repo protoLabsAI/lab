@@ -1,0 +1,36 @@
+[project]
+name = "lab"
+version = "0.1.0"
+description = "protoLabs AI Lab — models, evals, training, and infrastructure"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.uv.workspace]
+members = [
+    "packages/lab-core",
+    "evals",
+    "experiments",
+    "models",
+    "training",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.11",
+    "lab-core",
+]
+
+[tool.uv.sources]
+lab-core = { workspace = true }
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.pytest.ini_options]
+testpaths = ["packages/lab-core/tests", "evals/tests"]

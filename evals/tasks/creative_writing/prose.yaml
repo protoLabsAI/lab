@@ -1,0 +1,37 @@
+id: creative_prose
+name: "Creative Prose Generation"
+difficulty: medium
+category: creative_writing
+
+tests:
+  - id: cw_001
+    prompt: "Write the opening paragraph of a noir detective story set in a rain-soaked Tokyo alley. 150 words max."
+    graders:
+      - { type: llm_judge, dimension: narrative_quality }
+      - { type: llm_judge, dimension: engagement }
+
+  - id: cw_002
+    prompt: "Write a scene where two old friends meet after 20 years at a funeral. Show don't tell — convey their complicated history through dialogue and body language only. 200 words max."
+    graders:
+      - { type: llm_judge, dimension: narrative_quality }
+      - { type: llm_judge, dimension: character_voice }
+      - { type: llm_judge, dimension: engagement }
+
+  - id: cw_003
+    prompt: "Describe an alien marketplace from the perspective of a human visiting for the first time. Focus on sensory details — smells, sounds, textures. 200 words max."
+    graders:
+      - { type: llm_judge, dimension: narrative_quality }
+      - { type: llm_judge, dimension: world_building }
+
+  - id: cw_004
+    prompt: "Write a complete flash fiction story (beginning, middle, end) about a lighthouse keeper who discovers something impossible in the beam of light. 300 words max."
+    graders:
+      - { type: llm_judge, dimension: narrative_quality }
+      - { type: llm_judge, dimension: engagement }
+      - { type: llm_judge, dimension: world_building }
+
+  - id: cw_005
+    prompt: "Rewrite this sentence five different ways, each with a completely different emotional tone: 'She walked into the room and sat down.'"
+    graders:
+      - { type: llm_judge, dimension: narrative_quality }
+      - { type: llm_judge, dimension: character_voice }

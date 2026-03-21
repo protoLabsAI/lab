@@ -1,0 +1,18 @@
+[project]
+name = "lab-training"
+version = "0.1.0"
+description = "Fine-tuning workspace — LLaMA-Factory configs, datasets, run scripts"
+requires-python = ">=3.12"
+dependencies = [
+    "lab-core",
+]
+
+[project.optional-dependencies]
+llama-factory = ["llamafactory"]
+trl = ["trl>=0.12", "peft>=0.14", "datasets>=3.0"]
+
+[tool.ruff.lint]
+select = ["F"]
+
+[tool.uv.sources]
+lab-core = { workspace = true }

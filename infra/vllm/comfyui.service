@@ -1,0 +1,17 @@
+[Unit]
+Description=ComfyUI - AI Image/Video Generation
+After=network.target
+
+[Service]
+Type=simple
+User=ava
+WorkingDirectory=/home/ava/dev/ComfyUI
+ExecStart=/home/ava/dev/ComfyUI/venv/bin/python main.py --listen 0.0.0.0 --port 8188
+Restart=on-failure
+RestartSec=10
+Environment=PATH=/home/ava/dev/ComfyUI/venv/bin:/usr/local/cuda-12.8/bin:/usr/local/bin:/usr/bin
+Environment=LD_LIBRARY_PATH=/usr/local/cuda-12.8/lib64
+Environment=HF_HOME=/mnt/models/huggingface
+
+[Install]
+WantedBy=multi-user.target

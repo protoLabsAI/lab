@@ -1,0 +1,88 @@
+name: "Edge Case Function Calling"
+description: "Tricky scenarios: nested params, ambiguous intent, type coercion"
+
+tests:
+  - id: fc_edge_001
+    prompt: "Create a calendar event titled 'Team Standup' on March 15, 2026 from 9:00 AM to 9:30 AM with attendees alice@co.com and bob@co.com"
+    tools:
+      - type: function
+        function:
+          name: create_event
+          description: "Create a calendar event"
+          parameters:
+            type: object
+            properties:
+              title:
+                type: string
+              date:
+                type: string
+                description: "ISO date (YYYY-MM-DD)"
+              start_time:
+                type: string
+                description: "HH:MM format"
+              end_time:
+                type: string
+                description: "HH:MM format"
+              attendees:
+                type: array
+                items:
+                  type: string
+            required: ["title", "date", "start_time", "end_time"]
+    expected:
+      tool_calls:
+        - name: create_event
+          arguments:
+            title: "Team Standup"
+            date: "2026-03-15"
+            start_time: "09:00"
+            end_time: "09:30"
+
+  - id: fc_edge_002
+    prompt: "Search for 'machine learning' papers published after 2024 in the CS category, limit to 5 results"
+    tools:
+      - type: function
+        function:
+          name: search_papers
+          description: "Search academic papers"
+          parameters:
+            type: object
+            properties:
+              query:
+                type: string
+              category:
+                type: string
+                enum: ["CS", "Math", "Physics", "Biology"]
+              min_year:
+                type: integer
+              max_results:
+                type: integer
+            required: ["query"]
+    expected:
+      tool_calls:
+        - name: search_papers
+          arguments:
+            query: "machine learning"
+            category: "CS"
+            min_year: 2024
+            max_results: 5
+
+  - id: fc_edge_003
+    prompt: "I need to book a flight. Can you help?"
+    tools:
+      - type: function
+        function:
+          name: search_flights
+          description: "Search for flights"
+          parameters:
+            type: object
+            properties:
+              origin:
+                type: string
+              destination:
+                type: string
+              date:
+                type: string
+            required: ["origin", "destination", "date"]
+    expected:
+      tool_calls: []
+      # Model should ask for details, NOT call the tool with missing required params

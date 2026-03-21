@@ -1,0 +1,123 @@
+name: "Basic Function Calling"
+description: "Simple single-tool call scenarios"
+
+tests:
+  - id: fc_001
+    prompt: "What's the weather in San Francisco?"
+    tools:
+      - type: function
+        function:
+          name: get_weather
+          description: "Get current weather for a city"
+          parameters:
+            type: object
+            properties:
+              city:
+                type: string
+                description: "City name"
+              units:
+                type: string
+                enum: ["celsius", "fahrenheit"]
+                description: "Temperature units"
+            required: ["city"]
+    expected:
+      tool_calls:
+        - name: get_weather
+          arguments:
+            city: "San Francisco"
+
+  - id: fc_002
+    prompt: "Convert 100 USD to EUR"
+    tools:
+      - type: function
+        function:
+          name: convert_currency
+          description: "Convert between currencies"
+          parameters:
+            type: object
+            properties:
+              amount:
+                type: number
+              from_currency:
+                type: string
+              to_currency:
+                type: string
+            required: ["amount", "from_currency", "to_currency"]
+    expected:
+      tool_calls:
+        - name: convert_currency
+          arguments:
+            amount: 100
+            from_currency: "USD"
+            to_currency: "EUR"
+
+  - id: fc_003
+    prompt: "Send an email to josh@example.com with subject 'Meeting Tomorrow' and body 'Can we meet at 3pm?'"
+    tools:
+      - type: function
+        function:
+          name: send_email
+          description: "Send an email"
+          parameters:
+            type: object
+            properties:
+              to:
+                type: string
+              subject:
+                type: string
+              body:
+                type: string
+            required: ["to", "subject", "body"]
+      - type: function
+        function:
+          name: get_contacts
+          description: "List contacts"
+          parameters:
+            type: object
+            properties: {}
+    expected:
+      tool_calls:
+        - name: send_email
+          arguments:
+            to: "josh@example.com"
+            subject: "Meeting Tomorrow"
+            body: "Can we meet at 3pm?"
+
+  - id: fc_004
+    prompt: "What time is it in Tokyo and London?"
+    tools:
+      - type: function
+        function:
+          name: get_time
+          description: "Get current time in a timezone"
+          parameters:
+            type: object
+            properties:
+              timezone:
+                type: string
+                description: "IANA timezone name"
+            required: ["timezone"]
+    expected:
+      tool_calls:
+        - name: get_time
+          arguments:
+            timezone: "Asia/Tokyo"
+        - name: get_time
+          arguments:
+            timezone: "Europe/London"
+
+  - id: fc_005
+    prompt: "Just say hello, no need to use any tools."
+    tools:
+      - type: function
+        function:
+          name: search_web
+          description: "Search the web"
+          parameters:
+            type: object
+            properties:
+              query:
+                type: string
+            required: ["query"]
+    expected:
+      tool_calls: []
