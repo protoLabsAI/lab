@@ -11,6 +11,8 @@
 #   llama-70b        — Llama-3.3-70B-Instruct-AWQ, 128K ctx (creative/fast)
 #   qwen-27b-opus-v2 — Qwen3.5-27B-Opus-v2 bf16, 128K ctx
 #   qwen-9b          — Qwen3.5-9B bf16, 262K ctx (fine-tune base)
+#   cydonia-24b      — Cydonia-24B-v4.3 (Mistral base), 32K ctx (creative/roleplay)
+#   mistral-119b     — Mistral-Small-4-119B AWQ-4bit, 32K ctx (MoE)
 #
 # === Dual GPU (TP=2, needs UPS) ===
 #   qwen-122b        — Qwen3.5-122B-A10B-FP8, 64K ctx
@@ -209,6 +211,28 @@ case "$1" in
             --served-model-name local \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
+            --gpu-memory-utilization 0.90 \
+            --language-model-only \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+
+    cydonia-24b)
+        echo "Starting Cydonia-24B-v4.3 (GPU 0, 32K)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve TheDrummer/Cydonia-24B-v4.3 \
+            --host 0.0.0.0 --port $PORT \
+            --max-model-len 32768 \
+            --served-model-name local \
+            --enable-auto-tool-choice --tool-call-parser mistral \
+            --gpu-memory-utilization 0.90 \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+    mistral-119b)
+        echo "Starting Mistral-Small-4-119B AWQ-4bit (GPU 0, 32K)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve cyankiwi/Mistral-Small-4-119B-2603-AWQ-4bit \
+            --host 0.0.0.0 --port $PORT \
+            --max-model-len 32768 \
+            --served-model-name local \
+            --enable-auto-tool-choice --tool-call-parser mistral \
             --gpu-memory-utilization 0.90 \
             --language-model-only \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
