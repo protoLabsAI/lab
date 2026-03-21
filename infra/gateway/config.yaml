@@ -53,16 +53,19 @@ model_list:
     litellm_params:
       model: openai/gpt-5.4
       api_key: os.environ/OPENAI_API_KEY
+      drop_params: true
 
   - model_name: gpt-5.4-mini
     litellm_params:
       model: openai/gpt-5.4-mini
       api_key: os.environ/OPENAI_API_KEY
+      drop_params: true
 
   - model_name: gpt-5.4-nano
     litellm_params:
       model: openai/gpt-5.4-nano
       api_key: os.environ/OPENAI_API_KEY
+      drop_params: true
 
   # ─── Google Gemini ─────────────────────────────────────────────────
   - model_name: gemini-2.5-pro

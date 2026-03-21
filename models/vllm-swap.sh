@@ -189,6 +189,26 @@ case "$1" in
             --gpu-memory-utilization 0.90 \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
+    llama-8b)
+        echo "Starting Llama-3.1-8B-AWQ (GPU 0, 128K)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4 \
+            --host 0.0.0.0 --port $PORT \
+            --served-model-name local \
+            --max-model-len 131072 \
+            --enable-auto-tool-choice --tool-call-parser llama3_json \
+            --gpu-memory-utilization 0.90 \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+    hermes-70b)
+        echo "Starting Hermes-3-Llama-3.1-70B-FP8 (GPU 0, 128K)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve NousResearch/Hermes-3-Llama-3.1-70B-FP8 \
+            --host 0.0.0.0 --port $PORT \
+            --served-model-name local \
+            --max-model-len 131072 \
+            --enable-auto-tool-choice --tool-call-parser hermes \
+            --gpu-memory-utilization 0.90 \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
     qwen-9b)
         echo "Starting Qwen3.5-9B (GPU 0, 262K)..."
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-9B \
