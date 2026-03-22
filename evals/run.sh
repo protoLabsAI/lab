@@ -6,6 +6,9 @@
 #   ./run.sh custom --suite tool_use --model local --submit-langfuse
 #   ./run.sh profile --name quick --model local
 #   ./run.sh profile --name full --model local
+#   ./run.sh wildbench infer --model local          # generate responses (1,024 tasks)
+#   ./run.sh wildbench judge --results X --judge gpt-5.4  # score with cloud judge (~$5)
+#   ./run.sh wildbench run --model local --judge gpt-5.4  # both phases
 #   ./run.sh compare results/model_a results/model_b
 #   ./run.sh --setup       # configure machine identity (first time)
 #   ./run.sh --local ...   # use local .env instead of Infisical
