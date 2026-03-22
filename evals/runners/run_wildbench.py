@@ -270,33 +270,33 @@ def judge(results, judge, gateway_url, api_key, limit):
 
 @main.command()
 @click.option("--model", required=True, help="Model name for the API")
-@click.option("--judge", default="gpt-5.4", help="Judge model")
+@click.option("--judge", "judge_model", default="gpt-5.4", help="Judge model")
 @click.option("--gateway-url", default="http://localhost:4000/v1")
 @click.option("--api-key", envvar="GATEWAY_API_KEY", default="not-needed")
 @click.option("--max-tokens", default=4096)
 @click.option("--limit", default=None, type=int, help="Limit tasks")
-def run(model, judge, gateway_url, api_key, max_tokens, limit):
+def run(model, judge_model, gateway_url, api_key, max_tokens, limit):
     """Run both inference and judging in one step."""
-    from click.testing import CliRunner
+    import subprocess, sys
 
-    runner = CliRunner()
-
-    # Phase 1
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     out_path = str(RESULTS_DIR / f"{model}.json")
-    args = ["--model", model, "--gateway-url", gateway_url, "--api-key", api_key,
-            "--max-tokens", str(max_tokens), "--output", out_path]
-    if limit:
-        args += ["--limit", str(limit)]
-    result = runner.invoke(infer, args, catch_exceptions=False)
-    click.echo(result.output)
 
-    # Phase 2
-    args = ["--results", out_path, "--judge", judge, "--gateway-url", gateway_url,
-            "--api-key", api_key]
+    # Phase 1: Inference
+    cmd = [sys.executable, "-m", "runners.cli", "wildbench", "infer",
+           "--model", model, "--gateway-url", gateway_url, "--api-key", api_key,
+           "--max-tokens", str(max_tokens), "--output", out_path]
     if limit:
-        args += ["--limit", str(limit)]
-    result = runner.invoke(judge, args, catch_exceptions=False)
-    click.echo(result.output)
+        cmd += ["--limit", str(limit)]
+    subprocess.run(cmd, check=True)
+
+    # Phase 2: Judging
+    cmd = [sys.executable, "-m", "runners.cli", "wildbench", "judge",
+           "--results", out_path, "--judge", judge_model, "--gateway-url", gateway_url,
+           "--api-key", api_key]
+    if limit:
+        cmd += ["--limit", str(limit)]
+    subprocess.run(cmd, check=True)
 
 
 @main.command()
