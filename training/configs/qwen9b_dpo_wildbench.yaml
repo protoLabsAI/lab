@@ -1,0 +1,49 @@
+### LLaMA-Factory DPO config for Qwen3.5-9B on WildBench data
+### Usage: llamafactory-cli train training/configs/qwen9b_dpo_wildbench.yaml
+
+### Model
+model_name_or_path: Qwen/Qwen3.5-9B
+trust_remote_code: true
+
+### Method
+stage: dpo
+do_train: true
+finetuning_type: lora
+lora_target: all
+lora_rank: 64
+lora_alpha: 128
+lora_dropout: 0.05
+pref_beta: 0.1
+
+### Dataset
+dataset_dir: /home/ava/dev/lab/training/data
+dataset: wildbench_dpo_9b
+template: qwen3
+cutoff_len: 4096
+
+### Output
+output_dir: /mnt/data/training/qwen9b-dpo-wildbench
+logging_dir: /mnt/data/training/qwen9b-dpo-wildbench/logs
+logging_steps: 10
+save_steps: 100
+save_total_limit: 3
+overwrite_output_dir: true
+
+### Training
+per_device_train_batch_size: 2
+gradient_accumulation_steps: 8
+learning_rate: 5.0e-6
+num_train_epochs: 3
+lr_scheduler_type: cosine
+warmup_ratio: 0.1
+bf16: true
+ddp_timeout: 180000000
+
+### Eval
+val_size: 0.05
+per_device_eval_batch_size: 2
+eval_strategy: steps
+eval_steps: 100
+
+### Misc
+report_to: none

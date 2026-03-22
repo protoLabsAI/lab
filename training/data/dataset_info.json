@@ -1,0 +1,32 @@
+{
+  "wildbench_dpo_9b": {
+    "file_name": "dpo_wildbench_9b.json",
+    "formatting": "sharegpt",
+    "ranking": true,
+    "columns": {
+      "messages": "conversations",
+      "chosen": "chosen",
+      "rejected": "rejected"
+    }
+  },
+  "wildbench_dpo_4b": {
+    "file_name": "dpo_wildbench_4b.json",
+    "formatting": "sharegpt",
+    "ranking": true,
+    "columns": {
+      "messages": "conversations",
+      "chosen": "chosen",
+      "rejected": "rejected"
+    }
+  },
+  "wildbench_dpo_35b": {
+    "file_name": "dpo_wildbench_35b.json",
+    "formatting": "sharegpt",
+    "ranking": true,
+    "columns": {
+      "messages": "conversations",
+      "chosen": "chosen",
+      "rejected": "rejected"
+    }
+  }
+}
