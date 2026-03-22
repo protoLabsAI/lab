@@ -122,23 +122,23 @@ cd evals
 
 ## Model Inventory (`/mnt/models`)
 
-| Model | Size | tok/s | +MTP | Claw pass^3 | Role |
+| Model | Size | tok/s | +MTP | Quick Score | Role |
 |-------|------|:-----:|:----:|:-----------:|------|
-| **Qwen 27B INT4** | 29GB | 53 | **70** | 3/4 | Daily driver, all-rounder |
-| **Qwen 35B MoE BF16** | 67GB | 171 | — | 3/4 | Speed king (single GPU, 220 TP=2) |
-| **Qwen 122B FP8** | 119GB | 18.5 | — | 3/4 | Quality ceiling (TP=2 only) |
-| **Qwen 122B INT4** | 74GB | ~30 | — | 3/4 | Quality ceiling (TP=2, smaller) |
-| **Qwen 9B BF16** | 19GB | 92 | **112** | 2/4 | Fine-tune base (best coding at 9B) |
-| **Qwen 4B INT4** | 3GB | 297 | — | 2-3/4 | Edge deploy speed demon |
-| **Qwen 4B BF16** | 8GB | 155 | — | 3/4 | Edge deploy, LoRA base |
-| Cydonia 24B | 44GB | — | — | 0/4 | Creative/roleplay only |
-| Llama 70B AWQ | 38GB | 38 | — | 1/4 | Creative/roleplay |
-| Qwen 2B BF16 | 4GB | 307 | — | 0/4 | Training experiments |
-| Qwen 0.8B BF16 | 1.5GB | 547 | — | 0/4 | Training experiments |
+| **Qwen 27B INT4** | 29GB | 53 | **70** | **86/103** | Daily driver (MTP for chat, baseline for agents) |
+| **Qwen 35B MoE BF16** | 67GB | 171 | — | 76/103 | Speed king, best coding (10/10) |
+| **Qwen 122B INT4** | 74GB | ~30 | — | — | Quality ceiling (TP=2) |
+| **Qwen 9B BF16** | 19GB | 92 | **112** | 72/103 | Fine-tune base |
+| **Qwen 4B INT4** | 3.8GB | 297 | — | 56/103 | Edge deploy |
+| **Qwen 4B BF16** | 8.8GB | 155 | — | — | LoRA base |
+| Cydonia 24B | 44GB | — | — | — | Creative/roleplay (holding) |
+| Llama 70B AWQ | 38GB | 38 | — | — | Creative/roleplay (holding) |
+| Llama 8B AWQ | 5GB | — | — | 50/102 | Eval baseline (poor) |
+| Qwen 2B BF16 | 4GB | 307 | — | — | Training (5/5 reasoning!) |
+| Qwen 0.8B BF16 | 1.5GB | 547 | — | — | Training |
 
-Base models (0.8B, 2B, 4B) also downloaded for pretraining. 420GB free on `/mnt/models`.
+Base models (0.8B, 2B, 4B) also downloaded for pretraining. 415GB free on `/mnt/models`.
 
-Cold storage (`/mnt/data/models-cold/`): FLUX.2-klein 9B+base (100GB), Z-Image+Turbo (51GB), Voxtral-Mini-4B (17GB), Qianfan-OCR (9GB), GLM-OCR (2.5GB).
+Cold storage (`/mnt/data/models-cold/`): FLUX.2-klein 9B+base (100GB), Z-Image+Turbo (51GB), Voxtral-Mini-4B (17GB), OCR models (11.4GB).
 
 ## Blackwell GPU Constraints
 

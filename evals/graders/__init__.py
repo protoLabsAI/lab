@@ -11,7 +11,12 @@ Grader types:
 from graders.base import Grader, GradeResult
 from graders.outcome import OutcomeGrader
 from graders.llm_judge import LLMJudge
+from graders.pairwise_judge import PairwiseJudge, PairwiseResult
 from graders.function_call import FunctionCallGrader
 from graders.langfuse_scorer import LangfuseScorer
 
-__all__ = ["Grader", "GradeResult", "OutcomeGrader", "LLMJudge", "FunctionCallGrader", "LangfuseScorer"]
+__all__ = [
+    "Grader", "GradeResult", "OutcomeGrader", "LLMJudge",
+    "PairwiseJudge", "PairwiseResult",
+    "FunctionCallGrader", "LangfuseScorer",
+]

@@ -1,196 +1,174 @@
-# Session Handoff — 2026-03-21 (Afternoon)
+# Session Handoff — 2026-03-22
 
-## What We Did This Session
+## What We Built
 
-### 1. Qwen3.5 Small Model Evaluation (0.8B → 9B)
-Evaluated the full Qwen3.5 family for fine-tuning base selection:
+### 1. Comprehensive Eval Suite (128 custom tests + 72 claw + 8 FC)
 
-- **Qwen3.5-9B** selected as fine-tune base over OmniCoder-9B (same arch, better tool use)
-- **Qwen3.5-4B** is the breakout — matches 9B on 6/8 eval dimensions
-- **4B INT4 (AWQ)** runs at 294 tok/s, 3GB, quality intact
-- **Capability cliff at 4B→2B**: sub-4B models can't reliably call tools (0/4 claw pass^3)
-- **2B surprised on reasoning**: 5/5 on logic/math, matching 9B — can think but can't act
-- OmniCoder-9B nuked (inferior), Qwen3.5-27B bf16 nuked (redundant with INT4)
-- Base models (0.8B, 2B, 4B) downloaded for pretraining experiments
+| Suite | Tests | New? |
+|-------|:-----:|:----:|
+| **creative_writing** | 25 | +20 (narrative, character voice, genre, perspective) |
+| **summarization** | 25 | +20 (news, technical, factual consistency) |
+| **RAG** | 25 | +20 (faithfulness, multi-doc, domain-specific, edge cases) |
+| **coding** | 10 | — |
+| **instruction_following** | 5 | — |
+| **reasoning** | 5 | — |
+| **structured_output** | 5 | — |
+| **safety** | 5 | — |
+| **roleplay** | 5 | — |
+| **svg_generation** | 5 | — |
+| **research** | 4 | — |
+| **function_call** | 8 | — |
 
-### 2. Comprehensive Eval Suite Built
-Created 6 new eval suites (30 tests) and a profile runner:
+New infrastructure: pairwise A/B judge, NIAH context window test, deepeval/ragas integration.
 
-| Suite | Tests | Domain |
-|-------|:-----:|--------|
-| `instruction_following` | 5 | Constraint adherence, format compliance |
-| `reasoning` | 5 | Math, logic puzzles, deduction, pattern recognition |
-| `safety` | 5 | Refusal, jailbreak resistance, PII, security review |
-| `structured_output` | 5 | JSON, YAML, SQL, markdown tables, log parsing |
-| `summarization` | 5 | Compression, action extraction, TL;DR |
-| `coding/analysis` | 5 | Complexity, security review, regex, API design |
+**Quick profile is FROZEN as baseline** — don't change test composition. Add new profiles instead.
 
-**Profiles:**
-- `quick` — 6 claw + 6 custom suites + FC, 1 trial (~15 min)
-- `full` — 20 claw + 10 custom suites + FC, 3 trials pass^3 (~60-90 min)
+### 2. Speed Optimization Testing
 
-```bash
-cd evals && ./run.sh profile --name quick --model local
-cd evals && ./run.sh profile --name full --model local
-```
+| Optimization | Result |
+|-------------|--------|
+| P1+P2 flags (async-scheduling, prefix-caching, FP8 KV) | +1-3% single-request (real wins under concurrency) |
+| **MTP speculative decoding** | **+32% on 27B, +22% on 9B, -11% on 35B MoE** |
+| NCCL tuning for TP=2 | Zero impact on decode speed |
+| Prefix caching on TP=2 | TTFT -70% on 35B (1.8s→0.5s) |
+| MoE FP8 env vars | Crashes on 122B FP8 quants, +2% on BF16 MoE |
 
-### 3. Grand Model Comparison (17 Models)
-Ran quick profile across local and cloud models:
+### 3. Grand Model Comparison (Expanded Quick Profile)
 
-| Model | Claw | Code | IF | Reason | SO | Summ | Safety | FC | **Total** |
-|-------|:----:|:----:|:--:|:------:|:--:|:----:|:------:|:--:|:---------:|
-| **GPT-5.4** | 1/6 | 10/10 | 5/5 | 5/5 | 5/5 | 3/5 | 5/5 | 8/8 | **42/49** |
-| **Gemini 3 Flash** | 2/5 | 9/10 | 5/5 | 4/5 | 5/5 | 5/5 | 4/5 | 8/8 | **42/48** |
-| **Qwen 9B** | 4/6 | 7/10 | 3/5 | 5/5 | 5/5 | 5/5 | 5/5 | 8/8 | **42/49** |
-| **Sonnet 4.6** | 2/6 | 10/10 | 5/5 | 4/5 | 4/5 | 4/5 | 4/5 | 8/8 | **41/49** |
-| **DeepSeek V3.2** | 4/6 | 9/10 | 4/5 | 5/5 | 3/5 | 4/5 | 4/5 | 8/8 | **41/49** |
-| **Qwen 35B MoE** | 2/6 | 10/10 | 3/5 | 5/5 | 4/5 | 4/5 | 5/5 | 8/8 | **41/49** |
-| **GPT-OSS-120B** | 0/6 | 9/10 | 5/5 | 5/5 | 5/5 | 3/5 | 4/5 | 8/8 | **39/49** |
-| **Grok 4.1 Fast** | 1/6 | 8/10 | 5/5 | 5/5 | 4/5 | 3/5 | 5/5 | 8/8 | **39/49** |
-| **Opus 4.6** | 2/6 | 9/10 | 3/5 | 4/5 | 4/5 | 4/5 | 4/5 | 8/8 | **38/49** |
-| **Qwen 27B INT4** | 1/6 | 8/10 | 4/5 | 4/5 | 5/5 | 3/5 | 5/5 | 8/8 | **38/49** |
-| **Qwen 4B INT4** | 4/6 | 7/10 | 3/5 | 5/5 | 5/5 | 2/5 | 4/5 | 8/8 | **38/49** |
-| **GPT-OSS-20B** | 2/6 | 7/10 | 3/5 | 5/5 | 5/5 | 4/5 | 4/5 | 8/8 | **38/49** |
-| **Haiku 4.5** | 2/6 | 9/10 | 2/5 | 5/5 | 3/5 | 3/5 | 4/5 | 8/8 | **36/49** |
-| **Cydonia 24B** | 0/6 | 8/10 | 4/5 | 4/5 | 2/5 | 3/5 | 1/5 | 2/8 | **24/49** |
-| **Qwen 2B** | 1/6 | 3/10 | 3/5 | 5/5 | 3/5 | 2/5 | 2/5 | 2/8 | **21/49** |
-| **Qwen 0.8B** | 1/6 | 3/10 | 1/5 | 3/5 | 1/5 | 2/5 | — | 2/8 | **13/49** |
+| Model | Claw | Code | IF | Rea | SO | Summ/25 | Safe | Creat/25 | RP | FC | Total |
+|-------|:----:|:----:|:--:|:---:|:--:|:-------:|:----:|:--------:|:--:|:--:|:-----:|
+| **GPT-5.4** | 2/9 | 9 | 5 | 5 | 5 | 21 | 5 | 23 | 5 | 8 | **88/102** |
+| **Sonnet 4.6** | 4/10 | 9 | 3 | 5 | 4 | 20 | 4 | **25** | 5 | 8 | **87/103** |
+| **Gemini Flash** | 2/8 | 9 | 4 | 4 | 5 | **23** | 4 | 23 | 5 | 8 | **87/101** |
+| **DeepSeek V3.2** | 2/8 | 9 | 4 | 5 | 4 | 21 | 4 | **25** | 5 | 8 | **87/101** |
+| *27B INT4 MTP* | **5** | 8 | **5** | **5** | **5** | 19 | **5** | 21 | 5 | 8 | **86/103** |
+| **Gemini 3.1 Pro** | 0/7 | **10** | 4 | 4 | 5 | 22 | 5 | 22 | 5 | 8 | **85/100** |
+| **Grok 4.1 Fast** | 2/8 | 8 | 4 | 5 | 4 | 22 | 5 | 22 | 5 | 8 | **85/101** |
+| *27B INT4* | **5** | 8 | 4 | 4 | **5** | 21 | **5** | 19 | 5 | 8 | **84/103** |
+| **Haiku 4.5** | 3/8 | 9 | 2 | 4 | 3 | 22 | 4 | 23 | 5 | 8 | **83/101** |
+| *35B MoE* | **6** | **10** | 4 | **5** | 4 | 19 | **5** | 11 | 4 | 8 | **76/103** |
+| *9B MTP* | 5 | 8 | 4 | **5** | 4 | 19 | **5** | 11 | 3 | 8 | **72/103** |
+| *4B INT4* | 5 | 7 | 3 | **5** | **5** | 14 | 4 | 2 | 3 | 8 | **56/103** |
+| *Llama 8B AWQ* | 1/9 | 5 | 3 | 2 | 5 | 14 | 5 | 5 | 4 | 6 | **50/102** |
 
-### 4. New Models Tested
-- **Cydonia 24B v4.3** (Mistral base): 24/49, tool calling broken, safety 1/5. Keeping for creative/roleplay experiments only.
-- **Mistral-Small-4-119B AWQ**: **crashed** — MLA attention with head_size=320 not supported on Blackwell SM 12.0 in vLLM 0.17.1. Nuked (53GB freed).
-- **GPT-OSS-20B**: 38/49, slow (37 min for quick profile), tool calls output as text
-- **GPT-OSS-120B**: 39/49, faster than 20B (17 min), but 0/6 claw (can't use tools through gateway)
-- **Grok 4.1 Fast**: 39/49, finally completed (failed last session due to gateway restart)
+*italic = local model*
 
-### 5. Bug Fixes
-- **Claw task resolver**: T10 was matching T100_reverse_decoder. Fixed with underscore boundary (`T10_*` before `T10*`).
-- **vllm-swap.sh symlink**: Created `~/dev/vllm-swap.sh` → `lab/models/vllm-swap.sh`
-- **sam alias**: Fixed mangled bashrc alias
+### 4. Models Tested and Eliminated
 
----
+| Model | Why Eliminated |
+|-------|---------------|
+| OmniCoder 9B | Inferior to Qwen3.5-9B (same arch, worse tool use) |
+| Mistral-Small-4-119B | MLA attention unsupported on Blackwell SM 12.0 |
+| Qwen3.5-27B BF16 | Redundant with INT4 (same quality, 52GB wasted) |
+| Qwen3.5-122B FP8 | Redundant with INT4 (INT4 is faster on single GPU) |
+| Hermes 3 70B FP8 | FP8 crashes under sustained load, tool parser broken, all claw scores 0.00 |
+| Llama 8B AWQ | 50/102 — worst model tested, Qwen 4B beats it at 1/4 the size |
 
-## Currently Running
+### 5. Key Discoveries
 
-Full profile (3 trials, 20 claw tasks, all suites) on:
-- **Qwen3.5-4B INT4** (local)
-- **Claude Sonnet 4.6** (cloud)
-- **Claude Haiku 4.5** (cloud)
+**Creative writing is the great separator.** The expanded 25-test creative suite reveals massive quality gaps invisible in the old 5-test version:
+- Frontier ceiling: 25/25 (Sonnet 4.6, DeepSeek V3.2)
+- 27B MTP: 21/25 (competitive)
+- 35B MoE: 11/25 (MoE routing hurts creative?)
+- 9B: 11/25 (fine-tune target)
+- 4B: 2/25 (capability cliff)
 
-Check status:
-```bash
-# Background task output files
-ls /tmp/claude-1001/-home-ava-dev-lab/*/tasks/*.output
-# Or check results dirs
-ls evals/results/ | tail -10
-```
+**Qwen owns everything local.** Llama 8B scored 50/102 vs Qwen 9B at 72/103. Hermes 70B couldn't even complete a run. All fine-tuning should be on Qwen architecture.
+
+**27B MTP is 1 point behind frontier.** At 86/103 with 70 tok/s local, it's within striking distance of GPT-5.4 (88/102). The gap is creative (21 vs 23) and summarization (19 vs 21).
 
 ---
 
-## vLLM Optimization Research — Priority Actions
+## Current Model Inventory (`/mnt/models` — 415GB free)
 
-### Priority 1: Free Wins (Add to ALL configs)
-```bash
---async-scheduling              # ~30% throughput gain, zero risk (Blackwell-recommended)
---enable-prefix-caching         # TTFT 4.3s→0.6s on repeated prompts
---performance-mode interactivity  # Auto-tunes scheduler for latency
-```
+### Production LLMs
 
-### Priority 2: Double KV Cache Capacity
-```bash
---kv-cache-dtype fp8            # 2x effective KV cache (128K→200K+ context)
-```
-Low risk. Test quality first. No calibration needed (defaults to scale=1.0).
+| Model | Size | tok/s | Quick Score | Config |
+|-------|------|:-----:|:-----------:|--------|
+| **Qwen 27B INT4** | 29GB | 53/70 MTP | 84-86/103 | `qwen-27b-int4` / `-mtp` |
+| **Qwen 35B MoE** | 67GB | 171 | 76/103 | `qwen-35b` |
+| **Qwen 9B** | 19GB | 92/112 MTP | 72/103 | `qwen-9b` / `-mtp` |
+| **Qwen 4B INT4** | 3.8GB | 297 | 56/103 | `qwen-4b-int4` |
+| **Qwen 122B INT4** | 74GB | ~30 (TP=2) | — | `qwen-122b-int4` |
 
-### Priority 3: MTP Speculative Decoding (Test Carefully)
-```bash
---speculative-config '{"method": "mtp", "num_speculative_tokens": 1}'
-```
-Qwen3.5 natively supports Multi-Token Prediction. Big latency win BUT:
-- Known bug: acceptance rate collapses during tool-calling sessions (issue #36872)
-- Fix exists in PR #36910 — check if merged in 0.17.1
-- Only `num_speculative_tokens: 1` works, value of 2 errors out
-- **DO NOT use with tool-calling workflows until verified**
+### Training / Fine-tune Bases
 
-### Priority 4: TP=2 NCCL Tuning
-```bash
-export NCCL_ALGO=Ring
-export NCCL_PROTO=Simple
-export NCCL_MIN_NCHANNELS=4
-export NCCL_MAX_NCHANNELS=8
-```
+| Model | Size | Purpose |
+|-------|------|---------|
+| Qwen 4B BF16 | 8.8GB | LoRA base |
+| Qwen 4B Base | 8.8GB | Pretraining |
+| Qwen 2B + Base | 8.6GB | Training experiments (5/5 reasoning at 2B!) |
+| Qwen 0.8B + Base | 3.4GB | Training experiments |
+| Llama 3.1-8B AWQ | 5GB | Eval baseline (poor: 50/102) |
 
-### Priority 5: MoE-Specific (35B, 122B)
-```bash
-export VLLM_USE_FLASHINFER_MOE_FP8=1
-export VLLM_FLASHINFER_MOE_BACKEND=latency
-```
+### Creative / Experimental
 
-### Not Yet Viable
-- **FlashAttention 4**: Integrated in vLLM 0.17.0 for Blackwell, but `flash-attn` package may not be installed. Worth checking.
-- **NVFP4 quantization**: Native Blackwell FP4 tensor cores, but Mamba-hybrid layers must stay BF16 and output can be garbled. Stick with GPTQ-Int4.
-- **Mistral MLA models**: Not supported on SM 12.0 (head_size=320 unsupported by all attention backends).
+| Model | Size | Notes |
+|-------|------|-------|
+| Cydonia 24B | 44GB | Uncensored Mistral, tool calling broken, holding for manual creative testing |
+| Llama 3.3-70B AWQ | 38GB | Creative/roleplay, holding |
 
-### Recommended A/B Test
-1. Baseline: current qwen-27b-int4 config (44 tok/s)
-2. Optimized: add `--async-scheduling --enable-prefix-caching --performance-mode interactivity --kv-cache-dtype fp8`
-3. Run quick profile on both, compare tok/s and quality
+### Non-LLM
+
+| Model | Size | Notes |
+|-------|------|-------|
+| LTX-2.3 | 97GB | Video gen (ComfyUI symlinked, keep on fast drive) |
+| fishaudio/s2-pro | 11GB | TTS |
+
+### Cold Storage (`/mnt/data/models-cold/`)
+
+FLUX.2-klein 9B+base (100GB), Z-Image+Turbo (51GB), Voxtral-Mini-4B (17GB), OCR models (11.4GB)
 
 ---
 
-## Model Inventory (`/mnt/models` — 244GB free)
+## Recommended Production Configs
 
-### LLM Models (servable via vllm-swap.sh)
+```bash
+# Daily driver — agentic work (tools, claw tasks)
+bash models/vllm-swap.sh qwen-27b-int4       # 53 tok/s, reliable tools
 
-| Model | Size | tok/s | Quick Score | Role |
-|-------|------|:-----:|:-----------:|------|
-| **Qwen 27B INT4** | 29GB | 44 | 38/49 | Daily driver |
-| **Qwen 35B MoE BF16** | 67GB | 170 | 41/49 | Speed king (TP=2) |
-| **Qwen 122B INT4** | 74GB | ~30 | — | Quality ceiling |
-| **Qwen 9B BF16** | 19GB | 92 | 42/49 | Fine-tune base |
-| **Qwen 4B INT4** | 3.8GB | 294 | 38/49 | Edge deploy |
-| **Qwen 4B BF16** | 8.8GB | 155 | — | LoRA base |
-| Qwen 2B BF16 | 4.3GB | 307 | 21/49 | Training |
-| Qwen 0.8B BF16 | 1.7GB | 547 | 13/49 | Training |
-| Cydonia 24B | 44GB | — | 24/49 | Creative/roleplay only |
-| Llama 70B AWQ | 38GB | 38 | — | Creative/roleplay |
+# Daily driver — chat, creative, coding
+bash models/vllm-swap.sh qwen-27b-int4-mtp   # 70 tok/s, +32% speed
 
-### Base Models (for pretraining)
-- Qwen3.5-0.8B-Base (1.7GB)
-- Qwen3.5-2B-Base (4.3GB)
-- Qwen3.5-4B-Base (8.8GB)
+# Fine-tune evaluation
+bash models/vllm-swap.sh qwen-9b-mtp         # 112 tok/s, fine-tune baseline
 
-### Non-LLM Models
-- Lightricks/LTX-2.3 (97GB) — video gen
-- FLUX.2-klein-9B + base (100GB) — image gen
-- Z-Image + Turbo (51GB) — image gen
-- fishaudio/s2-pro (11GB) — TTS
-- Voxtral-Mini-4B (17GB) — TTS
-- Qianfan-OCR + GLM-OCR (11.4GB) — OCR
+# Edge deploy
+bash models/vllm-swap.sh qwen-4b-int4        # 297 tok/s, 3.8GB
+
+# Quality ceiling (needs both GPUs)
+bash models/vllm-swap.sh qwen-122b-int4      # 30 tok/s, TP=2
+
+# Speed king (single GPU or TP=2 for long context)
+bash models/vllm-swap.sh qwen-35b            # 171 tok/s, best for batch/coding
+```
 
 ---
 
 ## What YOU Need To Do Next
 
-### Immediate
-- [ ] Wait for full profile runs to complete (4B INT4, Sonnet, Haiku)
-- [ ] A/B test vLLM optimization flags on daily driver
-- [ ] Roll out winning flags to all vllm-swap.sh configs
-- [ ] Consider nuking Cydonia 24B (44GB, scored 24/49) if not using for creative work
+### Fine-Tuning (Primary Goal)
+- [ ] Install LLaMA-Factory (`pip install llamafactory` in training venv)
+- [ ] Accept Llama 3.1-8B-Instruct license: https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct
+- [ ] Set up Langfuse online evaluators for protoClaw production traffic
+- [ ] Export tool-use traces from Langfuse as training data
+- [ ] First LoRA: Qwen3.5-9B on protoClaw tool-use traces
+- [ ] Creative writing LoRA: Qwen3.5-9B on curated creative data (target: 11→20+/25)
+- [ ] Create HuggingFace dataset: `ArtificialCitizens/protoclaw-agent-v1`
 
-### Eval Suite Refinement
-- [ ] Review full profile results — identify tests that are too easy (5/5 everywhere) or too hard (0/5 everywhere) and recalibrate
-- [ ] The `communication` dimension scores 0.00 across all claw tasks — investigate if this grader is broken or just strict
-- [ ] T04 (calendar scheduling) fails for almost every model — check if the task or rubric needs adjustment
-- [ ] Install Inspect AI for HumanEval/GSM8K/ARC standardized benchmarks: `uv pip install inspect-ai`
+### Eval Refinement
+- [ ] Run full profile (3 trials, pass^3) on 27B MTP — it's our SOTA local model
+- [ ] Investigate claw scoring — many models score low, may be rubric/parser issues
+- [ ] GPT-5.4-mini/nano need gateway restart with `drop_params: true` to retest
+- [ ] Consider adding WildBench (1,024 tasks) as a periodic deep creative eval
 
-### Training Pipeline
-- [ ] Install LLaMA-Factory in training workspace
-- [ ] First fine-tune: Qwen3.5-9B LoRA on protoClaw tool-use traces from Langfuse
-- [ ] Create HuggingFace dataset (`ArtificialCitizens/protoclaw-agent-v1`)
-- [ ] Consider 2B as fine-tune target — if we can teach it tool calling, it's a 4GB model that reasons as well as 9B
+### Infrastructure
+- [ ] Rebuild protoClaw container for Langfuse tracing
+- [ ] Set up Grafana dashboard for protoClaw metrics
+- [ ] Concurrency testing — async-scheduling claims 30% but untested under load
+- [ ] Install Inspect AI: `uv pip install inspect-ai` (HumanEval, GSM8K, ARC)
 
 ### Models to Revisit
+- [ ] Qwen3-235B GPTQ-Int4 (~120GB) — would be our quality ceiling, 415GB free
 - [ ] Mistral-Small-4-119B — retry when vLLM ships MLA fixes for SM 12.0
-- [ ] Qwen3-235B-A22B GPTQ-Int4 — ~120GB, might fit TP=2 (244GB free)
-- [ ] DeepSeek-R1-Distill-Llama-70B — need AWQ quant (~38GB) or run TP=2 at BF16
+- [ ] Llama 3.1-8B-Instruct BF16 — for fine-tune experiments once license approved
