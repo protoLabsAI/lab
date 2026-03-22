@@ -120,11 +120,14 @@ def infer(model, gateway_url, api_key, max_tokens, limit, output):
 
         start = time.monotonic()
         try:
+            # Use higher max_tokens to accommodate Qwen3.5 thinking tokens
+            # The thinking/reasoning tokens don't appear in content but count toward limit
             resp = client.chat.completions.create(
                 model=model,
                 messages=messages,
                 max_tokens=max_tokens,
                 temperature=0,
+                extra_body={"chat_template_kwargs": {"enable_thinking": False}},
             )
             output_text = resp.choices[0].message.content or ""
             tokens = resp.usage.completion_tokens if resp.usage else 0
