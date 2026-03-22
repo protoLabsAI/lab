@@ -120,15 +120,18 @@ def infer(model, gateway_url, api_key, max_tokens, limit, output):
 
         start = time.monotonic()
         try:
-            # Use higher max_tokens to accommodate Qwen3.5 thinking tokens
-            # The thinking/reasoning tokens don't appear in content but count toward limit
-            resp = client.chat.completions.create(
+            kwargs = dict(
                 model=model,
                 messages=messages,
                 max_tokens=max_tokens,
                 temperature=0,
-                extra_body={"chat_template_kwargs": {"enable_thinking": False}},
             )
+            # Disable Qwen3.5 thinking mode for local vLLM models
+            # (vLLM-specific param, cloud APIs reject it)
+            if "localhost:8000" in gateway_url or model == "local":
+                kwargs["extra_body"] = {"chat_template_kwargs": {"enable_thinking": False}}
+
+            resp = client.chat.completions.create(**kwargs)
             output_text = resp.choices[0].message.content or ""
             tokens = resp.usage.completion_tokens if resp.usage else 0
             error = None
