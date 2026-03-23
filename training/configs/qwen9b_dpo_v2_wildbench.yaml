@@ -1,0 +1,53 @@
+### Method B (phase 2): DPO from SFT checkpoint — corrected hyperparameters
+### Method C standalone: DPO with corrected hyperparameters (no SFT warmup)
+### Usage: llamafactory-cli train training/configs/qwen9b_dpo_v2_wildbench.yaml
+
+### Model — change to SFT checkpoint path for Method B phase 2
+model_name_or_path: Qwen/Qwen3.5-9B
+adapter_name_or_path: /mnt/data/training/qwen9b-sft
+trust_remote_code: true
+
+### Method
+stage: dpo
+do_train: true
+finetuning_type: lora
+lora_target: all
+lora_rank: 16
+lora_alpha: 16
+lora_dropout: 0.1
+pref_beta: 0.1
+create_new_adapter: true
+
+### Dataset
+dataset_dir: /home/ava/dev/lab/training/data
+dataset: wildbench_dpo_9b
+template: qwen3
+cutoff_len: 4096
+
+### Output
+output_dir: /mnt/data/training/qwen9b-sft-dpo
+logging_dir: /mnt/data/training/qwen9b-sft-dpo/logs
+logging_steps: 5
+save_steps: 50
+save_total_limit: 3
+overwrite_output_dir: true
+
+### Training — 10x lower LR than our first attempt
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 8
+learning_rate: 5.0e-7
+num_train_epochs: 1
+lr_scheduler_type: cosine
+warmup_ratio: 0.1
+bf16: true
+gradient_checkpointing: true
+ddp_timeout: 180000000
+
+### Eval
+val_size: 0.05
+per_device_eval_batch_size: 1
+eval_strategy: steps
+eval_steps: 50
+
+### Misc
+report_to: none

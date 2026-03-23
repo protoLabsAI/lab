@@ -1,0 +1,49 @@
+### Method B (phase 1): SFT on chosen responses only
+### Usage: llamafactory-cli train training/configs/qwen9b_sft_wildbench.yaml
+
+### Model
+model_name_or_path: Qwen/Qwen3.5-9B
+trust_remote_code: true
+
+### Method
+stage: sft
+do_train: true
+finetuning_type: lora
+lora_target: all
+lora_rank: 16
+lora_alpha: 16
+lora_dropout: 0.1
+
+### Dataset
+dataset_dir: /home/ava/dev/lab/training/data
+dataset: wildbench_sft_chosen
+template: qwen3
+cutoff_len: 4096
+
+### Output
+output_dir: /mnt/data/training/qwen9b-sft
+logging_dir: /mnt/data/training/qwen9b-sft/logs
+logging_steps: 5
+save_steps: 50
+save_total_limit: 3
+overwrite_output_dir: true
+
+### Training
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 8
+learning_rate: 1.0e-4
+num_train_epochs: 1
+lr_scheduler_type: cosine
+warmup_ratio: 0.1
+bf16: true
+gradient_checkpointing: true
+ddp_timeout: 180000000
+
+### Eval
+val_size: 0.05
+per_device_eval_batch_size: 1
+eval_strategy: steps
+eval_steps: 50
+
+### Misc
+report_to: none

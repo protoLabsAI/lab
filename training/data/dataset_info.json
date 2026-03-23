@@ -1,4 +1,11 @@
 {
+  "wildbench_sft_chosen": {
+    "file_name": "sft_wildbench_chosen.json",
+    "formatting": "sharegpt",
+    "columns": {
+      "messages": "conversations"
+    }
+  },
   "wildbench_dpo_9b": {
     "file_name": "dpo_wildbench_9b.json",
     "formatting": "sharegpt",
