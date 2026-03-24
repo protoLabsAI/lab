@@ -35,5 +35,15 @@
       "chosen": "chosen",
       "rejected": "rejected"
     }
+  },
+  "wildbench_dpo_scaled": {
+    "file_name": "dpo_scaled_9b.json",
+    "formatting": "sharegpt",
+    "ranking": true,
+    "columns": {
+      "messages": "conversations",
+      "chosen": "chosen",
+      "rejected": "rejected"
+    }
   }
 }

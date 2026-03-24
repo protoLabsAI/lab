@@ -90,7 +90,7 @@ case "$1" in
         echo "Starting Qwen3.5-27B-GPTQ-Int4 (GPU 0, 128K)..."
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-27B-GPTQ-Int4 \
             --host 0.0.0.0 --port $PORT \
-            --served-model-name local \
+            \
             --max-model-len 131072 \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
@@ -101,7 +101,7 @@ case "$1" in
         echo "Starting Qwen3.5-27B-GPTQ-Int4 + MTP (GPU 0, 128K, 70 tok/s)..."
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-27B-GPTQ-Int4 \
             --host 0.0.0.0 --port $PORT \
-            --served-model-name local \
+            \
             --max-model-len 131072 \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
@@ -116,7 +116,7 @@ case "$1" in
         echo "Starting Qwen3.5-27B-GPTQ-Int4 OPTIMIZED (GPU 0, 128K, FP8 KV)..."
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-27B-GPTQ-Int4 \
             --host 0.0.0.0 --port $PORT \
-            --served-model-name local \
+            \
             --max-model-len 131072 \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
@@ -131,7 +131,7 @@ case "$1" in
         echo "Starting Qwen3.5-27B-GPTQ-Int4 (GPU 0, 160K)..."
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-27B-GPTQ-Int4 \
             --host 0.0.0.0 --port $PORT \
-            --served-model-name local \
+            \
             --max-model-len 163840 \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
@@ -142,7 +142,7 @@ case "$1" in
         echo "Starting Qwen3.5-122B-A10B-GPTQ-Int4 (GPU 0, 64K)..."
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-122B-A10B-GPTQ-Int4 \
             --host 0.0.0.0 --port $PORT \
-            --served-model-name local \
+            \
             --max-model-len 65536 \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
@@ -154,7 +154,7 @@ case "$1" in
         echo "Starting Qwen3.5-35B-A3B MoE (GPU 0, 64K)..."
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-35B-A3B \
             --host 0.0.0.0 --port $PORT \
-            --served-model-name local \
+            \
             --max-model-len 65536 \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
@@ -168,7 +168,7 @@ case "$1" in
         VLLM_FLASHINFER_MOE_BACKEND=latency \
         $VLLM_BIN serve Qwen/Qwen3.5-35B-A3B \
             --host 0.0.0.0 --port $PORT \
-            --served-model-name local \
+            \
             --max-model-len 65536 \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
@@ -183,7 +183,7 @@ case "$1" in
         echo "Starting Llama-3.3-70B-AWQ (GPU 0, 128K)..."
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve casperhansen/llama-3.3-70b-instruct-awq \
             --host 0.0.0.0 --port $PORT \
-            --served-model-name local \
+            \
             --max-model-len 131072 \
             --enable-auto-tool-choice --tool-call-parser llama3_json \
             --gpu-memory-utilization 0.90 \
@@ -193,7 +193,7 @@ case "$1" in
         echo "Starting Llama-3.1-8B-AWQ (GPU 0, 128K)..."
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4 \
             --host 0.0.0.0 --port $PORT \
-            --served-model-name local \
+            \
             --max-model-len 131072 \
             --enable-auto-tool-choice --tool-call-parser llama3_json \
             --gpu-memory-utilization 0.90 \
@@ -203,7 +203,7 @@ case "$1" in
         echo "Starting Hermes-3-Llama-3.1-70B-FP8 (GPU 0, 128K)..."
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve NousResearch/Hermes-3-Llama-3.1-70B-FP8 \
             --host 0.0.0.0 --port $PORT \
-            --served-model-name local \
+            \
             --max-model-len 131072 \
             --enable-auto-tool-choice --tool-call-parser hermes \
             --gpu-memory-utilization 0.90 \
@@ -214,7 +214,7 @@ case "$1" in
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-9B \
             --host 0.0.0.0 --port $PORT \
             --max-model-len 262144 \
-            --served-model-name local \
+            \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.90 \
@@ -226,7 +226,7 @@ case "$1" in
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-9B \
             --host 0.0.0.0 --port $PORT \
             --max-model-len 262144 \
-            --served-model-name local \
+            \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.90 \
@@ -242,7 +242,7 @@ case "$1" in
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve cyankiwi/Qwen3.5-4B-AWQ-4bit \
             --host 0.0.0.0 --port $PORT \
             --max-model-len 262144 \
-            --served-model-name local \
+            \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.90 \
@@ -254,7 +254,7 @@ case "$1" in
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve cyankiwi/Qwen3.5-4B-AWQ-4bit \
             --host 0.0.0.0 --port $PORT \
             --max-model-len 262144 \
-            --served-model-name local \
+            \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.90 \
@@ -270,7 +270,7 @@ case "$1" in
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-4B \
             --host 0.0.0.0 --port $PORT \
             --max-model-len 262144 \
-            --served-model-name local \
+            \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.90 \
@@ -282,7 +282,7 @@ case "$1" in
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-2B \
             --host 0.0.0.0 --port $PORT \
             --max-model-len 262144 \
-            --served-model-name local \
+            \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.90 \
@@ -294,7 +294,7 @@ case "$1" in
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-0.8B \
             --host 0.0.0.0 --port $PORT \
             --max-model-len 262144 \
-            --served-model-name local \
+            \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.90 \
@@ -307,7 +307,7 @@ case "$1" in
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve TheDrummer/Cydonia-24B-v4.3 \
             --host 0.0.0.0 --port $PORT \
             --max-model-len 32768 \
-            --served-model-name local \
+            \
             --enable-auto-tool-choice --tool-call-parser mistral \
             --gpu-memory-utilization 0.90 \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
@@ -323,7 +323,7 @@ case "$1" in
         VLLM_FLASHINFER_MOE_BACKEND=latency \
         $VLLM_BIN serve Qwen/Qwen3.5-35B-A3B \
             --host 0.0.0.0 --port $PORT \
-            --served-model-name local \
+            \
             --max-model-len 65536 \
             --gpu-memory-utilization 0.85 \
             --async-scheduling \
@@ -336,7 +336,7 @@ case "$1" in
         echo "Starting Cydonia-24B + MTP (GPU 0, 32K, NO TOOLS)..."
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve TheDrummer/Cydonia-24B-v4.3 \
             --host 0.0.0.0 --port $PORT \
-            --served-model-name local \
+            \
             --max-model-len 32768 \
             --gpu-memory-utilization 0.90 \
             --async-scheduling \
@@ -353,7 +353,7 @@ case "$1" in
         $VLLM_BIN serve Qwen/Qwen3.5-122B-A10B-GPTQ-Int4 \
             --host 0.0.0.0 --port $PORT \
             --tensor-parallel-size 2 \
-            --served-model-name local \
+            \
             --max-model-len 131072 \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
@@ -367,7 +367,7 @@ case "$1" in
         $VLLM_BIN serve Qwen/Qwen3.5-35B-A3B \
             --host 0.0.0.0 --port $PORT \
             --tensor-parallel-size 2 \
-            --served-model-name local \
+            \
             --max-model-len 253952 \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
@@ -386,7 +386,7 @@ case "$1" in
         $VLLM_BIN serve Qwen/Qwen3.5-35B-A3B \
             --host 0.0.0.0 --port $PORT \
             --tensor-parallel-size 2 \
-            --served-model-name local \
+            \
             --max-model-len 253952 \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
@@ -402,7 +402,7 @@ case "$1" in
         $VLLM_BIN serve Qwen/Qwen3.5-27B-GPTQ-Int4 \
             --host 0.0.0.0 --port $PORT \
             --tensor-parallel-size 2 \
-            --served-model-name local \
+            \
             --max-model-len 262144 \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
