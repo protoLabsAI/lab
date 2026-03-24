@@ -3,7 +3,7 @@
 # Uses vLLM /metrics for accurate TTFT, TPOT, and decode tok/s
 #
 # Usage:
-#   bash models/speed-test.sh           # 5 runs (default)
+#   bash models/speed-test.sh           # 5 runs on current model (800 tok gen)
 #   bash models/speed-test.sh 10        # 10 runs
 #   bash models/speed-test.sh 3 short   # 3 short runs (200 tokens)
 
@@ -11,7 +11,7 @@ set -euo pipefail
 
 RUNS="${1:-5}"
 MODE="${2:-long}"
-URL="http://localhost:8000"
+URL="${3:-http://localhost:8000}"
 
 # Check vLLM is running
 if ! curl -s --max-time 3 "${URL}/v1/models" | grep -q "model"; then
@@ -20,6 +20,12 @@ if ! curl -s --max-time 3 "${URL}/v1/models" | grep -q "model"; then
 fi
 
 MODEL=$(curl -s "${URL}/v1/models" | python3 -c "import sys,json; print(json.load(sys.stdin)['data'][0]['id'])" 2>/dev/null || echo "unknown")
+
+# Only disable thinking for Qwen3.5 models (they burn tokens on reasoning)
+EXTRA_BODY=""
+if echo "$MODEL" | grep -qi "qwen3.5\|Qwen3\.5"; then
+    EXTRA_BODY=',"extra_body":{"chat_template_kwargs":{"enable_thinking":false}}'
+fi
 
 if [ "$MODE" = "short" ]; then
     PROMPT="List 5 programming languages and one strength of each."
@@ -54,7 +60,7 @@ echo "Warming up..."
 for _ in 1 2 3; do
     curl -s "${URL}/v1/chat/completions" \
         -H "Content-Type: application/json" \
-        -d '{"model":"local","messages":[{"role":"user","content":"Say hello"}],"max_tokens":20,"chat_template_kwargs":{"enable_thinking":false}}' > /dev/null 2>&1
+        -d "{\"model\":\"${MODEL}\",\"messages\":[{\"role\":\"user\",\"content\":\"Say hello\"}],\"max_tokens\":20${EXTRA_BODY}}" > /dev/null 2>&1
 done
 sleep 1
 
@@ -67,7 +73,7 @@ for i in $(seq 1 "$RUNS"); do
     START=$(date +%s%N)
     curl -s "${URL}/v1/chat/completions" \
         -H "Content-Type: application/json" \
-        -d "{\"model\":\"local\",\"messages\":[{\"role\":\"user\",\"content\":\"${PROMPT}\"}],\"max_tokens\":${MAX_TOKENS},\"chat_template_kwargs\":{\"enable_thinking\":false}}" > /dev/null 2>&1
+        -d "{\"model\":\"${MODEL}\",\"messages\":[{\"role\":\"user\",\"content\":\"${PROMPT}\"}],\"max_tokens\":${MAX_TOKENS}${EXTRA_BODY}}" > /dev/null 2>&1
     END=$(date +%s%N)
     wall=$(python3 -c "print(round(($END - $START) / 1e9, 2))")
     echo "  Run $i: ${wall}s"
