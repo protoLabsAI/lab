@@ -318,6 +318,7 @@ case "$1" in
         echo "Starting Qwen3-Coder-30B-A3B FP8 (GPU 0, 256K)..."
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8 \
             --host 0.0.0.0 --port $PORT \
+            --served-model-name local \
             --max-model-len 131072 \
             --enable-auto-tool-choice --tool-call-parser qwen3_coder \
             --gpu-memory-utilization 0.90 \
@@ -328,6 +329,7 @@ case "$1" in
         echo "Starting Qwen3-Coder-Next FP8 (TP=2, 256K)..."
         $VLLM_BIN serve Qwen/Qwen3-Coder-Next-FP8 \
             --host 0.0.0.0 --port $PORT \
+            --served-model-name local \
             --tensor-parallel-size 2 \
             --max-model-len 131072 \
             --enable-auto-tool-choice --tool-call-parser qwen3_coder \
