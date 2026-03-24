@@ -73,6 +73,7 @@ def generate_video(
     input_image,
     prompt: str,
     duration: float,
+    inference_steps: int,
     enhance_prompt: bool,
     seed: int,
     randomize_seed: bool,
@@ -95,7 +96,7 @@ def generate_video(
             "width": str(int(width)),
             "num_frames": str(num_frames),
             "fps": str(int(DEFAULT_FRAME_RATE)),
-            "num_inference_steps": "40",
+            "num_inference_steps": str(int(inference_steps)),
             "guidance_scale": "4.0",
             "seed": str(current_seed),
             "negative_prompt": "worst quality, inconsistent motion, blurry, jittery, distorted",
@@ -200,6 +201,8 @@ def main():
 
                 with gr.Row():
                     duration = gr.Slider(label="Duration (seconds)", minimum=1.0, maximum=60.0, value=5.0, step=0.1)
+                    inference_steps = gr.Slider(label="Quality (steps)", minimum=4, maximum=50, value=8, step=1,
+                                                info="8=fast/distilled, 20=balanced, 40=max quality")
                     with gr.Column():
                         enhance_prompt = gr.Checkbox(label="Enhance Prompt", value=False)
                         high_res = gr.Checkbox(label="High Resolution", value=True)
@@ -221,7 +224,7 @@ def main():
 
         generate_btn.click(
             fn=lambda *a: generate_video(*a, api_url=args.api_url),
-            inputs=[input_image, prompt, duration, enhance_prompt, seed, randomize_seed, height, width],
+            inputs=[input_image, prompt, duration, inference_steps, enhance_prompt, seed, randomize_seed, height, width],
             outputs=[output_video, seed],
         )
 
