@@ -26,6 +26,16 @@ MAX_SEED = np.iinfo(np.int32).max
 DEFAULT_FRAME_RATE = 24.0
 DEFAULT_API_URL = "http://localhost:8091"
 
+_current_video_id = None
+_cancelled = False
+
+
+def cancel_generation():
+    global _cancelled
+    _cancelled = True
+    return "Cancelling..."
+
+
 RESOLUTIONS = {
     "high": {"16:9": (1536, 1024), "9:16": (1024, 1536), "1:1": (1024, 1024)},
     "low": {"16:9": (768, 512), "9:16": (512, 768), "1:1": (768, 768)},
@@ -55,18 +65,23 @@ def detect_aspect_ratio(image) -> str:
     return min(candidates, key=lambda k: abs(ratio - candidates[k]))
 
 
+def snap_to_32(val):
+    """Round to nearest multiple of 32, minimum 320."""
+    return max(int(round(val / 32) * 32), 320)
+
+
 def on_image_upload(image, high_res):
     aspect = detect_aspect_ratio(image)
     tier = "high" if high_res else "low"
     w, h = RESOLUTIONS[tier][aspect]
-    return gr.update(value=w), gr.update(value=h)
+    return gr.update(value=snap_to_32(w)), gr.update(value=snap_to_32(h))
 
 
 def on_highres_toggle(image, high_res):
     aspect = detect_aspect_ratio(image)
     tier = "high" if high_res else "low"
     w, h = RESOLUTIONS[tier][aspect]
-    return gr.update(value=w), gr.update(value=h)
+    return gr.update(value=snap_to_32(w)), gr.update(value=snap_to_32(h))
 
 
 def generate_video(
@@ -87,7 +102,13 @@ def generate_video(
         num_frames = int(duration * DEFAULT_FRAME_RATE) + 1
         num_frames = ((num_frames - 1 + 7) // 8) * 8 + 1
 
-        print(f"Generating: {int(height)}x{int(width)}, {num_frames} frames ({duration}s), seed={current_seed}")
+        # LTX-2 requires dimensions divisible by 32
+        height = int(round(height / 32) * 32)
+        width = int(round(width / 32) * 32)
+        height = max(height, 320)
+        width = max(width, 320)
+
+        print(f"Generating: {height}x{width}, {num_frames} frames ({duration}s), seed={current_seed}")
 
         # Build request
         data = {
@@ -132,8 +153,17 @@ def generate_video(
                 return job["url"], current_seed
             return None, current_seed
 
+        # Store video_id for cancel
+        global _current_video_id, _cancelled
+        _current_video_id = video_id
+        _cancelled = False
+
         # Poll for completion
         for i in range(600):  # 10 min max
+            if _cancelled:
+                requests.delete(f"{api_url}/v1/videos/{video_id}", timeout=5)
+                print(f"Cancelled: {video_id}")
+                return None, current_seed
             time.sleep(1)
             status_r = requests.get(f"{api_url}/v1/videos/{video_id}", timeout=10)
             status = status_r.json()
@@ -145,9 +175,9 @@ def generate_video(
             elif state == "failed":
                 print(f"Generation failed: {status}")
                 return None, current_seed
-            elif i % 10 == 0:
-                pct = status.get("progress", 0)
-                progress(pct, desc=f"Generating... {state}")
+            elif i % 5 == 0:
+                elapsed = i
+                progress(0.5, desc=f"Generating... ({elapsed}s)")
 
         # Download the video
         output_dir = "/mnt/data/comfyui/output"
@@ -207,14 +237,16 @@ def main():
                         enhance_prompt = gr.Checkbox(label="Enhance Prompt", value=False)
                         high_res = gr.Checkbox(label="High Resolution", value=True)
 
-                generate_btn = gr.Button("Generate Video", variant="primary", size="lg")
+                with gr.Row():
+                    generate_btn = gr.Button("Generate Video", variant="primary", size="lg")
+                    cancel_btn = gr.Button("Cancel", variant="stop", size="lg")
 
                 with gr.Accordion("Advanced Settings", open=False):
                     seed = gr.Slider(label="Seed", minimum=0, maximum=MAX_SEED, value=42, step=1)
                     randomize_seed = gr.Checkbox(label="Randomize Seed", value=True)
                     with gr.Row():
-                        width = gr.Number(label="Width", value=1536, precision=0)
-                        height = gr.Number(label="Height", value=1024, precision=0)
+                        width = gr.Slider(label="Width", value=768, minimum=320, maximum=1920, step=32)
+                        height = gr.Slider(label="Height", value=512, minimum=320, maximum=1920, step=32)
 
             with gr.Column():
                 output_video = gr.Video(label="Generated Video", autoplay=True)
@@ -228,7 +260,9 @@ def main():
             outputs=[output_video, seed],
         )
 
-    demo.launch(server_name="0.0.0.0", server_port=args.port, theme=gr.themes.Citrus(),
+        cancel_btn.click(fn=cancel_generation, outputs=[])
+
+    demo.launch(server_name="0.0.0.0", server_port=args.port,
                 allowed_paths=["/mnt/data/comfyui/output"])
 
 
