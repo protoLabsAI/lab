@@ -77,13 +77,16 @@ Native Qwen3.5 Multi-Token Prediction — big speed gains on dense models:
 NCCL env vars for PCIe (no NVLink): `NCCL_ALGO=Ring NCCL_PROTO=Simple NCCL_MIN_NCHANNELS=4 NCCL_MAX_NCHANNELS=8`
 
 **Tested results:**
-- **122B INT4 WITHOUT enforce-eager: 23→131 tok/s (5.6x!)** — CUDA graphs work on TP=2 with INT4
-- 122B INT4 stable over 10 consecutive requests, no memory corruption
+- **FIX: `NCCL_P2P_DISABLE=1` enables stable CUDA graphs on TP=2 Blackwell PCIe**
+- 122B INT4: 23→**122 tok/s** (5.3x, stable over 10 runs)
+- 35B MoE: 22→**205 tok/s** (9.3x, stable over 10 runs)
+- Root cause: ACS enabled on PCIe bridges corrupts P2P during CUDA graph replay
+- Disabling P2P forces shared memory transport — slight overhead but fully stable
 - TTFT: 3077ms→29ms with prefix caching after warmup
 - Power draw: only 88-96W per card at 600W limit — MoE is not power-bound
 - 35B TP=2: prefix caching fixed 1.8s TTFT → 0.5s (**-70%**), wall tok/s +25%
 - `VLLM_USE_FLASHINFER_MOE_FP8` crashes on 122B FP8 (unsupported quant scheme) — don't use
-- **Previous finding that TP=2 needs enforce-eager was WRONG for INT4 MoE** — only FP8 had issues
+- **Previous finding that TP=2 needs enforce-eager was WRONG** — `NCCL_P2P_DISABLE=1` fixes it
 
 ## Running Evals
 
@@ -129,7 +132,7 @@ cd evals
 |-------|------|:-----:|:----:|:-----------:|------|
 | **Qwen 27B INT4** | 29GB | 53 | **70** | **86/103** | Daily driver (MTP for chat, baseline for agents) |
 | **Qwen 35B MoE BF16** | 67GB | 171 | — | 76/103 | Speed king, best coding (10/10) |
-| **Qwen 122B INT4** | 74GB | **131** | — | — | Quality ceiling (TP=2, CUDA graphs!) |
+| **Qwen 122B INT4** | 74GB | **122** | — | — | Quality ceiling (TP=2, 122 tok/s!) |
 | **Qwen 9B BF16** | 19GB | 92 | **112** | 72/103 | Fine-tune base |
 | **Qwen 4B INT4** | 3.8GB | 297 | — | 56/103 | Edge deploy |
 | **Qwen 4B BF16** | 8.8GB | 155 | — | — | LoRA base |

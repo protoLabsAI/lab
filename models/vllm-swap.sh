@@ -326,7 +326,9 @@ case "$1" in
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     qwen3-coder-next)
-        echo "Starting Qwen3-Coder-Next FP8 (TP=2, 256K)..."
+        echo "Starting Qwen3-Coder-Next FP8 (TP=2, 131K)..."
+        NCCL_P2P_DISABLE=1 \
+        NCCL_CUMEM_ENABLE=0 \
         $VLLM_BIN serve Qwen/Qwen3-Coder-Next-FP8 \
             --host 0.0.0.0 --port $PORT \
             --served-model-name local \
@@ -335,7 +337,8 @@ case "$1" in
             --enable-auto-tool-choice --tool-call-parser qwen3_coder \
             --gpu-memory-utilization 0.90 \
             --disable-custom-all-reduce \
-            --enforce-eager \
+            --async-scheduling \
+            --enable-prefix-caching \
             --trust-remote-code \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
@@ -375,9 +378,13 @@ case "$1" in
         ;;
 
     # ─── Dual GPU configs (TP=2) ───────────────────────────────────
+    # NCCL_P2P_DISABLE=1 required for stable CUDA graphs on Blackwell PCIe
+    # (ACS on PCIe bridges corrupts P2P during graph replay)
 
     qwen-122b-int4)
-        echo "Starting Qwen3.5-122B-A10B-GPTQ-Int4 (TP=2, 128K)..."
+        echo "Starting Qwen3.5-122B-A10B-GPTQ-Int4 (TP=2, 128K, 122 tok/s)..."
+        NCCL_P2P_DISABLE=1 \
+        NCCL_CUMEM_ENABLE=0 \
         $VLLM_BIN serve Qwen/Qwen3.5-122B-A10B-GPTQ-Int4 \
             --host 0.0.0.0 --port $PORT \
             --tensor-parallel-size 2 \
@@ -387,30 +394,14 @@ case "$1" in
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.90 \
             --disable-custom-all-reduce \
-            --enforce-eager \
+            --async-scheduling \
+            --enable-prefix-caching \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     qwen-35b-tp2)
-        echo "Starting Qwen3.5-35B-A3B MoE (TP=2, 250K)..."
-        $VLLM_BIN serve Qwen/Qwen3.5-35B-A3B \
-            --host 0.0.0.0 --port $PORT \
-            --tensor-parallel-size 2 \
-            --served-model-name local \
-            --max-model-len 253952 \
-            --reasoning-parser qwen3 \
-            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
-            --gpu-memory-utilization 0.90 \
-            --disable-custom-all-reduce \
-            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
-        ;;
-    qwen-35b-tp2-opt)
-        echo "Starting Qwen3.5-35B-A3B MoE OPTIMIZED (TP=2, 250K, NCCL tuned)..."
-        NCCL_ALGO=Ring \
-        NCCL_PROTO=Simple \
-        NCCL_MIN_NCHANNELS=4 \
-        NCCL_MAX_NCHANNELS=8 \
-        VLLM_USE_FLASHINFER_MOE_FP8=1 \
-        VLLM_FLASHINFER_MOE_BACKEND=latency \
+        echo "Starting Qwen3.5-35B-A3B MoE (TP=2, 250K, 205 tok/s)..."
+        NCCL_P2P_DISABLE=1 \
+        NCCL_CUMEM_ENABLE=0 \
         $VLLM_BIN serve Qwen/Qwen3.5-35B-A3B \
             --host 0.0.0.0 --port $PORT \
             --tensor-parallel-size 2 \
@@ -422,13 +413,14 @@ case "$1" in
             --disable-custom-all-reduce \
             --async-scheduling \
             --enable-prefix-caching \
-            --kv-cache-dtype fp8 \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     qwen-27b-int4-tp2)
         echo "Starting Qwen3.5-27B-GPTQ-Int4 (TP=2, 256K)..."
+        NCCL_P2P_DISABLE=1 \
+        NCCL_CUMEM_ENABLE=0 \
         $VLLM_BIN serve Qwen/Qwen3.5-27B-GPTQ-Int4 \
-            --host 0.0.0.0 --port $PORT \
+            --host 0.0.0.0 --port 8000 \
             --tensor-parallel-size 2 \
             --served-model-name local \
             --max-model-len 262144 \
@@ -436,7 +428,8 @@ case "$1" in
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.90 \
             --disable-custom-all-reduce \
-            --enforce-eager \
+            --async-scheduling \
+            --enable-prefix-caching \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     *)
