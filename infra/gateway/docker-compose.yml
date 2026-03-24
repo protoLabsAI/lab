@@ -1,7 +1,9 @@
 services:
   # ─── LiteLLM Gateway ──────────────────────────────────────────────
   gateway:
-    image: ghcr.io/berriai/litellm:main-stable
+    # PINNED: LiteLLM 1.82.3 — DO NOT upgrade past 1.82.6 (supply chain attack in 1.82.7-1.82.8)
+    # See: https://futuresearch.ai/blog/litellm-pypi-supply-chain-attack/
+    image: ghcr.io/berriai/litellm@sha256:657c8fc999a6c1d1099b07963cbfcd853c624fb447dfedad5f3b6a43405194d8
     container_name: gateway
     restart: unless-stopped
     ports:
