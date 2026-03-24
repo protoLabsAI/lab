@@ -312,6 +312,32 @@ case "$1" in
             --gpu-memory-utilization 0.90 \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
+    # ─── Qwen3-Coder configs ─────────────────────────────────────────
+
+    qwen3-coder-30b)
+        echo "Starting Qwen3-Coder-30B-A3B FP8 (GPU 0, 256K)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8 \
+            --host 0.0.0.0 --port $PORT \
+            --max-model-len 131072 \
+            --enable-auto-tool-choice --tool-call-parser qwen3_coder \
+            --gpu-memory-utilization 0.90 \
+            --trust-remote-code \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+    qwen3-coder-next)
+        echo "Starting Qwen3-Coder-Next FP8 (TP=2, 256K)..."
+        $VLLM_BIN serve Qwen/Qwen3-Coder-Next-FP8 \
+            --host 0.0.0.0 --port $PORT \
+            --tensor-parallel-size 2 \
+            --max-model-len 131072 \
+            --enable-auto-tool-choice --tool-call-parser qwen3_coder \
+            --gpu-memory-utilization 0.90 \
+            --disable-custom-all-reduce \
+            --enforce-eager \
+            --trust-remote-code \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+
     # ─── Experimental MTP configs (no tool calling) ─────────────────
     # These are for creative/roleplay/summarization benchmarking only.
     # MTP hurts MoE models — these exist for testing, not production.
