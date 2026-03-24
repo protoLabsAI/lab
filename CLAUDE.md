@@ -132,7 +132,7 @@ cd evals
 |-------|------|:-----:|:----:|:-----------:|------|
 | **Qwen 27B INT4** | 29GB | 53 | **70** | **86/103** | Daily driver (MTP for chat, baseline for agents) |
 | **Qwen 35B MoE BF16** | 67GB | 171 | — | 76/103 | Speed king, best coding (10/10) |
-| **Qwen 122B INT4** | 74GB | **122** | — | — | Quality ceiling (TP=2, 122 tok/s!) |
+| **Qwen 122B INT4** | 74GB | **122** | — | **89/103** | **SOTA local — beats all cloud models (TP=2)** |
 | **Qwen 9B BF16** | 19GB | 92 | **112** | 72/103 | Fine-tune base |
 | **Qwen 4B INT4** | 3.8GB | 297 | — | 56/103 | Edge deploy |
 | **Qwen 4B BF16** | 8.8GB | 155 | — | — | LoRA base |
