@@ -221,7 +221,10 @@ def main():
 
         with gr.Row():
             with gr.Column():
-                input_image = gr.Image(label="Input Image (Optional — enables image-to-video)", type="pil")
+                # Image-to-video requires restarting backend with:
+                #   --model-class-name LTX2ImageToVideoPipeline
+                # Current mode: text-to-video only
+                input_image = gr.Image(label="Input Image (requires I2V mode — not active)", type="pil", visible=False)
                 prompt = gr.Textbox(
                     label="Prompt",
                     info="Be descriptive — motion, camera, mood, lighting",
