@@ -12,10 +12,25 @@ model_list:
       api_key: os.environ/VLLM_API_KEY
 
   # ─── Remote: Ollama on ava (Tailscale) ────────────────────────────
-  - model_name: ava-ollama
+  - model_name: ava-qwen3.5
     litellm_params:
-      model: ollama/qwen3.5:9b
-      api_base: http://ava:11434
+      model: ollama/qwen3.5:latest
+      api_base: http://100.101.189.45:11434
+
+  - model_name: ava-qwen3-coder
+    litellm_params:
+      model: ollama/qwen3-coder:latest
+      api_base: http://100.101.189.45:11434
+
+  - model_name: ava-deepseek-r1
+    litellm_params:
+      model: ollama/deepseek-r1:32b
+      api_base: http://100.101.189.45:11434
+
+  - model_name: ava-gemma3
+    litellm_params:
+      model: ollama/gemma3:27b
+      api_base: http://100.101.189.45:11434
 
   # ─── Anthropic (Claude) ────────────────────────────────────────────
   - model_name: claude-sonnet-4-6
