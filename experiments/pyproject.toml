@@ -9,6 +9,10 @@ dependencies = [
     "gradio>=5.0",
     "transformers",
     "accelerate",
+    "diffusers>=0.32",
+    "scipy",
+    "huggingface_hub",
+    "peft>=0.17.1",
 ]
 
 [tool.ruff.lint]
@@ -16,3 +20,4 @@ select = ["F"]  # Loose — just catch errors, no style enforcement
 
 [tool.uv.sources]
 lab-core = { workspace = true }
+torch = { index = "pytorch-cu128" }
