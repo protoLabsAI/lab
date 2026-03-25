@@ -13,6 +13,7 @@ dependencies = [
     "scipy",
     "huggingface_hub",
     "peft>=0.17.1",
+    "opencv-python-headless",
 ]
 
 [tool.ruff.lint]
