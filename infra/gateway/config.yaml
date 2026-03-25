@@ -11,6 +11,12 @@ model_list:
       api_base: http://host.docker.internal:8000/v1
       api_key: os.environ/VLLM_API_KEY
 
+  # ─── Remote: Ollama on ava (Tailscale) ────────────────────────────
+  - model_name: ava-ollama
+    litellm_params:
+      model: ollama/qwen3.5:9b
+      api_base: http://ava:11434
+
   # ─── Anthropic (Claude) ────────────────────────────────────────────
   - model_name: claude-sonnet-4-6
     litellm_params:
