@@ -133,7 +133,9 @@ def generate_video(
             buf = io.BytesIO()
             input_image.save(buf, format="JPEG")
             buf.seek(0)
-            files["image"] = ("input.jpg", buf, "image/jpeg")
+            files["input_reference"] = ("input.jpg", buf, "image/jpeg")
+
+        print(f"Image provided: {input_image is not None}, files: {list(files.keys())}")
 
         # Submit job
         progress(0, desc="Submitting to vLLM-Omni...")
@@ -188,8 +190,13 @@ def generate_video(
         with open(output_path, "wb") as f:
             f.write(video_r.content)
 
-        print(f"Saved to {output_path}")
-        return output_path, current_seed
+        print(f"Saved to {output_path} ({os.path.getsize(output_path)} bytes)")
+
+        # Copy to temp dir for Gradio (some versions need this)
+        import shutil, tempfile
+        tmp = os.path.join(tempfile.gettempdir(), f"ltx_{current_seed}.mp4")
+        shutil.copy2(output_path, tmp)
+        return tmp, current_seed
 
     except Exception as e:
         import traceback
@@ -224,7 +231,7 @@ def main():
                 # Image-to-video requires restarting backend with:
                 #   --model-class-name LTX2ImageToVideoPipeline
                 # Current mode: text-to-video only
-                input_image = gr.Image(label="Input Image (requires I2V mode — not active)", type="pil", visible=False)
+                input_image = gr.Image(label="Input Image (optional — enables image-to-video)", type="pil")
                 prompt = gr.Textbox(
                     label="Prompt",
                     info="Be descriptive — motion, camera, mood, lighting",
