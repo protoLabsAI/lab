@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>protoLabs AI Node</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: #0a0a14;
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #fff;
+        }
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 36px;
+        }
+        .section-title {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #555;
+            margin-bottom: 12px;
+            margin-top: 32px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 12px;
+        }
+        a.card {
+            display: block;
+            background: #12121f;
+            border: 1px solid #1e1e30;
+            border-radius: 10px;
+            padding: 20px;
+            text-decoration: none;
+            color: inherit;
+            transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s;
+        }
+        a.card:hover {
+            border-color: #6366f1;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.15);
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .card-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #fff;
+        }
+        .card-port {
+            font-size: 12px;
+            color: #555;
+            font-family: monospace;
+        }
+        .card-desc {
+            font-size: 13px;
+            color: #888;
+            line-height: 1.5;
+        }
+        .dot {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        .dot-green { background: #22c55e; }
+        .dot-blue { background: #6366f1; }
+        .dot-yellow { background: #eab308; }
+        .dot-gray { background: #444; }
+        .footer {
+            margin-top: 48px;
+            text-align: center;
+            font-size: 12px;
+            color: #333;
+        }
+        .gpu-bar {
+            margin-top: 24px;
+            padding: 16px 20px;
+            background: #12121f;
+            border: 1px solid #1e1e30;
+            border-radius: 10px;
+            font-size: 13px;
+            color: #888;
+        }
+        .gpu-bar span { color: #e0e0e0; font-weight: 600; }
+        #gpu-status { display: flex; gap: 32px; flex-wrap: wrap; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>protoLabs AI Node</h1>
+        <div class="subtitle">2x RTX PRO 6000 Blackwell &middot; 192 GB VRAM &middot; protolabs.tail</div>
+
+        <div class="gpu-bar" id="gpu-status">Loading GPU status...</div>
+
+        <div class="section-title">Inference</div>
+        <div class="grid">
+            <a class="card" href="/dashboard/" target="_blank">
+                <div class="card-header">
+                    <div class="card-name"><span class="dot dot-green"></span>vLLM Dashboard</div>
+                    <div class="card-port">:7860</div>
+                </div>
+                <div class="card-desc">GPU monitoring, model swap, chat testing</div>
+            </a>
+            <a class="card" href="/webui/" target="_blank">
+                <div class="card-header">
+                    <div class="card-name"><span class="dot dot-green"></span>Open WebUI</div>
+                    <div class="card-port">:3000</div>
+                </div>
+                <div class="card-desc">Chat interface for vLLM + Ollama models</div>
+            </a>
+            <a class="card" href="/comfyui/" target="_blank">
+                <div class="card-header">
+                    <div class="card-name"><span class="dot dot-blue"></span>ComfyUI</div>
+                    <div class="card-port">:8188</div>
+                </div>
+                <div class="card-desc">Node-based image and video generation</div>
+            </a>
+        </div>
+
+        <div class="section-title">APIs</div>
+        <div class="grid">
+            <a class="card" href="http://protolabs:8000/docs" target="_blank">
+                <div class="card-header">
+                    <div class="card-name"><span class="dot dot-green"></span>vLLM API</div>
+                    <div class="card-port">:8000</div>
+                </div>
+                <div class="card-desc">OpenAI-compatible LLM endpoint</div>
+            </a>
+            <a class="card" href="http://protolabs:4000/ui" target="_blank">
+                <div class="card-header">
+                    <div class="card-name"><span class="dot dot-green"></span>Gateway</div>
+                    <div class="card-port">:4000</div>
+                </div>
+                <div class="card-desc">LiteLLM proxy — routes to 25+ models</div>
+            </a>
+            <a class="card" href="http://protolabs:11434" target="_blank">
+                <div class="card-header">
+                    <div class="card-name"><span class="dot dot-yellow"></span>Ollama</div>
+                    <div class="card-port">:11434</div>
+                </div>
+                <div class="card-desc">Local GGUF model inference</div>
+            </a>
+        </div>
+
+        <div class="section-title">Observability</div>
+        <div class="grid">
+            <a class="card" href="http://protolabs:3001" target="_blank">
+                <div class="card-header">
+                    <div class="card-name"><span class="dot dot-blue"></span>Langfuse</div>
+                    <div class="card-port">:3001</div>
+                </div>
+                <div class="card-desc">LLM tracing, evaluation scores, datasets</div>
+            </a>
+            <a class="card" href="http://protolabs:5050" target="_blank">
+                <div class="card-header">
+                    <div class="card-name"><span class="dot dot-blue"></span>MLflow</div>
+                    <div class="card-port">:5050</div>
+                </div>
+                <div class="card-desc">Experiment tracking, model registry</div>
+            </a>
+        </div>
+
+        <div class="footer">protolabs &middot; protoLabsAI</div>
+    </div>
+
+    <script>
+        async function updateGPU() {
+            try {
+                const r = await fetch('/api/gpu');
+                const gpus = await r.json();
+                const el = document.getElementById('gpu-status');
+                el.innerHTML = gpus.map(g => {
+                    const pct = (g.memory_used_mb / g.memory_total_mb * 100).toFixed(0);
+                    return `<div>GPU ${g.index}: <span>${(g.memory_used_mb/1024).toFixed(1)}/${(g.memory_total_mb/1024).toFixed(0)} GB</span> (${pct}%) &middot; ${g.temp_c}&deg;C &middot; ${g.power_draw_w.toFixed(0)}W</div>`;
+                }).join('');
+            } catch(e) {
+                document.getElementById('gpu-status').innerHTML = 'GPU status unavailable';
+            }
+        }
+        updateGPU();
+        setInterval(updateGPU, 5000);
+    </script>
+</body>
+</html>
