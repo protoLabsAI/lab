@@ -22,3 +22,9 @@
 - [ ] **Voxtral Mini 4B Realtime** (Mistral) — real-time STT, 13 languages, sub-500ms latency
   - `vllm serve mistralai/Voxtral-Mini-4B-Realtime-2602`
   - Pair with Fish Audio S2 Pro for full STT→TTS pipeline
+
+## Training / Adaptation
+- [ ] **Doc-to-LoRA** (Sakana AI) — hypernetwork that compresses a document into a LoRA adapter in <1s
+  - Currently Gemma-2-2b-it only, no Qwen support. Track for when they expand architectures.
+  - GitHub: `SakanaAI/doc-to-lora` | Paper: arXiv:2602.15902
+  - Could replace RAG context stuffing with per-document LoRA patches (~50MB vs 12GB KV cache)
