@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """
-Voice Agent — Real-time conversational AI (streaming pipeline)
+Voice Agent — Real-time conversational AI (streaming + interrupts + context)
 
-Pipeline: Silero VAD → Whisper STT → Qwen LLM (streaming) → TTS (chunked) → Speaker
+Pipeline: Silero VAD → Whisper STT → Qwen LLM (streaming) → Kokoro TTS (chunked) → Speaker
 
-The LLM streams tokens, a sentence chunker detects boundaries, and TTS
-synthesizes each chunk immediately — audio starts playing before the LLM
-finishes generating.
+Features:
+  - Streaming LLM→TTS: audio plays before LLM finishes generating
+  - Interruption: new speech cancels current response mid-stream
+  - Context window: sliding history with summarization for long conversations
+  - Pre-warm: all models loaded on startup, zero cold start
 
 Run: CUDA_VISIBLE_DEVICES=1 uv run python -u app.py
 Requires: vLLM running on :8000 (any Qwen3.5 model)
-Optional: Voxtral on :8091 for high-quality TTS
 """
 
 import io
@@ -18,6 +19,7 @@ import json
 import logging
 import os
 import re
+import threading
 import time
 from pathlib import Path
 
@@ -36,8 +38,6 @@ logger = logging.getLogger(__name__)
 
 DEVICE = "cuda"
 LLM_URL = os.environ.get("LLM_URL", "http://localhost:8000/v1")
-VOXTRAL_URL = os.environ.get("VOXTRAL_URL", "http://localhost:8091")
-VOXTRAL_VOICE = os.environ.get("VOXTRAL_VOICE", "casual_male")
 
 SYSTEM_PROMPT = (
     "You are a helpful voice assistant. Keep responses concise — 1-3 sentences max. "
@@ -45,20 +45,27 @@ SYSTEM_PROMPT = (
     "Respond as if speaking out loud."
 )
 
+# Context window config
+MAX_HISTORY_TURNS = 10  # Keep last 10 turns (20 messages) in full
+MAX_HISTORY_TOKENS = 2000  # Rough char estimate (4 chars ≈ 1 token)
+SUMMARY_PROMPT = (
+    "Summarize this conversation so far in 2-3 sentences. "
+    "Focus on key topics discussed and any important facts mentioned."
+)
+
+
 # ---------------------------------------------------------------------------
-# Sentence Chunker — detects boundaries in streaming token output
+# Sentence Chunker
 # ---------------------------------------------------------------------------
 class SentenceChunker:
-    """Buffers streaming tokens and yields complete sentences."""
-
     BOUNDARY = re.compile(r'(?<=[.!?;:])\s+|(?<=[.!?])\s*$')
 
     def __init__(self, min_first=10, min_rest=30, max_chars=200):
         self.buffer = ""
         self.chunk_count = 0
-        self.min_first = min_first   # Aggressive first chunk for fast TTFA
-        self.min_rest = min_rest     # Sentence-level for good prosody
-        self.max_chars = max_chars   # Force yield on run-on sentences
+        self.min_first = min_first
+        self.min_rest = min_rest
+        self.max_chars = max_chars
 
     @property
     def min_chars(self):
@@ -66,8 +73,6 @@ class SentenceChunker:
 
     def feed(self, token: str):
         self.buffer += token
-
-        # Force yield on very long buffers
         if len(self.buffer) >= self.max_chars:
             text = self.buffer.strip()
             if text:
@@ -75,13 +80,10 @@ class SentenceChunker:
                 yield text
             self.buffer = ""
             return
-
-        # First chunk: also split on commas for faster TTFA
         if self.chunk_count == 0:
             pattern = re.compile(r'(?<=[,.!?;:])\s+')
         else:
             pattern = self.BOUNDARY
-
         matches = list(pattern.finditer(self.buffer))
         if matches:
             last = matches[-1]
@@ -99,7 +101,7 @@ class SentenceChunker:
 
 
 # ---------------------------------------------------------------------------
-# STT: Whisper large-v3-turbo
+# STT
 # ---------------------------------------------------------------------------
 _stt_pipe = None
 
@@ -116,15 +118,14 @@ def get_stt():
             device=DEVICE,
             model_kwargs={"attn_implementation": "sdpa"},
         )
-        # Pre-warm with silence — triggers CUDA kernel compilation
-        silence = np.zeros(16000, dtype=np.float32)  # 1s of silence
+        silence = np.zeros(16000, dtype=np.float32)
         _stt_pipe({"raw": silence, "sampling_rate": 16000})
         logger.info(f"Whisper loaded + warmed in {time.time() - t0:.1f}s")
     return _stt_pipe
 
 
 # ---------------------------------------------------------------------------
-# TTS: Kokoro (in-process) or Voxtral (external)
+# TTS
 # ---------------------------------------------------------------------------
 _kokoro_pipe = None
 
@@ -136,7 +137,6 @@ def get_kokoro():
         t0 = time.time()
         from kokoro import KPipeline
         _kokoro_pipe = KPipeline(lang_code="a")
-        # Pre-warm with a short phrase
         list(_kokoro_pipe("Hello.", voice="af_heart", speed=1))
         logger.info(f"Kokoro loaded + warmed in {time.time() - t0:.1f}s")
     return _kokoro_pipe
@@ -151,42 +151,13 @@ def tts_kokoro(text: str) -> tuple[int, np.ndarray]:
     return 24000, (audio * 32767).clip(-32768, 32767).astype(np.int16)
 
 
-def tts_voxtral(text: str) -> tuple[int, np.ndarray] | None:
-    try:
-        response = httpx.post(
-            f"{VOXTRAL_URL}/v1/audio/speech",
-            json={
-                "input": text,
-                "model": "mistralai/Voxtral-4B-TTS-2603",
-                "response_format": "wav",
-                "voice": VOXTRAL_VOICE,
-            },
-            timeout=30.0,
-        )
-        response.raise_for_status()
-        audio, sr = sf.read(io.BytesIO(response.content), dtype="float32")
-        return sr, (audio * 32767).clip(-32768, 32767).astype(np.int16)
-    except Exception as e:
-        logger.warning(f"Voxtral TTS failed: {e}")
-        return None
-
-
-def tts_synthesize(text: str, backend: str) -> tuple[int, np.ndarray]:
-    """Synthesize with selected backend, fallback to Kokoro."""
-    if backend == "voxtral":
-        result = tts_voxtral(text)
-        if result is not None:
-            return result
-    return tts_kokoro(text)
-
-
 # ---------------------------------------------------------------------------
-# LLM: Streaming tokens from vLLM
+# LLM: Streaming with cancellation support
 # ---------------------------------------------------------------------------
-def stream_llm_tokens(text: str, history: list[dict]):
-    """Generator that yields tokens from vLLM streaming endpoint."""
+def stream_llm_tokens(text: str, history: list[dict], cancel: threading.Event):
+    """Generator yielding tokens. Stops early if cancel is set."""
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    messages.extend(history[-6:])
+    messages.extend(history)
     messages.append({"role": "user", "content": text})
 
     try:
@@ -204,6 +175,9 @@ def stream_llm_tokens(text: str, history: list[dict]):
                 },
             ) as response:
                 for line in response.iter_lines():
+                    if cancel.is_set():
+                        logger.info("[LLM] Cancelled mid-stream")
+                        return
                     if not line.startswith("data: "):
                         continue
                     data = line[6:]
@@ -215,25 +189,106 @@ def stream_llm_tokens(text: str, history: list[dict]):
                     if content:
                         yield content
     except Exception as e:
-        logger.error(f"LLM stream error: {e}")
-        yield "Sorry, I couldn't process that."
+        if not cancel.is_set():
+            logger.error(f"LLM stream error: {e}")
+            yield "Sorry, I couldn't process that."
+
+
+def llm_summarize(history: list[dict]) -> str:
+    """Ask the LLM to summarize conversation history."""
+    messages = [
+        {"role": "system", "content": SUMMARY_PROMPT},
+        {"role": "user", "content": "\n".join(
+            f"{m['role']}: {m['content']}" for m in history
+        )},
+    ]
+    try:
+        response = httpx.post(
+            f"{LLM_URL}/chat/completions",
+            json={
+                "model": "local",
+                "messages": messages,
+                "max_tokens": 100,
+                "temperature": 0.3,
+                "chat_template_kwargs": {"enable_thinking": False},
+            },
+            timeout=15.0,
+        )
+        response.raise_for_status()
+        msg = response.json()["choices"][0]["message"]
+        return (msg.get("content") or "").strip()
+    except Exception as e:
+        logger.warning(f"Summarization failed: {e}")
+        return ""
 
 
 # ---------------------------------------------------------------------------
-# Voice Agent — Streaming Pipeline
+# Voice Agent
 # ---------------------------------------------------------------------------
 class VoiceAgent:
     def __init__(self):
         self.history: list[dict] = []
-        self.tts_backend = "kokoro"
+        self.summary: str = ""  # Rolling summary of older context
+        self.cancel = threading.Event()
         self.last_latency = {}
+        self._turn_lock = threading.Lock()
+
+    def _get_context_messages(self) -> list[dict]:
+        """Build context: summary (if any) + recent history within token budget."""
+        messages = []
+
+        # Add summary as system context if we have one
+        if self.summary:
+            messages.append({
+                "role": "system",
+                "content": f"Previous conversation summary: {self.summary}",
+            })
+
+        # Add recent history, respecting token budget
+        recent = self.history[-(MAX_HISTORY_TURNS * 2):]
+        total_chars = sum(len(m["content"]) for m in recent)
+
+        # If over budget, trim oldest turns
+        while total_chars > MAX_HISTORY_TOKENS and len(recent) > 2:
+            removed = recent.pop(0)
+            if recent and recent[0]["role"] == "assistant":
+                removed2 = recent.pop(0)
+                total_chars -= len(removed["content"]) + len(removed2["content"])
+            else:
+                total_chars -= len(removed["content"])
+
+        messages.extend(recent)
+        return messages
+
+    def _maybe_summarize(self):
+        """Summarize old history if it's getting long."""
+        if len(self.history) > MAX_HISTORY_TURNS * 2:
+            # Summarize the oldest turns that are about to be dropped
+            old_turns = self.history[:-(MAX_HISTORY_TURNS * 2)]
+            if old_turns:
+                # Include existing summary for continuity
+                to_summarize = []
+                if self.summary:
+                    to_summarize.append({"role": "system", "content": f"Prior summary: {self.summary}"})
+                to_summarize.extend(old_turns)
+
+                new_summary = llm_summarize(to_summarize)
+                if new_summary:
+                    self.summary = new_summary
+                    logger.info(f"[Context] Summarized {len(old_turns)} messages: {new_summary[:80]}...")
+
+                # Trim history to recent window
+                self.history = self.history[-(MAX_HISTORY_TURNS * 2):]
+
+    def interrupt(self):
+        """Cancel current generation (called when user starts speaking)."""
+        self.cancel.set()
 
     def process_turn_streaming(self, audio_tuple: tuple[int, np.ndarray]):
-        """Streaming pipeline: STT → LLM tokens → chunked TTS → yield audio.
+        """Full streaming pipeline with interrupt support."""
+        # Reset cancellation for this turn
+        self.cancel.clear()
 
-        Yields (sample_rate, audio_chunk) tuples as soon as each sentence
-        is synthesized — doesn't wait for the full LLM response.
-        """
         sr_in, audio_in = audio_tuple
         total_start = time.time()
 
@@ -260,58 +315,72 @@ class VoiceAgent:
         chunker = SentenceChunker()
         full_response = ""
         llm_start = time.time()
-        ttfa = None  # Time to first audio
+        ttfa = None
         chunk_count = 0
         tts_total = 0
+        interrupted = False
 
-        for token in stream_llm_tokens(user_text, self.history):
+        context = self._get_context_messages()
+
+        for token in stream_llm_tokens(user_text, context, self.cancel):
+            if self.cancel.is_set():
+                interrupted = True
+                break
+
             full_response += token
 
             for sentence in chunker.feed(token):
+                if self.cancel.is_set():
+                    interrupted = True
+                    break
+
                 t1 = time.time()
-                sr_out, audio_chunk = tts_synthesize(sentence, self.tts_backend)
-                tts_time = time.time() - t1
-                tts_total += tts_time
+                sr_out, audio_chunk = tts_kokoro(sentence)
+                tts_total += time.time() - t1
 
                 if ttfa is None:
                     ttfa = time.time() - total_start
-                    logger.info(f"[TTFA {ttfa:.2f}s] First audio chunk: {sentence!r}")
+                    logger.info(f"[TTFA {ttfa:.2f}s] First chunk: {sentence!r}")
 
                 chunk_count += 1
                 yield sr_out, audio_chunk
 
-        # Flush remaining text
-        for sentence in chunker.flush():
-            t1 = time.time()
-            sr_out, audio_chunk = tts_synthesize(sentence, self.tts_backend)
-            tts_total += time.time() - t1
-            chunk_count += 1
-            yield sr_out, audio_chunk
+            if interrupted:
+                break
+
+        # Flush remaining (unless interrupted)
+        if not interrupted:
+            for sentence in chunker.flush():
+                if self.cancel.is_set():
+                    break
+                t1 = time.time()
+                sr_out, audio_chunk = tts_kokoro(sentence)
+                tts_total += time.time() - t1
+                chunk_count += 1
+                yield sr_out, audio_chunk
 
         llm_time = time.time() - llm_start
         total_time = time.time() - total_start
 
-        if not full_response:
-            full_response = "I'm not sure how to respond to that."
+        # Update history (even partial responses are useful context)
+        if full_response.strip():
+            self.history.append({"role": "user", "content": user_text})
+            self.history.append({"role": "assistant", "content": full_response.strip()})
+            self._maybe_summarize()
 
-        # Update history
-        self.history.append({"role": "user", "content": user_text})
-        self.history.append({"role": "assistant", "content": full_response})
-
+        status = "interrupted" if interrupted else "complete"
         self.last_latency = {
-            "stt": stt_time,
-            "llm": llm_time,
-            "tts": tts_total,
-            "ttfa": ttfa or total_time,
-            "total": total_time,
-            "chunks": chunk_count,
-            "user_text": user_text,
-            "response_text": full_response,
+            "stt": stt_time, "llm": llm_time, "tts": tts_total,
+            "ttfa": ttfa or total_time, "total": total_time,
+            "chunks": chunk_count, "status": status,
+            "history_len": len(self.history),
+            "has_summary": bool(self.summary),
         }
 
         logger.info(
-            f"[Total {total_time:.2f}s] STT={stt_time:.2f}s LLM={llm_time:.2f}s "
-            f"TTS={tts_total:.2f}s TTFA={ttfa:.2f}s chunks={chunk_count}"
+            f"[{status.upper()} {total_time:.2f}s] STT={stt_time:.2f}s LLM={llm_time:.2f}s "
+            f"TTS={tts_total:.2f}s TTFA={ttfa or 0:.2f}s chunks={chunk_count} "
+            f"history={len(self.history)} summary={'yes' if self.summary else 'no'}"
         )
 
 
@@ -319,17 +388,10 @@ agent = VoiceAgent()
 
 
 def prewarm():
-    """Pre-warm all models on startup so first turn is fast."""
     logger.info("Pre-warming all models...")
     t0 = time.time()
-
-    # 1. Whisper (loads model + CUDA kernels)
     get_stt()
-
-    # 2. Kokoro (loads model + vocoder)
     get_kokoro()
-
-    # 3. LLM prefix cache — send the system prompt so vLLM caches it
     try:
         httpx.post(
             f"{LLM_URL}/chat/completions",
@@ -347,92 +409,34 @@ def prewarm():
         )
         logger.info("LLM prefix cache warmed")
     except Exception as e:
-        logger.warning(f"LLM warmup failed (will work on first turn): {e}")
-
+        logger.warning(f"LLM warmup failed: {e}")
     logger.info(f"All models pre-warmed in {time.time() - t0:.1f}s")
 
 
 def voice_handler(audio: tuple[int, np.ndarray]):
-    """FastRTC ReplyOnPause handler — yields audio chunks as they're ready."""
+    # Signal interruption to any in-progress generation
+    agent.interrupt()
     yield from agent.process_turn_streaming(audio)
 
 
-# ---------------------------------------------------------------------------
-# UI
-# ---------------------------------------------------------------------------
 def build_ui():
     with gr.Blocks(title="Voice Agent") as demo:
-        gr.Markdown(
-            "# Voice Agent (Streaming)\n"
-            "VAD → Whisper → Qwen (streaming) → Kokoro/Voxtral (chunked) → Speaker\n\n"
-            "Audio starts playing before the LLM finishes generating."
+        gr.Markdown("# Voice Agent\nSpeak — I'll respond.")
+        from fastrtc.reply_on_pause import AlgoOptions
+        Stream(
+            ReplyOnPause(
+                voice_handler,
+                algo_options=AlgoOptions(
+                    audio_chunk_duration=0.6,
+                    started_talking_threshold=0.5,
+                    speech_threshold=0.1,
+                ),
+                output_sample_rate=24000,
+                can_interrupt=True,
+            ),
+            modality="audio",
+            mode="send-receive",
         )
-
-        def get_log():
-            lat = agent.last_latency
-            if not lat:
-                return "Waiting for first turn..."
-            lines = []
-            for i in range(0, len(agent.history), 2):
-                if i + 1 < len(agent.history):
-                    lines.append(f"YOU: {agent.history[i]['content']}")
-                    lines.append(f"AI:  {agent.history[i+1]['content']}")
-                    lines.append("")
-            if lat:
-                lines.append("--- Last Turn ---")
-                lines.append(
-                    f"TTFA: {lat['ttfa']:.2f}s | STT: {lat['stt']:.2f}s | "
-                    f"LLM: {lat['llm']:.2f}s | TTS: {lat['tts']:.2f}s"
-                )
-                lines.append(
-                    f"Total: {lat['total']:.2f}s | Chunks: {lat['chunks']}"
-                )
-            return "\n".join(lines)
-
-        def set_tts(v):
-            agent.tts_backend = v
-            return f"TTS set to {v}"
-
-        def clear_history():
-            agent.history.clear()
-            agent.last_latency = {}
-            return "History cleared."
-
-        with gr.Row():
-            with gr.Column(scale=1):
-                tts_select = gr.Radio(
-                    choices=["kokoro", "voxtral"],
-                    value="kokoro",
-                    label="TTS Backend",
-                    info="Kokoro: ~50ms, in-process | Voxtral: ~250ms, better quality",
-                )
-                tts_status = gr.Textbox(label="", lines=1, interactive=False)
-                tts_select.change(fn=set_tts, inputs=[tts_select], outputs=[tts_status])
-
-                gr.Markdown("### Conversation Log")
-                log_box = gr.Textbox(label="Log", lines=15, interactive=False)
-                refresh_btn = gr.Button("Refresh Log", variant="secondary")
-                refresh_btn.click(fn=get_log, outputs=[log_box])
-
-                clear_btn = gr.Button("Clear History", size="sm")
-                clear_btn.click(fn=clear_history, outputs=[log_box])
-
-            with gr.Column(scale=2):
-                from fastrtc.reply_on_pause import AlgoOptions
-                webrtc = Stream(
-                    ReplyOnPause(
-                        voice_handler,
-                        algo_options=AlgoOptions(
-                            audio_chunk_duration=0.6,
-                            started_talking_threshold=0.5,
-                            speech_threshold=0.1,
-                        ),
-                        output_sample_rate=24000,
-                    ),
-                    modality="audio",
-                    mode="send-receive",
-                )
-
     return demo
 
 
