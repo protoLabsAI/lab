@@ -257,6 +257,33 @@ def build_ui():
             "Speak into your mic — the agent responds when you pause."
         )
 
+        def get_log():
+            lat = agent.last_latency
+            if not lat:
+                return "Waiting for first turn..."
+            lines = []
+            for i in range(0, len(agent.history), 2):
+                if i + 1 < len(agent.history):
+                    lines.append(f"YOU: {agent.history[i]['content']}")
+                    lines.append(f"AI:  {agent.history[i+1]['content']}")
+                    lines.append("")
+            if lat:
+                lines.append("--- Last Turn ---")
+                lines.append(
+                    f"STT: {lat['stt']:.2f}s | LLM: {lat['llm']:.2f}s | "
+                    f"TTS: {lat['tts']:.2f}s | Total: {lat['total']:.2f}s"
+                )
+            return "\n".join(lines)
+
+        def set_tts(v):
+            agent.tts_backend = v
+            return f"TTS set to {v}"
+
+        def clear_history():
+            agent.history.clear()
+            agent.last_latency = {}
+            return "History cleared."
+
         with gr.Row():
             with gr.Column(scale=1):
                 tts_select = gr.Radio(
@@ -265,45 +292,15 @@ def build_ui():
                     label="TTS Backend",
                     info="Kokoro: ~50ms, in-process | Voxtral: ~250ms, better quality",
                 )
-                tts_select.change(
-                    fn=lambda v: setattr(agent, "tts_backend", v),
-                    inputs=[tts_select],
-                )
+                tts_status = gr.Textbox(label="", lines=1, interactive=False)
+                tts_select.change(fn=set_tts, inputs=[tts_select], outputs=[tts_status])
 
                 gr.Markdown("### Conversation Log")
-                log_box = gr.Textbox(
-                    label="Log",
-                    lines=15,
-                    interactive=False,
-                    every=2,
-                )
-
-                def get_log():
-                    lat = agent.last_latency
-                    if not lat:
-                        return "Waiting for first turn..."
-                    lines = []
-                    for i in range(0, len(agent.history), 2):
-                        if i + 1 < len(agent.history):
-                            lines.append(f"YOU: {agent.history[i]['content']}")
-                            lines.append(f"AI:  {agent.history[i+1]['content']}")
-                            lines.append("")
-                    if lat:
-                        lines.append("--- Last Turn ---")
-                        lines.append(
-                            f"STT: {lat['stt']:.2f}s | LLM: {lat['llm']:.2f}s | "
-                            f"TTS: {lat['tts']:.2f}s | Total: {lat['total']:.2f}s"
-                        )
-                    return "\n".join(lines)
-
-                refresh_btn = gr.Button("Refresh Log", size="sm")
+                log_box = gr.Textbox(label="Log", lines=15, interactive=False)
+                refresh_btn = gr.Button("Refresh Log", variant="secondary")
                 refresh_btn.click(fn=get_log, outputs=[log_box])
 
                 clear_btn = gr.Button("Clear History", size="sm")
-                def clear_history():
-                    agent.history.clear()
-                    agent.last_latency = {}
-                    return "History cleared."
                 clear_btn.click(fn=clear_history, outputs=[log_box])
 
             with gr.Column(scale=2):
@@ -329,9 +326,16 @@ if __name__ == "__main__":
     demo = build_ui()
     # For mic access over Tailscale, use: sudo tailscale funnel 7866
     # Then access via https://protolabs.taild25506.ts.net:443
+    auth = os.environ.get("GRADIO_AUTH")  # format: "user:pass" or "user1:pass1,user2:pass2"
+    auth_pairs = None
+    if auth:
+        auth_pairs = [tuple(pair.split(":")) for pair in auth.split(",")]
+        logger.info(f"Auth enabled for {len(auth_pairs)} user(s)")
+
     demo.launch(
         server_name="0.0.0.0",
         server_port=7866,
         share=False,
         show_error=True,
+        auth=auth_pairs,
     )
