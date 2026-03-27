@@ -116,7 +116,10 @@ def get_stt():
             device=DEVICE,
             model_kwargs={"attn_implementation": "sdpa"},
         )
-        logger.info(f"Whisper loaded in {time.time() - t0:.1f}s")
+        # Pre-warm with silence — triggers CUDA kernel compilation
+        silence = np.zeros(16000, dtype=np.float32)  # 1s of silence
+        _stt_pipe({"raw": silence, "sampling_rate": 16000})
+        logger.info(f"Whisper loaded + warmed in {time.time() - t0:.1f}s")
     return _stt_pipe
 
 
@@ -130,9 +133,12 @@ def get_kokoro():
     global _kokoro_pipe
     if _kokoro_pipe is None:
         logger.info("Loading Kokoro 82M...")
+        t0 = time.time()
         from kokoro import KPipeline
         _kokoro_pipe = KPipeline(lang_code="a")
-        logger.info("Kokoro loaded")
+        # Pre-warm with a short phrase
+        list(_kokoro_pipe("Hello.", voice="af_heart", speed=1))
+        logger.info(f"Kokoro loaded + warmed in {time.time() - t0:.1f}s")
     return _kokoro_pipe
 
 
@@ -312,6 +318,40 @@ class VoiceAgent:
 agent = VoiceAgent()
 
 
+def prewarm():
+    """Pre-warm all models on startup so first turn is fast."""
+    logger.info("Pre-warming all models...")
+    t0 = time.time()
+
+    # 1. Whisper (loads model + CUDA kernels)
+    get_stt()
+
+    # 2. Kokoro (loads model + vocoder)
+    get_kokoro()
+
+    # 3. LLM prefix cache — send the system prompt so vLLM caches it
+    try:
+        httpx.post(
+            f"{LLM_URL}/chat/completions",
+            json={
+                "model": "local",
+                "messages": [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": "Hi"},
+                ],
+                "max_tokens": 1,
+                "temperature": 0,
+                "chat_template_kwargs": {"enable_thinking": False},
+            },
+            timeout=30.0,
+        )
+        logger.info("LLM prefix cache warmed")
+    except Exception as e:
+        logger.warning(f"LLM warmup failed (will work on first turn): {e}")
+
+    logger.info(f"All models pre-warmed in {time.time() - t0:.1f}s")
+
+
 def voice_handler(audio: tuple[int, np.ndarray]):
     """FastRTC ReplyOnPause handler — yields audio chunks as they're ready."""
     yield from agent.process_turn_streaming(audio)
@@ -397,6 +437,7 @@ def build_ui():
 
 
 if __name__ == "__main__":
+    prewarm()
     demo = build_ui()
     auth = os.environ.get("GRADIO_AUTH")
     auth_pairs = None
