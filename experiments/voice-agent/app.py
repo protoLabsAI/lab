@@ -1,17 +1,12 @@
 #!/usr/bin/env python3
 """
-Voice Agent — Real-time conversational AI
+Voice Agent — Real-time conversational AI (streaming pipeline)
 
-Pipeline: Silero VAD → Whisper STT → Qwen LLM → TTS → Speaker
+Pipeline: Silero VAD → Whisper STT → Qwen LLM (streaming) → TTS (chunked) → Speaker
 
-Three TTS backends (swap in UI):
-  - Kokoro 82M: ~50ms latency, in-process, Apache 2.0
-  - Voxtral 4B: ~250ms latency, external service, voice cloning, Qwen encoder
-  - None: text-only (debug mode)
-
-STT: whisper-large-v3-turbo via HuggingFace Transformers (~120ms for 3-5s utterance)
-LLM: Qwen3.5 via vLLM on localhost:8000 (streaming tokens)
-VAD: Silero VAD via FastRTC ReplyOnPause
+The LLM streams tokens, a sentence chunker detects boundaries, and TTS
+synthesizes each chunk immediately — audio starts playing before the LLM
+finishes generating.
 
 Run: CUDA_VISIBLE_DEVICES=1 uv run python -u app.py
 Requires: vLLM running on :8000 (any Qwen3.5 model)
@@ -19,8 +14,10 @@ Optional: Voxtral on :8091 for high-quality TTS
 """
 
 import io
+import json
 import logging
 import os
+import re
 import time
 from pathlib import Path
 
@@ -47,6 +44,59 @@ SYSTEM_PROMPT = (
     "Be conversational and natural. Do not use markdown, bullet points, or formatting. "
     "Respond as if speaking out loud."
 )
+
+# ---------------------------------------------------------------------------
+# Sentence Chunker — detects boundaries in streaming token output
+# ---------------------------------------------------------------------------
+class SentenceChunker:
+    """Buffers streaming tokens and yields complete sentences."""
+
+    BOUNDARY = re.compile(r'(?<=[.!?;:])\s+|(?<=[.!?])\s*$')
+
+    def __init__(self, min_first=10, min_rest=30, max_chars=200):
+        self.buffer = ""
+        self.chunk_count = 0
+        self.min_first = min_first   # Aggressive first chunk for fast TTFA
+        self.min_rest = min_rest     # Sentence-level for good prosody
+        self.max_chars = max_chars   # Force yield on run-on sentences
+
+    @property
+    def min_chars(self):
+        return self.min_first if self.chunk_count == 0 else self.min_rest
+
+    def feed(self, token: str):
+        self.buffer += token
+
+        # Force yield on very long buffers
+        if len(self.buffer) >= self.max_chars:
+            text = self.buffer.strip()
+            if text:
+                self.chunk_count += 1
+                yield text
+            self.buffer = ""
+            return
+
+        # First chunk: also split on commas for faster TTFA
+        if self.chunk_count == 0:
+            pattern = re.compile(r'(?<=[,.!?;:])\s+')
+        else:
+            pattern = self.BOUNDARY
+
+        matches = list(pattern.finditer(self.buffer))
+        if matches:
+            last = matches[-1]
+            candidate = self.buffer[:last.end()].strip()
+            if len(candidate) >= self.min_chars:
+                self.chunk_count += 1
+                yield candidate
+                self.buffer = self.buffer[last.end():]
+
+    def flush(self):
+        if self.buffer.strip():
+            self.chunk_count += 1
+            yield self.buffer.strip()
+            self.buffer = ""
+
 
 # ---------------------------------------------------------------------------
 # STT: Whisper large-v3-turbo
@@ -87,19 +137,15 @@ def get_kokoro():
 
 
 def tts_kokoro(text: str) -> tuple[int, np.ndarray]:
-    """Synthesize speech with Kokoro. Returns (sample_rate, int16_audio)."""
     pipe = get_kokoro()
     chunks = list(pipe(text, voice="af_heart", speed=1))
     if not chunks:
         return 24000, np.zeros(2400, dtype=np.int16)
     audio = np.concatenate([c[2] for c in chunks])
-    # Convert float32 [-1,1] to int16 for FastRTC
-    audio_int16 = (audio * 32767).clip(-32768, 32767).astype(np.int16)
-    return 24000, audio_int16
+    return 24000, (audio * 32767).clip(-32768, 32767).astype(np.int16)
 
 
 def tts_voxtral(text: str) -> tuple[int, np.ndarray] | None:
-    """Synthesize speech with Voxtral. Returns (sample_rate, audio_array) or None."""
     try:
         response = httpx.post(
             f"{VOXTRAL_URL}/v1/audio/speech",
@@ -113,50 +159,62 @@ def tts_voxtral(text: str) -> tuple[int, np.ndarray] | None:
         )
         response.raise_for_status()
         audio, sr = sf.read(io.BytesIO(response.content), dtype="float32")
-        # Convert to int16 for FastRTC
-        audio_int16 = (audio * 32767).clip(-32768, 32767).astype(np.int16)
-        return sr, audio_int16
+        return sr, (audio * 32767).clip(-32768, 32767).astype(np.int16)
     except Exception as e:
         logger.warning(f"Voxtral TTS failed: {e}")
         return None
 
 
+def tts_synthesize(text: str, backend: str) -> tuple[int, np.ndarray]:
+    """Synthesize with selected backend, fallback to Kokoro."""
+    if backend == "voxtral":
+        result = tts_voxtral(text)
+        if result is not None:
+            return result
+    return tts_kokoro(text)
+
+
 # ---------------------------------------------------------------------------
-# LLM: Qwen via vLLM (streaming)
+# LLM: Streaming tokens from vLLM
 # ---------------------------------------------------------------------------
-def llm_respond(text: str, history: list[dict]) -> str:
-    """Get LLM response via vLLM OpenAI-compatible API."""
+def stream_llm_tokens(text: str, history: list[dict]):
+    """Generator that yields tokens from vLLM streaming endpoint."""
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    messages.extend(history[-6:])  # Keep last 3 turns
+    messages.extend(history[-6:])
     messages.append({"role": "user", "content": text})
 
     try:
-        response = httpx.post(
-            f"{LLM_URL}/chat/completions",
-            json={
-                "model": "local",
-                "messages": messages,
-                "max_tokens": 150,
-                "temperature": 0.7,
-                "stream": False,
-                "chat_template_kwargs": {"enable_thinking": False},
-            },
-            timeout=30.0,
-        )
-        response.raise_for_status()
-        msg = response.json()["choices"][0]["message"]
-        # Content may be null if model used reasoning — check reasoning field too
-        content = msg.get("content") or ""
-        if not content and msg.get("reasoning"):
-            content = msg["reasoning"]
-        return content.strip() if content else "I'm not sure how to respond to that."
+        with httpx.Client(timeout=60.0) as client:
+            with client.stream(
+                "POST",
+                f"{LLM_URL}/chat/completions",
+                json={
+                    "model": "local",
+                    "messages": messages,
+                    "max_tokens": 150,
+                    "temperature": 0.7,
+                    "stream": True,
+                    "chat_template_kwargs": {"enable_thinking": False},
+                },
+            ) as response:
+                for line in response.iter_lines():
+                    if not line.startswith("data: "):
+                        continue
+                    data = line[6:]
+                    if data == "[DONE]":
+                        break
+                    chunk = json.loads(data)
+                    delta = chunk["choices"][0].get("delta", {})
+                    content = delta.get("content")
+                    if content:
+                        yield content
     except Exception as e:
-        logger.error(f"LLM error: {e}")
-        return "Sorry, I couldn't process that."
+        logger.error(f"LLM stream error: {e}")
+        yield "Sorry, I couldn't process that."
 
 
 # ---------------------------------------------------------------------------
-# Voice Agent Pipeline
+# Voice Agent — Streaming Pipeline
 # ---------------------------------------------------------------------------
 class VoiceAgent:
     def __init__(self):
@@ -164,21 +222,22 @@ class VoiceAgent:
         self.tts_backend = "kokoro"
         self.last_latency = {}
 
-    def process_turn(self, audio_tuple: tuple[int, np.ndarray]) -> tuple[int, np.ndarray] | None:
-        """Full pipeline: audio in → audio out."""
+    def process_turn_streaming(self, audio_tuple: tuple[int, np.ndarray]):
+        """Streaming pipeline: STT → LLM tokens → chunked TTS → yield audio.
+
+        Yields (sample_rate, audio_chunk) tuples as soon as each sentence
+        is synthesized — doesn't wait for the full LLM response.
+        """
         sr_in, audio_in = audio_tuple
         total_start = time.time()
 
         # 1. STT
         t0 = time.time()
         stt = get_stt()
-        # Ensure 1D mono
         if audio_in.ndim > 1:
             audio_in = audio_in[:, 0] if audio_in.shape[1] < audio_in.shape[0] else audio_in[0]
-        # Convert to float32 for Whisper
         if audio_in.dtype != np.float32:
             audio_in = audio_in.astype(np.float32) / max(np.iinfo(audio_in.dtype).max, 1)
-        # Resample to 16kHz if needed
         if sr_in != 16000:
             import soxr
             audio_in = soxr.resample(audio_in.reshape(-1), sr_in, 16000)
@@ -187,63 +246,75 @@ class VoiceAgent:
         stt_time = time.time() - t0
 
         if not user_text:
-            return None
+            return
 
         logger.info(f"[STT {stt_time:.2f}s] {user_text}")
 
-        # 2. LLM
-        t0 = time.time()
-        response_text = llm_respond(user_text, self.history)
-        llm_time = time.time() - t0
-        if not response_text:
-            response_text = "I'm not sure how to respond to that."
-        logger.info(f"[LLM {llm_time:.2f}s] {response_text}")
+        # 2. Stream LLM → chunk → TTS → yield audio
+        chunker = SentenceChunker()
+        full_response = ""
+        llm_start = time.time()
+        ttfa = None  # Time to first audio
+        chunk_count = 0
+        tts_total = 0
+
+        for token in stream_llm_tokens(user_text, self.history):
+            full_response += token
+
+            for sentence in chunker.feed(token):
+                t1 = time.time()
+                sr_out, audio_chunk = tts_synthesize(sentence, self.tts_backend)
+                tts_time = time.time() - t1
+                tts_total += tts_time
+
+                if ttfa is None:
+                    ttfa = time.time() - total_start
+                    logger.info(f"[TTFA {ttfa:.2f}s] First audio chunk: {sentence!r}")
+
+                chunk_count += 1
+                yield sr_out, audio_chunk
+
+        # Flush remaining text
+        for sentence in chunker.flush():
+            t1 = time.time()
+            sr_out, audio_chunk = tts_synthesize(sentence, self.tts_backend)
+            tts_total += time.time() - t1
+            chunk_count += 1
+            yield sr_out, audio_chunk
+
+        llm_time = time.time() - llm_start
+        total_time = time.time() - total_start
+
+        if not full_response:
+            full_response = "I'm not sure how to respond to that."
 
         # Update history
         self.history.append({"role": "user", "content": user_text})
-        self.history.append({"role": "assistant", "content": response_text})
-
-        # 3. TTS
-        t0 = time.time()
-        if self.tts_backend == "voxtral":
-            tts_result = tts_voxtral(response_text)
-        else:
-            tts_result = tts_kokoro(response_text)
-        tts_time = time.time() - t0
-
-        if tts_result is None:
-            # Voxtral failed, fall back to kokoro
-            t0 = time.time()
-            tts_result = tts_kokoro(response_text)
-            tts_time = time.time() - t0
-
-        total_time = time.time() - total_start
-        logger.info(
-            f"[Total {total_time:.2f}s] STT={stt_time:.2f}s LLM={llm_time:.2f}s TTS={tts_time:.2f}s"
-        )
+        self.history.append({"role": "assistant", "content": full_response})
 
         self.last_latency = {
             "stt": stt_time,
             "llm": llm_time,
-            "tts": tts_time,
+            "tts": tts_total,
+            "ttfa": ttfa or total_time,
             "total": total_time,
+            "chunks": chunk_count,
             "user_text": user_text,
-            "response_text": response_text,
+            "response_text": full_response,
         }
 
-        sr_out, audio_out = tts_result
-        # FastRTC expects (sample_rate, audio_array)
-        return sr_out, audio_out
+        logger.info(
+            f"[Total {total_time:.2f}s] STT={stt_time:.2f}s LLM={llm_time:.2f}s "
+            f"TTS={tts_total:.2f}s TTFA={ttfa:.2f}s chunks={chunk_count}"
+        )
 
 
 agent = VoiceAgent()
 
 
 def voice_handler(audio: tuple[int, np.ndarray]):
-    """FastRTC ReplyOnPause handler — called when user stops speaking."""
-    result = agent.process_turn(audio)
-    if result is not None:
-        yield result
+    """FastRTC ReplyOnPause handler — yields audio chunks as they're ready."""
+    yield from agent.process_turn_streaming(audio)
 
 
 # ---------------------------------------------------------------------------
@@ -252,9 +323,9 @@ def voice_handler(audio: tuple[int, np.ndarray]):
 def build_ui():
     with gr.Blocks(title="Voice Agent") as demo:
         gr.Markdown(
-            "# Voice Agent\n"
-            "Silero VAD → Whisper Turbo → Qwen LLM → Kokoro/Voxtral TTS\n\n"
-            "Speak into your mic — the agent responds when you pause."
+            "# Voice Agent (Streaming)\n"
+            "VAD → Whisper → Qwen (streaming) → Kokoro/Voxtral (chunked) → Speaker\n\n"
+            "Audio starts playing before the LLM finishes generating."
         )
 
         def get_log():
@@ -270,8 +341,11 @@ def build_ui():
             if lat:
                 lines.append("--- Last Turn ---")
                 lines.append(
-                    f"STT: {lat['stt']:.2f}s | LLM: {lat['llm']:.2f}s | "
-                    f"TTS: {lat['tts']:.2f}s | Total: {lat['total']:.2f}s"
+                    f"TTFA: {lat['ttfa']:.2f}s | STT: {lat['stt']:.2f}s | "
+                    f"LLM: {lat['llm']:.2f}s | TTS: {lat['tts']:.2f}s"
+                )
+                lines.append(
+                    f"Total: {lat['total']:.2f}s | Chunks: {lat['chunks']}"
                 )
             return "\n".join(lines)
 
@@ -324,9 +398,7 @@ def build_ui():
 
 if __name__ == "__main__":
     demo = build_ui()
-    # For mic access over Tailscale, use: sudo tailscale funnel 7866
-    # Then access via https://protolabs.taild25506.ts.net:443
-    auth = os.environ.get("GRADIO_AUTH")  # format: "user:pass" or "user1:pass1,user2:pass2"
+    auth = os.environ.get("GRADIO_AUTH")
     auth_pairs = None
     if auth:
         auth_pairs = [tuple(pair.split(":")) for pair in auth.split(",")]
