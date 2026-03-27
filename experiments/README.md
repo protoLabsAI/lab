@@ -12,6 +12,7 @@ Loose ML experiment scripts on Blackwell GPUs — fast iteration, Gradio UIs, be
 | **[qwen3-omni](qwen3-omni/)** | Qwen3-Omni | Multimodal (audio+vision+text) demo adapted for local vLLM-Omni endpoint. | `uv run python -u experiments/qwen3-omni/app.py` |
 | **[tts-compare](tts-compare/)** | Voxtral 4B / Fish S2 Pro / Kokoro 82M | A/B/C TTS comparison — same text, side-by-side playback with latency + RTF. Kokoro in-process, others as services. | `uv run python -u experiments/tts-compare/app.py` |
 | **[stt-whisper](stt-whisper/)** | Whisper large-v3-turbo / distil-large-v3 / large-v3 | Speech-to-text comparison — upload or mic record, transcribe with speed metrics. Models auto-swap. | `CUDA_VISIBLE_DEVICES=1 uv run python -u experiments/stt-whisper/app.py` |
+| **[voice-agent](voice-agent/)** | Whisper Turbo + Qwen 4B + Kokoro 82M | Real-time voice agent — speak and get spoken responses in <1s. Silero VAD, FastRTC WebRTC streaming. | `CUDA_VISIBLE_DEVICES=1 uv run python -u experiments/voice-agent/app.py` |
 
 ## Backlog
 
