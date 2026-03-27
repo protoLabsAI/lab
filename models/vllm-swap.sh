@@ -25,16 +25,18 @@
 #
 # === Legacy / Eval-only (suffix -opt adds P1+P2 flags) ===
 #   qwen-27b-int4-opt, qwen-4b-int4-opt, qwen-35b-opt, qwen-122b-opt
-
 set -euo pipefail
-
 PORT=8000
 VLLM_BIN="$HOME/dev/vllm-env/bin/vllm"
 LOG_DIR="/mnt/scratch/logs"
-
 export HF_HOME="/mnt/models/huggingface"
 export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
-
+export VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=1
+# Shared flags for Qwen3.5 with prefix caching (hybrid Mamba/attention)
+# --mamba-block-size requires --enable-prefix-caching
+QWEN35_PREFIX_FLAGS="--enable-prefix-caching --mamba-cache-mode align --mamba-block-size 8"
+# -O3: graph optimizations + kernel fusions (5-15% throughput gain)
+O3="-O3"
 usage() {
     echo "Production:"
     echo "  $0 {qwen-27b-int4|qwen-27b-int4-mtp|qwen-35b|qwen-9b-mtp|qwen-4b-int4}"
@@ -49,7 +51,6 @@ usage() {
     echo "  $0 {qwen-122b-int4|qwen-35b-tp2-opt|qwen-27b-int4-tp2}"
     exit 1
 }
-
 stop_vllm() {
     echo "Stopping vLLM..."
     pkill -f "vllm serve" 2>/dev/null || true
@@ -64,7 +65,6 @@ stop_vllm() {
     pkill -9 -f "vllm serve" 2>/dev/null || true
     sleep 3
 }
-
 wait_ready() {
     echo "Waiting for model to load..."
     for i in $(seq 1 60); do
@@ -78,28 +78,28 @@ wait_ready() {
     tail -20 "${LOG_DIR}/vllm-swap.log"
     return 1
 }
-
 [[ $# -lt 1 ]] && usage
-
 stop_vllm
-
 case "$1" in
     # ─── Single GPU configs ────────────────────────────────────────
-
     qwen-27b-int4)
         echo "Starting Qwen3.5-27B-GPTQ-Int4 (GPU 0, 128K)..."
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-27B-GPTQ-Int4 \
+            $O3 \
             --host 0.0.0.0 --port $PORT \
             --served-model-name local \
             --max-model-len 131072 \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.90 \
+            --enable-chunked-prefill \
+            $QWEN35_PREFIX_FLAGS \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     qwen-27b-int4-mtp)
         echo "Starting Qwen3.5-27B-GPTQ-Int4 + MTP (GPU 0, 128K, 70 tok/s)..."
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-27B-GPTQ-Int4 \
+            $O3 \
             --host 0.0.0.0 --port $PORT \
             --served-model-name local \
             --max-model-len 131072 \
@@ -107,9 +107,10 @@ case "$1" in
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.90 \
             --async-scheduling \
-            --enable-prefix-caching \
+            --enable-chunked-prefill \
             --kv-cache-dtype fp8 \
             --speculative-config '{"method": "mtp", "num_speculative_tokens": 1}' \
+            $QWEN35_PREFIX_FLAGS \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     qwen-27b-int4-opt)
@@ -122,7 +123,6 @@ case "$1" in
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.90 \
             --async-scheduling \
-            --enable-prefix-caching \
             --performance-mode interactivity \
             --kv-cache-dtype fp8 \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
@@ -153,12 +153,15 @@ case "$1" in
     qwen-35b)
         echo "Starting Qwen3.5-35B-A3B MoE (GPU 0, 64K)..."
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-35B-A3B \
+            $O3 \
             --host 0.0.0.0 --port $PORT \
             --served-model-name local \
             --max-model-len 65536 \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.85 \
+            --enable-chunked-prefill \
+            $QWEN35_PREFIX_FLAGS \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     qwen-35b-opt)
@@ -174,7 +177,6 @@ case "$1" in
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.85 \
             --async-scheduling \
-            --enable-prefix-caching \
             --performance-mode interactivity \
             --kv-cache-dtype fp8 \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
@@ -212,6 +214,7 @@ case "$1" in
     qwen-9b)
         echo "Starting Qwen3.5-9B (GPU 0, 262K)..."
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-9B \
+            $O3 \
             --host 0.0.0.0 --port $PORT \
             --max-model-len 262144 \
             --served-model-name local \
@@ -219,11 +222,14 @@ case "$1" in
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.90 \
             --language-model-only \
+            --enable-chunked-prefill \
+            $QWEN35_PREFIX_FLAGS \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     qwen-9b-mtp)
         echo "Starting Qwen3.5-9B + MTP (GPU 0, 262K, 112 tok/s)..."
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-9B \
+            $O3 \
             --host 0.0.0.0 --port $PORT \
             --max-model-len 262144 \
             --served-model-name local \
@@ -232,14 +238,16 @@ case "$1" in
             --gpu-memory-utilization 0.90 \
             --language-model-only \
             --async-scheduling \
-            --enable-prefix-caching \
+            --enable-chunked-prefill \
             --kv-cache-dtype fp8 \
             --speculative-config '{"method": "mtp", "num_speculative_tokens": 1}' \
+            $QWEN35_PREFIX_FLAGS \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     qwen-4b-int4)
         echo "Starting Qwen3.5-4B-AWQ-4bit (GPU 0, 262K)..."
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve cyankiwi/Qwen3.5-4B-AWQ-4bit \
+            $O3 \
             --host 0.0.0.0 --port $PORT \
             --max-model-len 262144 \
             --served-model-name local \
@@ -247,6 +255,8 @@ case "$1" in
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.90 \
             --language-model-only \
+            --enable-chunked-prefill \
+            $QWEN35_PREFIX_FLAGS \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     qwen-4b-int4-opt)
@@ -260,7 +270,6 @@ case "$1" in
             --gpu-memory-utilization 0.90 \
             --language-model-only \
             --async-scheduling \
-            --enable-prefix-caching \
             --performance-mode interactivity \
             --kv-cache-dtype fp8 \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
@@ -301,7 +310,6 @@ case "$1" in
             --language-model-only \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
-
     cydonia-24b)
         echo "Starting Cydonia-24B-v4.3 (GPU 0, 32K)..."
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve TheDrummer/Cydonia-24B-v4.3 \
@@ -313,7 +321,6 @@ case "$1" in
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     # ─── Qwen3-Coder configs ─────────────────────────────────────────
-
     qwen3-coder-30b)
         echo "Starting Qwen3-Coder-30B-A3B FP8 (GPU 0, 256K)..."
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8 \
@@ -338,15 +345,12 @@ case "$1" in
             --gpu-memory-utilization 0.90 \
             --disable-custom-all-reduce \
             --async-scheduling \
-            --enable-prefix-caching \
             --trust-remote-code \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
-
     # ─── Experimental MTP configs (no tool calling) ─────────────────
     # These are for creative/roleplay/summarization benchmarking only.
     # MTP hurts MoE models — these exist for testing, not production.
-
     qwen-35b-mtp)
         echo "Starting Qwen3.5-35B-A3B MoE + MTP (GPU 0, 64K, NO TOOLS)..."
         CUDA_VISIBLE_DEVICES=0 \
@@ -358,7 +362,6 @@ case "$1" in
             --max-model-len 65536 \
             --gpu-memory-utilization 0.85 \
             --async-scheduling \
-            --enable-prefix-caching \
             --kv-cache-dtype fp8 \
             --speculative-config '{"method": "mtp", "num_speculative_tokens": 1}' \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
@@ -371,21 +374,19 @@ case "$1" in
             --max-model-len 32768 \
             --gpu-memory-utilization 0.90 \
             --async-scheduling \
-            --enable-prefix-caching \
             --kv-cache-dtype fp8 \
             --speculative-config '{"method": "mtp", "num_speculative_tokens": 1}' \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
-
     # ─── Dual GPU configs (TP=2) ───────────────────────────────────
     # NCCL_P2P_DISABLE=1 required for stable CUDA graphs on Blackwell PCIe
     # (ACS on PCIe bridges corrupts P2P during graph replay)
-
     qwen-122b-int4)
         echo "Starting Qwen3.5-122B-A10B-GPTQ-Int4 (TP=2, 128K, 122 tok/s)..."
         NCCL_P2P_DISABLE=1 \
         NCCL_CUMEM_ENABLE=0 \
         $VLLM_BIN serve Qwen/Qwen3.5-122B-A10B-GPTQ-Int4 \
+            $O3 \
             --host 0.0.0.0 --port $PORT \
             --tensor-parallel-size 2 \
             --served-model-name local \
@@ -395,7 +396,8 @@ case "$1" in
             --gpu-memory-utilization 0.90 \
             --disable-custom-all-reduce \
             --async-scheduling \
-            --enable-prefix-caching \
+            --enable-chunked-prefill \
+            $QWEN35_PREFIX_FLAGS \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     qwen-35b-tp2)
@@ -403,6 +405,7 @@ case "$1" in
         NCCL_P2P_DISABLE=1 \
         NCCL_CUMEM_ENABLE=0 \
         $VLLM_BIN serve Qwen/Qwen3.5-35B-A3B \
+            $O3 \
             --host 0.0.0.0 --port $PORT \
             --tensor-parallel-size 2 \
             --served-model-name local \
@@ -412,7 +415,8 @@ case "$1" in
             --gpu-memory-utilization 0.90 \
             --disable-custom-all-reduce \
             --async-scheduling \
-            --enable-prefix-caching \
+            --enable-chunked-prefill \
+            $QWEN35_PREFIX_FLAGS \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     qwen-27b-int4-tp2)
@@ -420,7 +424,8 @@ case "$1" in
         NCCL_P2P_DISABLE=1 \
         NCCL_CUMEM_ENABLE=0 \
         $VLLM_BIN serve Qwen/Qwen3.5-27B-GPTQ-Int4 \
-            --host 0.0.0.0 --port 8000 \
+            $O3 \
+            --host 0.0.0.0 --port $PORT \
             --tensor-parallel-size 2 \
             --served-model-name local \
             --max-model-len 262144 \
@@ -429,12 +434,12 @@ case "$1" in
             --gpu-memory-utilization 0.90 \
             --disable-custom-all-reduce \
             --async-scheduling \
-            --enable-prefix-caching \
+            --enable-chunked-prefill \
+            $QWEN35_PREFIX_FLAGS \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     *)
         usage
         ;;
 esac
-
 wait_ready
