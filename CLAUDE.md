@@ -8,8 +8,8 @@ Monorepo for model evaluation, training, inference infrastructure, and ML experi
 - `evals/` — LLM eval suite: claw-eval, custom suites, function-call, RAG (strict, tested)
 - `models/` — Model inventory, vllm-swap.sh, benchmarks
 - `training/` — Fine-tuning workspace (LLaMA-Factory configs, datasets)
-- `experiments/` — Loose ML experiment scripts (ltx-video, flux2)
-- `infra/` — Gateway (LiteLLM + Langfuse), vLLM systemd, Prometheus configs
+- `experiments/` — ML experiments (ltx-video, flux2, quantize, pixel-gen, stt-whisper, voice-agent)
+- `infra/` — Prometheus exporters, vLLM systemd, gateway configs (gateway runs on ava node)
 
 ## Using uv
 
@@ -134,15 +134,17 @@ cd evals
 | **Qwen 35B MoE BF16** | 67GB | 171 | — | 76/103 | Speed king, best coding (10/10) |
 | **Qwen 122B INT4** | 74GB | **122** | — | **89/103** | **SOTA local — beats all cloud models (TP=2)** |
 | **Qwen 9B BF16** | 19GB | 92 | **112** | 72/103 | Fine-tune base |
+| **Qwen 9B FP8** | 10.3GB | **140** | — | — | FP8 quant (+52% vs bf16) |
 | **Qwen 4B INT4** | 3.8GB | 297 | — | 56/103 | Edge deploy |
 | **Qwen 4B BF16** | 8.8GB | 155 | — | — | LoRA base |
+| **Qwen 4B FP8** | 4.5GB | 140 | — | — | FP8 quant (21ms TTFT) |
 | Cydonia 24B | 44GB | — | — | — | Creative/roleplay (holding) |
 | Llama 70B AWQ | 38GB | 38 | — | — | Creative/roleplay (holding) |
 | Llama 8B AWQ | 5GB | — | — | 50/102 | Eval baseline (poor) |
 | Qwen 2B BF16 | 4GB | 307 | — | — | Training (5/5 reasoning!) |
 | Qwen 0.8B BF16 | 1.5GB | 547 | — | — | Training |
 
-Base models (0.8B, 2B, 4B) also downloaded for pretraining. 415GB free on `/mnt/models`.
+Base models (0.8B, 2B, 4B) also downloaded for pretraining. FP8 quants in `/mnt/models/quantized/` and on [HuggingFace protoLabsAI](https://huggingface.co/protoLabsAI).
 
 Cold storage (`/mnt/data/models-cold/`): FLUX.2-klein 9B+base (100GB), Z-Image+Turbo (51GB), Voxtral-Mini-4B (17GB), OCR models (11.4GB).
 
