@@ -91,10 +91,12 @@ def quantize_fp8(
     vram = _get_gpu_memory()
     logger.info(f"VRAM after load: {vram}")
 
+    # Ignore lm_head + Mamba/SSM layers (linear_attn has unaligned dims
+    # that crash FP8 compressed-tensors kernels on Ampere/Ada GPUs)
     recipe = QuantizationModifier(
         targets="Linear",
         scheme="FP8_DYNAMIC",
-        ignore=["lm_head"],
+        ignore=["lm_head", "re:.*linear_attn.*"],
     )
 
     logger.info("Running FP8_DYNAMIC quantization...")
