@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-Speech-to-Text — Whisper model comparison
+Speech-to-Text — Whisper model comparison + speaker diarization
 
 Compare whisper-large-v3-turbo vs large-v3 vs distil-large-v3 on Blackwell.
 Upload audio or record from mic, get transcription with speed metrics.
+Optional speaker diarization via pyannote-audio.
 
 Uses HuggingFace Transformers pipeline (SDPA attention, no flash-attn needed).
 
@@ -19,6 +20,8 @@ from pathlib import Path
 os.environ.setdefault("HF_HOME", "/mnt/models/huggingface")
 
 import gradio as gr
+import numpy as np
+import soundfile as sf
 import torch
 from transformers import pipeline
 
@@ -31,27 +34,26 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 DEVICE = "cuda"
 DTYPE = torch.float16
 
+HF_TOKEN = os.environ.get("HF_TOKEN", "")
+
 MODELS = {
     "large-v3-turbo (809M, fastest)": "openai/whisper-large-v3-turbo",
     "distil-large-v3 (756M, fast)": "distil-whisper/distil-large-v3",
     "large-v3 (1.55B, best quality)": "openai/whisper-large-v3",
 }
 
-# Cache loaded pipelines
 _pipes: dict[str, object] = {}
 _current_model: str | None = None
+_diarization_pipeline = None
 
 
 def get_pipe(model_key: str):
-    """Load or return cached pipeline. Unloads previous model to save VRAM."""
     global _current_model
-
     model_id = MODELS[model_key]
 
     if model_key in _pipes:
         return _pipes[model_key]
 
-    # Unload previous model
     if _current_model and _current_model != model_key and _current_model in _pipes:
         del _pipes[_current_model]
         torch.cuda.empty_cache()
@@ -75,14 +77,55 @@ def get_pipe(model_key: str):
     return pipe
 
 
+def get_diarization_pipeline():
+    global _diarization_pipeline
+    if _diarization_pipeline is not None:
+        return _diarization_pipeline
+
+    if not HF_TOKEN:
+        return None
+
+    logger.info("Loading pyannote diarization pipeline...")
+    t0 = time.time()
+    from pyannote.audio import Pipeline as PyannotePipeline
+
+    _diarization_pipeline = PyannotePipeline.from_pretrained(
+        "pyannote/speaker-diarization-3.1",
+        use_auth_token=HF_TOKEN,
+    ).to(torch.device(DEVICE))
+
+    logger.info(f"Diarization pipeline loaded in {time.time() - t0:.1f}s")
+    return _diarization_pipeline
+
+
+def merge_diarization(transcript_chunks, diarization_result):
+    """Merge whisper transcript segments with pyannote speaker labels."""
+    lines = []
+    for chunk in transcript_chunks:
+        ts = chunk.get("timestamp", (None, None))
+        start = ts[0] if ts[0] is not None else 0.0
+
+        # Find which speaker is talking at this timestamp
+        speaker = "?"
+        for turn, _, spk in diarization_result.itertracks(yield_label=True):
+            if turn.start <= start < turn.end:
+                speaker = spk
+                break
+
+        start_str = f"{start:.1f}s" if ts[0] is not None else ""
+        lines.append(f"[{speaker}] {start_str}: {chunk['text'].strip()}")
+
+    return "\n".join(lines)
+
+
 def transcribe(
     audio,
     model_key: str,
     batch_size: int,
     return_timestamps: bool,
+    enable_diarization: bool,
     language: str,
 ):
-    """Transcribe audio file or recording."""
     if audio is None:
         return "", "No audio provided"
 
@@ -103,44 +146,61 @@ def transcribe(
         generate_kwargs=generate_kwargs,
     )
 
-    elapsed = time.time() - t0
-
+    transcribe_time = time.time() - t0
     text = result["text"]
 
-    # Calculate audio duration
-    import soundfile as sf
+    # Audio duration
     audio_data, sr = sf.read(audio)
     duration = len(audio_data) / sr
 
-    rtf = elapsed / duration if duration > 0 else 0
-    speed_x = duration / elapsed if elapsed > 0 else 0
+    # Diarization
+    diarize_time = 0
+    diarized_text = None
+    if enable_diarization and "chunks" in result:
+        diar_pipe = get_diarization_pipeline()
+        if diar_pipe is None:
+            diarized_text = "(Diarization requires HF_TOKEN env var — pyannote models are gated)"
+        else:
+            t1 = time.time()
+            diar_result = diar_pipe(audio)
+            diarize_time = time.time() - t1
+            diarized_text = merge_diarization(result["chunks"], diar_result)
 
-    # Save transcript
+    total_time = transcribe_time + diarize_time
+    rtf = total_time / duration if duration > 0 else 0
+    speed_x = duration / total_time if total_time > 0 else 0
+
+    # Save
     ts = int(time.time())
     save_path = OUTPUT_DIR / f"transcript_{ts}.txt"
-    save_path.write_text(text)
+    save_text = diarized_text if diarized_text else text
+    save_path.write_text(save_text)
 
     info_lines = [
         f"Model: {model_id}",
         f"Audio: {duration:.1f}s",
-        f"Transcription time: {elapsed:.2f}s",
+        f"Transcription: {transcribe_time:.2f}s",
+    ]
+    if diarize_time > 0:
+        info_lines.append(f"Diarization: {diarize_time:.2f}s")
+    info_lines.extend([
+        f"Total: {total_time:.2f}s",
         f"Speed: {speed_x:.1f}x real-time",
         f"RTF: {rtf:.4f}",
         f"Batch size: {batch_size}",
-        f"Saved: {save_path.name}",
-    ]
-
-    # Add timestamps if requested
+    ])
     if return_timestamps and "chunks" in result:
         info_lines.append(f"Segments: {len(result['chunks'])}")
+    info_lines.append(f"Saved: {save_path.name}")
 
-    return text, "\n".join(info_lines)
+    display_text = diarized_text if diarized_text else text
+    return display_text, "\n".join(info_lines)
 
 
 def build_ui():
     with gr.Blocks(title="Speech-to-Text") as demo:
         gr.Markdown(
-            "# Speech-to-Text — Whisper Comparison\n"
+            "# Speech-to-Text — Whisper + Diarization\n"
             "Compare large-v3-turbo vs distil-large-v3 vs large-v3 on Blackwell"
         )
 
@@ -164,18 +224,23 @@ def build_ui():
                 batch_size = gr.Slider(
                     1, 48, value=24, step=4,
                     label="Batch Size",
-                    info="Higher = faster but more VRAM. 24 is good for 96GB.",
+                    info="Higher = faster but more VRAM",
                 )
                 timestamps = gr.Checkbox(
                     label="Word-level timestamps",
                     value=False,
+                )
+                diarization = gr.Checkbox(
+                    label="Speaker diarization (pyannote)",
+                    value=False,
+                    info="Requires HF_TOKEN env var" if not HF_TOKEN else "Ready",
                 )
                 transcribe_btn = gr.Button("Transcribe", variant="primary", size="lg")
 
             with gr.Column(scale=2):
                 transcript_output = gr.Textbox(
                     label="Transcript",
-                    lines=12,
+                    lines=15,
                 )
                 info_output = gr.Textbox(
                     label="Performance Info",
@@ -185,7 +250,7 @@ def build_ui():
 
         transcribe_btn.click(
             fn=transcribe,
-            inputs=[audio_input, model_select, batch_size, timestamps, language],
+            inputs=[audio_input, model_select, batch_size, timestamps, diarization, language],
             outputs=[transcript_output, info_output],
         )
 

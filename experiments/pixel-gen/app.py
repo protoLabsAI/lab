@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 """
-Pixel Art Generator — txt2img + img2img experiment
+Pixel Art Generator — SDXL Lightning vs FLUX.2 Klein A/B test
 
-SDXL Lightning 4-step with optional image input for guided generation.
-Fused Lightning LoRA, Tiny VAE, optimized pixel cleanup.
+Two model backends with shared pixel cleanup pipeline:
+  - SDXL Lightning (4-step, fused LoRA, Tiny VAE) — current production
+  - FLUX.2 Klein 4B (4-step distilled, Qwen3 text encoder) — experimental
+
+Both support txt2img + img2img. Toggle between them to compare quality/speed.
 
 Run: CUDA_VISIBLE_DEVICES=1 uv run python -u app.py
 """
 
+import gc
 import logging
 import os
 import random
@@ -22,6 +26,7 @@ import torch
 from diffusers import (
     AutoencoderTiny,
     EulerDiscreteScheduler,
+    Flux2KleinPipeline,
     StableDiffusionXLImg2ImgPipeline,
     StableDiffusionXLPipeline,
 )
@@ -37,15 +42,20 @@ logger = logging.getLogger(__name__)
 # Config
 # ---------------------------------------------------------------------------
 DEVICE = "cuda"
-DTYPE = torch.float16
 OUTPUT_DIR = Path("/mnt/data/comfyui/output/pixel-gen")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-MODEL_ID = "stabilityai/stable-diffusion-xl-base-1.0"
+# SDXL Lightning config
+SDXL_MODEL_ID = "stabilityai/stable-diffusion-xl-base-1.0"
 TINY_VAE_ID = "madebyollin/taesdxl"
 LIGHTNING_REPO = "ByteDance/SDXL-Lightning"
 LIGHTNING_FILE = "sdxl_lightning_4step_lora.safetensors"
 SYSTEM_LORA_DIR = Path("/mnt/data/models-cold/system_loras")
+
+# FLUX.2 Klein config
+FLUX_MODEL_ID = "black-forest-labs/FLUX.2-klein-4B"
+
+MODEL_BACKENDS = ["SDXL Lightning", "FLUX.2 Klein 4B"]
 
 RESOLUTION_PRESETS = {
     "Scene (1024x768)": (1024, 768),
@@ -70,10 +80,10 @@ NEGATIVE_PROMPT = (
 )
 
 # ---------------------------------------------------------------------------
-# Pipeline singletons
+# SDXL Lightning pipeline
 # ---------------------------------------------------------------------------
-_pipe: StableDiffusionXLPipeline | None = None
-_img2img_pipe: StableDiffusionXLImg2ImgPipeline | None = None
+_sdxl_pipe: StableDiffusionXLPipeline | None = None
+_sdxl_img2img: StableDiffusionXLImg2ImgPipeline | None = None
 
 
 def ensure_lightning_lora() -> Path | None:
@@ -91,86 +101,124 @@ def ensure_lightning_lora() -> Path | None:
         return None
 
 
-def get_base_pipeline() -> StableDiffusionXLPipeline:
-    global _pipe
-    if _pipe is not None:
-        return _pipe
+def get_sdxl_pipeline() -> StableDiffusionXLPipeline:
+    global _sdxl_pipe
+    if _sdxl_pipe is not None:
+        return _sdxl_pipe
 
-    logger.info(f"Loading SDXL: {MODEL_ID}")
+    logger.info(f"Loading SDXL Lightning: {SDXL_MODEL_ID}")
     t0 = time.time()
 
-    _pipe = StableDiffusionXLPipeline.from_pretrained(
-        MODEL_ID, torch_dtype=DTYPE, use_safetensors=True, variant="fp16",
+    _sdxl_pipe = StableDiffusionXLPipeline.from_pretrained(
+        SDXL_MODEL_ID, torch_dtype=torch.float16, use_safetensors=True, variant="fp16",
     ).to(DEVICE)
 
     try:
-        tiny_vae = AutoencoderTiny.from_pretrained(TINY_VAE_ID, torch_dtype=DTYPE)
-        _pipe.vae = tiny_vae.to(DEVICE)
+        tiny_vae = AutoencoderTiny.from_pretrained(TINY_VAE_ID, torch_dtype=torch.float16)
+        _sdxl_pipe.vae = tiny_vae.to(DEVICE)
         logger.info("Tiny VAE loaded")
     except Exception as e:
         logger.warning(f"Tiny VAE failed: {e}")
 
-    _pipe.enable_vae_slicing()
-    _pipe.unet = _pipe.unet.to(memory_format=torch.channels_last)
-    _pipe.vae = _pipe.vae.to(memory_format=torch.channels_last)
-    _pipe.scheduler = EulerDiscreteScheduler.from_config(
-        _pipe.scheduler.config, timestep_spacing="trailing"
+    _sdxl_pipe.enable_vae_slicing()
+    _sdxl_pipe.unet = _sdxl_pipe.unet.to(memory_format=torch.channels_last)
+    _sdxl_pipe.vae = _sdxl_pipe.vae.to(memory_format=torch.channels_last)
+    _sdxl_pipe.scheduler = EulerDiscreteScheduler.from_config(
+        _sdxl_pipe.scheduler.config, timestep_spacing="trailing"
     )
 
     lightning_path = ensure_lightning_lora()
     if lightning_path:
-        _pipe.load_lora_weights(
+        _sdxl_pipe.load_lora_weights(
             str(lightning_path.parent), weight_name=lightning_path.name,
             adapter_name="lightning",
         )
-        _pipe.set_adapters(["lightning"], [1.0])
-        _pipe.fuse_lora()
-        _pipe.unload_lora_weights()
+        _sdxl_pipe.set_adapters(["lightning"], [1.0])
+        _sdxl_pipe.fuse_lora()
+        _sdxl_pipe.unload_lora_weights()
         logger.info("Lightning LoRA fused")
 
-    logger.info(f"Base pipeline loaded in {time.time() - t0:.1f}s")
-    return _pipe
+    logger.info(f"SDXL Lightning loaded in {time.time() - t0:.1f}s")
+    return _sdxl_pipe
 
 
-def get_img2img_pipeline() -> StableDiffusionXLImg2ImgPipeline:
-    global _img2img_pipe
-    if _img2img_pipe is not None:
-        return _img2img_pipe
-
-    pipe = get_base_pipeline()
-    _img2img_pipe = StableDiffusionXLImg2ImgPipeline(
-        vae=pipe.vae,
-        text_encoder=pipe.text_encoder,
-        text_encoder_2=pipe.text_encoder_2,
-        tokenizer=pipe.tokenizer,
-        tokenizer_2=pipe.tokenizer_2,
-        unet=pipe.unet,
-        scheduler=pipe.scheduler,
+def get_sdxl_img2img() -> StableDiffusionXLImg2ImgPipeline:
+    global _sdxl_img2img
+    if _sdxl_img2img is not None:
+        return _sdxl_img2img
+    pipe = get_sdxl_pipeline()
+    _sdxl_img2img = StableDiffusionXLImg2ImgPipeline(
+        vae=pipe.vae, text_encoder=pipe.text_encoder,
+        text_encoder_2=pipe.text_encoder_2, tokenizer=pipe.tokenizer,
+        tokenizer_2=pipe.tokenizer_2, unet=pipe.unet, scheduler=pipe.scheduler,
     )
-    logger.info("img2img pipeline created (shared weights)")
-    return _img2img_pipe
+    logger.info("SDXL img2img created (shared weights)")
+    return _sdxl_img2img
 
 
 # ---------------------------------------------------------------------------
-# Generation
+# FLUX.2 Klein pipeline
+# ---------------------------------------------------------------------------
+_flux_pipe: Flux2KleinPipeline | None = None
+
+
+def get_flux_pipeline() -> Flux2KleinPipeline:
+    global _flux_pipe
+    if _flux_pipe is not None:
+        return _flux_pipe
+
+    logger.info(f"Loading FLUX.2 Klein: {FLUX_MODEL_ID}")
+    t0 = time.time()
+
+    _flux_pipe = Flux2KleinPipeline.from_pretrained(
+        FLUX_MODEL_ID, torch_dtype=torch.bfloat16,
+    ).to(DEVICE)
+
+    logger.info(f"FLUX.2 Klein loaded in {time.time() - t0:.1f}s")
+    return _flux_pipe
+
+
+def unload_flux():
+    """Free FLUX VRAM when switching back to SDXL."""
+    global _flux_pipe
+    if _flux_pipe is not None:
+        del _flux_pipe
+        _flux_pipe = None
+        torch.cuda.empty_cache()
+        gc.collect()
+        logger.info("FLUX.2 Klein unloaded")
+
+
+def unload_sdxl():
+    """Free SDXL VRAM when switching to FLUX."""
+    global _sdxl_pipe, _sdxl_img2img
+    if _sdxl_pipe is not None:
+        del _sdxl_pipe, _sdxl_img2img
+        _sdxl_pipe = None
+        _sdxl_img2img = None
+        torch.cuda.empty_cache()
+        gc.collect()
+        logger.info("SDXL Lightning unloaded")
+
+
+# ---------------------------------------------------------------------------
+# Unified generation
 # ---------------------------------------------------------------------------
 def generate(
     prompt: str,
+    model_backend: str,
     style: str,
     resolution: str,
     seed: int,
     randomize_seed: bool,
     custom_negative: str,
-    # Image input
     use_img2img: bool,
     input_image: Image.Image | None,
     img2img_strength: float,
-    # Pixel cleanup
     enable_cleanup: bool,
     reduce_palette: bool,
     max_colors: int,
     upscale_factor: int,
-    # Advanced
     override_steps: int,
     override_cfg: float,
     progress=gr.Progress(track_tqdm=False),
@@ -179,51 +227,89 @@ def generate(
     full_prompt = f"{style_prefix}, {prompt}" if style_prefix else prompt
     neg = custom_negative if custom_negative.strip() else NEGATIVE_PROMPT
 
-    steps = override_steps if override_steps > 0 else 4
-    cfg = override_cfg if override_cfg > 0 else 1.5
-    if cfg > 2.0:
-        cfg = 2.0
-
     width, height = RESOLUTION_PRESETS[resolution]
 
     if randomize_seed:
         seed = random.randint(0, np.iinfo(np.int32).max)
+
+    is_flux = model_backend == "FLUX.2 Klein 4B"
+
+    # Defaults per backend
+    if is_flux:
+        steps = override_steps if override_steps > 0 else 4
+        cfg = override_cfg if override_cfg > 0 else 1.0
+    else:
+        steps = override_steps if override_steps > 0 else 4
+        cfg = override_cfg if override_cfg > 0 else 1.5
+        if cfg > 2.0:
+            cfg = 2.0
+
     generator = torch.Generator(device=DEVICE).manual_seed(seed)
 
-    progress(0.1, desc="Generating...")
+    progress(0.05, desc=f"Loading {model_backend}...")
     t0 = time.time()
 
-    if use_img2img and input_image is not None:
-        pipe = get_img2img_pipeline()
-        init = input_image.convert("RGB").resize((width, height), Image.Resampling.LANCZOS)
+    if is_flux:
+        # Unload SDXL to free VRAM if loaded
+        if _sdxl_pipe is not None:
+            unload_sdxl()
+
+        pipe = get_flux_pipeline()
+
+        if use_img2img and input_image is not None:
+            # FLUX Klein doesn't have an img2img pipeline — fall back to txt2img
+            logger.warning("FLUX.2 Klein does not support img2img, running txt2img instead")
+            mode_label = "FLUX txt2img (img2img not supported)"
+        else:
+            mode_label = "FLUX txt2img"
+
+        progress(0.1, desc="FLUX generating...")
         result = pipe(
             prompt=full_prompt,
-            negative_prompt=neg,
-            image=init,
-            strength=img2img_strength,
-            num_inference_steps=steps,
-            guidance_scale=cfg,
-            generator=generator,
-        )
-        mode_label = f"img2img (strength={img2img_strength})"
-    else:
-        pipe = get_base_pipeline()
-        result = pipe(
-            prompt=full_prompt,
-            negative_prompt=neg,
             width=width,
             height=height,
             num_inference_steps=steps,
             guidance_scale=cfg,
             generator=generator,
         )
-        mode_label = "txt2img"
+    else:
+        # Unload FLUX to free VRAM if loaded
+        if _flux_pipe is not None:
+            unload_flux()
+
+        if use_img2img and input_image is not None:
+            pipe = get_sdxl_img2img()
+            init = input_image.convert("RGB").resize((width, height), Image.Resampling.LANCZOS)
+            progress(0.1, desc="SDXL img2img generating...")
+            result = pipe(
+                prompt=full_prompt,
+                negative_prompt=neg,
+                image=init,
+                strength=img2img_strength,
+                num_inference_steps=steps,
+                guidance_scale=cfg,
+                generator=generator,
+            )
+            mode_label = f"SDXL img2img (strength={img2img_strength})"
+        else:
+            pipe = get_sdxl_pipeline()
+            progress(0.1, desc="SDXL generating...")
+            result = pipe(
+                prompt=full_prompt,
+                negative_prompt=neg,
+                width=width,
+                height=height,
+                num_inference_steps=steps,
+                guidance_scale=cfg,
+                generator=generator,
+            )
+            mode_label = "SDXL txt2img"
 
     gen_time = time.time() - t0
     raw_image = result.images[0]
     progress(0.7, desc="Generation complete")
 
-    # Pixel cleanup
+    # Pixel cleanup (shared across both backends)
     cleanup_info = None
     final_image = raw_image
     cleanup_time = 0
@@ -248,6 +334,7 @@ def generate(
 
     # Info
     info_lines = [
+        f"Backend: {model_backend}",
         f"Mode: {mode_label}",
         f"Seed: {seed}",
         f"Steps: {steps} | CFG: {cfg}",
@@ -292,12 +379,20 @@ def cleanup_only(image, reduce_palette, max_colors, upscale_factor):
 # ---------------------------------------------------------------------------
 def build_ui():
     with gr.Blocks(title="Pixel Art Generator") as demo:
-        gr.Markdown("# Pixel Art Generator\nSDXL Lightning — txt2img + img2img + pixel cleanup")
+        gr.Markdown(
+            "# Pixel Art Generator\n"
+            "SDXL Lightning vs FLUX.2 Klein 4B — same pixel cleanup, compare quality + speed"
+        )
 
         with gr.Tabs():
             with gr.TabItem("Generate"):
                 with gr.Row():
                     with gr.Column(scale=1):
+                        model_backend = gr.Radio(
+                            choices=MODEL_BACKENDS,
+                            value="SDXL Lightning",
+                            label="Model Backend",
+                        )
                         prompt = gr.Textbox(
                             label="Prompt",
                             placeholder="a medieval castle on a cliff at sunset",
@@ -327,7 +422,7 @@ def build_ui():
                         img2img_strength = gr.Slider(
                             0.25, 1.0, value=0.5, step=0.25,
                             label="Strength",
-                            info="0.25 = subtle tweak, 0.50 = balanced, 0.75 = creative riff",
+                            info="0.25 = subtle, 0.50 = balanced, 0.75 = creative",
                             visible=False,
                         )
 
@@ -344,22 +439,22 @@ def build_ui():
                         upscale_factor = gr.Slider(1, 8, value=4, step=1, label="Upscale factor")
 
                         with gr.Accordion("Advanced Overrides", open=False):
-                            override_steps = gr.Slider(0, 50, value=0, step=1, label="Override steps (0 = 4)")
-                            override_cfg = gr.Slider(0, 20, value=0, step=0.5, label="Override CFG (0 = 1.5)")
+                            override_steps = gr.Slider(0, 50, value=0, step=1, label="Override steps (0 = default)")
+                            override_cfg = gr.Slider(0, 20, value=0, step=0.5, label="Override CFG (0 = default)")
 
                         gen_btn = gr.Button("Generate", variant="primary", size="lg")
 
                     with gr.Column(scale=2):
                         with gr.Row():
-                            raw_output = gr.Image(label="Raw SDXL Output", type="pil")
+                            raw_output = gr.Image(label="Raw Output", type="pil")
                             clean_output = gr.Image(label="After Pixel Cleanup", type="pil")
-                        info_box = gr.Textbox(label="Generation Info", lines=10, interactive=False)
+                        info_box = gr.Textbox(label="Generation Info", lines=12, interactive=False)
 
                 gen_btn.click(
                     fn=generate,
                     inputs=[
-                        prompt, style, resolution, seed, randomize, custom_neg,
-                        use_img2img, input_image, img2img_strength,
+                        prompt, model_backend, style, resolution, seed, randomize,
+                        custom_neg, use_img2img, input_image, img2img_strength,
                         enable_cleanup, reduce_palette, max_colors, upscale_factor,
                         override_steps, override_cfg,
                     ],
