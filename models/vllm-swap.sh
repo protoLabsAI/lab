@@ -3,13 +3,13 @@
 # Gracefully stops vLLM, waits for port release, starts new model.
 #
 # === Production (Single GPU) ===
-#   qwen-35b           — speed king MoE FP8, 262K ctx (236 tok/s)
+#   qwen-35b           — speed king MoE FP8 (Qwen official), 262K ctx (180 tok/s)
 #   qwen-27b-int4      — daily driver, agentic work (53 tok/s)
 #   qwen-27b-int4-mtp  — daily driver + MTP, chat/creative (70 tok/s, T08 regresses)
-#   qwen-9b-fp8        — FP8 quant (140 tok/s, +52% vs bf16)
+#   qwen-9b-fp8        — on-the-fly FP8 (140 tok/s, +53% vs bf16)
 #   qwen-9b-mtp        — fine-tune base + MTP (112 tok/s, tools safe)
-#   qwen-4b-int4       — edge deploy (297 tok/s)
-#   qwen-4b-fp8        — FP8 edge (140 tok/s, 5.5GB)
+#   qwen-4b-fp8        — on-the-fly FP8 edge (140 tok/s)
+#   qwen-4b-int4       — edge deploy, fastest absolute (297 tok/s)
 #
 # === Training / LoRA ===
 #   qwen-9b            — fine-tune base, no MTP (92 tok/s)
@@ -21,8 +21,9 @@
 #   llama-70b          — Llama 70B AWQ creative (38 tok/s)
 #
 # === TP=2 (Both GPUs) ===
-#   qwen-122b-int4     — quality ceiling (122 tok/s)
-#   qwen-27b-fp8-tp2   — FP8 quant TP=2 (70 tok/s, 131K ctx, 99% quality)
+#   qwen-122b-fp8      — quality ceiling FP8 (Qwen official), 112 tok/s
+#   qwen-122b-int4     — quality ceiling INT4 (122 tok/s, faster on PCIe)
+#   qwen-27b-fp8-tp2   — on-the-fly FP8 TP=2 (70 tok/s, 131K ctx)
 #   qwen-35b-tp2-opt   — 250K context, prefix caching (220 tok/s)
 #   qwen-27b-int4-tp2  — 256K context
 #
@@ -42,7 +43,7 @@ QWEN35_PREFIX_FLAGS="--enable-prefix-caching --mamba-cache-mode align --mamba-bl
 O3="-O3"
 usage() {
     echo "Production:"
-    echo "  $0 {qwen-35b|qwen-27b-int4|qwen-27b-int4-mtp|qwen-9b-fp8|qwen-9b-mtp|qwen-4b-int4|qwen-4b-fp8}"
+    echo "  $0 {qwen-35b|qwen-9b-fp8|qwen-4b-fp8|qwen-27b-int4|qwen-27b-int4-mtp|qwen-9b-mtp|qwen-4b-int4}"
     echo ""
     echo "Training / LoRA:"
     echo "  $0 {qwen-9b|qwen-4b|qwen-2b|qwen-0.8b}"
@@ -51,7 +52,7 @@ usage() {
     echo "  $0 {cydonia-24b|llama-70b}"
     echo ""
     echo "TP=2 (both GPUs):"
-    echo "  $0 {qwen-122b-int4|qwen-27b-fp8-tp2|qwen-35b-tp2-opt|qwen-27b-int4-tp2}"
+    echo "  $0 {qwen-122b-fp8|qwen-122b-int4|qwen-27b-fp8-tp2|qwen-35b-tp2-opt|qwen-27b-int4-tp2}"
     exit 1
 }
 stop_vllm() {
@@ -154,8 +155,8 @@ case "$1" in
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     qwen-35b)
-        echo "Starting Qwen3.5-35B-A3B MoE FP8 (GPU 0, 262K, 236 tok/s)..."
-        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve /mnt/models/quantized/Qwen3.5-35B-A3B-FP8 \
+        echo "Starting Qwen3.5-35B-A3B MoE FP8 official (GPU 0, 262K, 180 tok/s)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-35B-A3B-FP8 \
             $O3 \
             --host 0.0.0.0 --port $PORT \
             --served-model-name local \
@@ -230,8 +231,8 @@ case "$1" in
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     qwen-9b-fp8)
-        echo "Starting Qwen3.5-9B FP8 (GPU 0, 262K, 140 tok/s)..."
-        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve /mnt/models/quantized/Qwen3.5-9B-FP8 \
+        echo "Starting Qwen3.5-9B + on-the-fly FP8 (GPU 0, 262K, 140 tok/s)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-9B \
             $O3 \
             --host 0.0.0.0 --port $PORT \
             --max-model-len 262144 \
@@ -241,12 +242,13 @@ case "$1" in
             --gpu-memory-utilization 0.85 \
             --language-model-only \
             --enable-chunked-prefill \
+            --quantization fp8 \
             $QWEN35_PREFIX_FLAGS \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     qwen-4b-fp8)
-        echo "Starting Qwen3.5-4B FP8 (GPU 0, 262K, 140 tok/s, 21ms TTFT)..."
-        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve /mnt/models/quantized/Qwen3.5-4B-FP8 \
+        echo "Starting Qwen3.5-4B + on-the-fly FP8 (GPU 0, 262K, 140 tok/s)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.5-4B \
             $O3 \
             --host 0.0.0.0 --port $PORT \
             --max-model-len 262144 \
@@ -256,6 +258,7 @@ case "$1" in
             --gpu-memory-utilization 0.85 \
             --language-model-only \
             --enable-chunked-prefill \
+            --quantization fp8 \
             $QWEN35_PREFIX_FLAGS \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
@@ -430,16 +433,36 @@ case "$1" in
     # NCCL_P2P_DISABLE=1 required for stable CUDA graphs on Blackwell PCIe
     # (ACS on PCIe bridges corrupts P2P during graph replay)
     qwen-27b-fp8-tp2)
-        echo "Starting Qwen3.5-27B FP8 (TP=2, 131K, 70 tok/s, 99% quality)..."
+        echo "Starting Qwen3.5-27B FP8 official (TP=2, 131K, 70 tok/s)..."
         NCCL_P2P_DISABLE=1 \
         NCCL_ALGO=Ring NCCL_PROTO=Simple \
         NCCL_MIN_NCHANNELS=4 NCCL_MAX_NCHANNELS=8 \
-        $VLLM_BIN serve /mnt/models/quantized/Qwen3.5-27B-FP8 \
+        $VLLM_BIN serve Qwen/Qwen3.5-27B-FP8 \
             $O3 \
             --host 0.0.0.0 --port $PORT \
             --served-model-name local \
             --tensor-parallel-size 2 \
             --max-model-len 131072 \
+            --reasoning-parser qwen3 \
+            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
+            --gpu-memory-utilization 0.90 \
+            --language-model-only \
+            --enable-chunked-prefill \
+            --disable-custom-all-reduce \
+            $QWEN35_PREFIX_FLAGS \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+    qwen-122b-fp8)
+        echo "Starting Qwen3.5-122B-A10B FP8 official (TP=2, 65K, 112 tok/s)..."
+        NCCL_P2P_DISABLE=1 \
+        NCCL_ALGO=Ring NCCL_PROTO=Simple \
+        NCCL_MIN_NCHANNELS=4 NCCL_MAX_NCHANNELS=8 \
+        $VLLM_BIN serve Qwen/Qwen3.5-122B-A10B-FP8 \
+            $O3 \
+            --host 0.0.0.0 --port $PORT \
+            --served-model-name local \
+            --tensor-parallel-size 2 \
+            --max-model-len 65536 \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.90 \

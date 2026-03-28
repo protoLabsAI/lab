@@ -24,17 +24,16 @@ uv run ruff check .                        # lint everything
 ## Running Models
 
 ```bash
-bash models/vllm-swap.sh qwen-35b           # speed king MoE FP8, 262K ctx (236 tok/s)
+bash models/vllm-swap.sh qwen-35b           # speed king MoE FP8 official, 262K (180 tok/s)
+bash models/vllm-swap.sh qwen-9b-fp8        # on-the-fly FP8 (140 tok/s)
+bash models/vllm-swap.sh qwen-4b-fp8        # on-the-fly FP8 edge (140 tok/s)
 bash models/vllm-swap.sh qwen-27b-int4      # daily driver, agentic (53 tok/s)
 bash models/vllm-swap.sh qwen-27b-int4-mtp  # daily driver + MTP, chat/creative (70 tok/s)
-bash models/vllm-swap.sh qwen-9b-fp8        # FP8 quant (140 tok/s)
-bash models/vllm-swap.sh qwen-9b-mtp        # fine-tune base + MTP (112 tok/s)
-bash models/vllm-swap.sh qwen-4b-int4       # edge deploy (297 tok/s)
-bash models/vllm-swap.sh qwen-4b-fp8        # FP8 edge (140 tok/s, 5.5GB)
+bash models/vllm-swap.sh qwen-4b-int4       # edge deploy, fastest absolute (297 tok/s)
 bash models/vllm-swap.sh qwen-4b            # LoRA base bf16 (155 tok/s)
-bash models/vllm-swap.sh qwen-122b-int4     # quality ceiling TP=2 (122 tok/s)
-bash models/vllm-swap.sh qwen-27b-fp8-tp2   # FP8 TP=2 (70 tok/s, 131K, 99% quality)
-bash models/vllm-swap.sh qwen-35b-tp2-opt   # 250K context TP=2 (220 tok/s)
+bash models/vllm-swap.sh qwen-122b-fp8      # quality ceiling FP8 official TP=2 (112 tok/s)
+bash models/vllm-swap.sh qwen-122b-int4     # quality ceiling INT4 TP=2 (122 tok/s)
+bash models/vllm-swap.sh qwen-27b-fp8-tp2   # FP8 official TP=2 (70 tok/s, 131K)
 ```
 
 ## Speed Testing
@@ -133,14 +132,17 @@ cd evals
 
 | Model | Size | tok/s | +MTP | Quick Score | Role |
 |-------|------|:-----:|:----:|:-----------:|------|
-| **Qwen 35B MoE FP8** | 34GB | **236** | — | — | **Speed king, 262K ctx, single GPU** |
+| **Qwen 35B MoE FP8** | 35GB | **180** | — | — | **Speed king, 262K ctx, single GPU (Qwen official)** |
+| **Qwen 9B FP8** | 19GB* | **141** | — | — | On-the-fly FP8 (+53% vs bf16) |
+| **Qwen 4B FP8** | 8.8GB* | 141 | — | — | On-the-fly FP8 edge |
 | **Qwen 27B INT4** | 29GB | 53 | **70** | **86/103** | Daily driver (MTP for chat, baseline for agents) |
-| **Qwen 27B FP8 TP=2** | 33GB | **70** | — | — | 131K ctx, 99% quality, no MTP regression |
-| **Qwen 122B INT4** | 74GB | **122** | — | **89/103** | **SOTA local — beats all cloud models (TP=2)** |
-| **Qwen 9B FP8** | 12GB | **140** | — | — | FP8 quant (+52% vs bf16) |
+| **Qwen 122B FP8** | 119GB | **112** | — | — | Quality ceiling FP8 TP=2 (Qwen official) |
+| **Qwen 122B INT4** | 74GB | **122** | — | **89/103** | Quality ceiling INT4 TP=2 (faster on PCIe) |
+| **Qwen 27B FP8 TP=2** | 29GB | **70** | — | — | 131K ctx, TP=2 (Qwen official) |
 | **Qwen 9B BF16** | 19GB | 92 | **112** | 72/103 | Fine-tune base (cold storage) |
-| **Qwen 4B FP8** | 5.5GB | 140 | — | — | FP8 edge (21ms TTFT) |
 | **Qwen 4B INT4** | 3.8GB | 297 | — | 56/103 | Edge deploy (fastest absolute) |
+
+\* On-the-fly FP8 (`--quantization fp8`) loads bf16 weights from disk, quantizes during model load. No separate quant files needed.
 | Cydonia 24B | 44GB | — | — | — | Creative/roleplay (holding) |
 | Llama 70B AWQ | 38GB | 38 | — | — | Creative/roleplay (holding) |
 | Llama 8B AWQ | 5GB | — | — | 50/102 | Eval baseline (poor) |
