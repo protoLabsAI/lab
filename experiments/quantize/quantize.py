@@ -111,6 +111,11 @@ def quantize_fp8(
     model.save_pretrained(output_dir)
     tokenizer.save_pretrained(output_dir)
 
+    # Patch config for vLLM compatibility — transformers 5.x saves
+    # qwen3_5_text model_type which vLLM <0.19 doesn't recognize.
+    # Restore the original config.json and inject quantization metadata.
+    _patch_config_for_vllm(model_id, output_dir)
+
     output_size = _dir_size_gb(output_dir)
     logger.info(f"Output size: {output_size:.1f} GB")
 
@@ -288,6 +293,58 @@ def _resolve_calib_dataset(dataset: str, split: str) -> dict:
     else:
         logger.info(f"Using HuggingFace dataset: {dataset} [{split}]")
         return {"dataset": dataset, "splits": {"calibration": split}}
+
+
+def _patch_config_for_vllm(model_id: str, output_dir: Path):
+    """Patch quantized config.json for vLLM compatibility.
+
+    transformers 5.x saves Qwen3.5 as model_type=qwen3_5_text with a flat
+    config, but vLLM <0.19 expects the original nested config with
+    model_type=qwen3_5. This restores the original config and injects
+    the quantization metadata from the quantized version.
+    """
+    from huggingface_hub import hf_hub_download
+
+    quant_config_path = output_dir / "config.json"
+    quant_config = json.load(open(quant_config_path))
+
+    # Only patch if model_type was changed by transformers 5.x
+    if quant_config.get("model_type") == quant_config.get("model_type"):
+        try:
+            orig_config_path = hf_hub_download(model_id, "config.json")
+            orig_config = json.load(open(orig_config_path))
+
+            if orig_config.get("model_type") != quant_config.get("model_type"):
+                logger.info(
+                    f"Patching config: {quant_config.get('model_type')} "
+                    f"→ {orig_config.get('model_type')}"
+                )
+                orig_config["quantization_config"] = quant_config.get(
+                    "quantization_config"
+                )
+                comp = quant_config.get("compression_config")
+                if comp:
+                    orig_config["compression_config"] = comp
+                json.dump(orig_config, open(quant_config_path, "w"), indent=2)
+
+                # Copy missing tokenizer/preprocessor files
+                for fname in [
+                    "preprocessor_config.json",
+                    "video_preprocessor_config.json",
+                    "tokenizer_config.json",
+                    "tokenizer.json",
+                    "vocab.json",
+                    "generation_config.json",
+                ]:
+                    dest = output_dir / fname
+                    if not dest.exists():
+                        try:
+                            src = hf_hub_download(model_id, fname)
+                            shutil.copy2(src, dest)
+                        except Exception:
+                            pass
+        except Exception as e:
+            logger.warning(f"Config patching failed (non-fatal): {e}")
 
 
 def _get_gpu_memory() -> dict:
