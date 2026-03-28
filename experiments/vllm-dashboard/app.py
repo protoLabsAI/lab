@@ -125,7 +125,7 @@ CSS = ".gradio-container { max-width: 1200px !important; }"
 
 
 def build_app() -> gr.Blocks:
-    with gr.Blocks(title="protoLabs vLLM Dashboard") as app:
+    with gr.Blocks(title="protoLabs vLLM Dashboard", theme=THEME, css=CSS) as app:
         gr.Markdown("# protoLabs vLLM Dashboard")
 
         # ── GPU Status ────────────────────────────────
@@ -164,6 +164,7 @@ def build_app() -> gr.Blocks:
                 chatbot = gr.Chatbot(
                     label="Test Chat",
                     height=400,
+                    type="messages",
                 )
                 with gr.Row():
                     chat_input = gr.Textbox(
@@ -222,6 +223,4 @@ if __name__ == "__main__":
         server_port=7860,
         share=False,
         show_error=True,
-        theme=THEME,
-        css=CSS,
     )

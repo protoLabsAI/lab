@@ -85,8 +85,6 @@
         }
         .dot-green { background: #22c55e; }
         .dot-blue { background: #6366f1; }
-        .dot-yellow { background: #eab308; }
-        .dot-gray { background: #444; }
         .footer {
             margin-top: 48px;
             text-align: center;
@@ -113,7 +111,7 @@
 
         <div class="gpu-bar" id="gpu-status">Loading GPU status...</div>
 
-        <div class="section-title">Inference</div>
+        <div class="section-title">Services</div>
         <div class="grid">
             <a class="card" href="/dashboard/" target="_blank">
                 <div class="card-header">
@@ -122,24 +120,6 @@
                 </div>
                 <div class="card-desc">GPU monitoring, model swap, chat testing</div>
             </a>
-            <a class="card" href="/webui/" target="_blank">
-                <div class="card-header">
-                    <div class="card-name"><span class="dot dot-green"></span>Open WebUI</div>
-                    <div class="card-port">:3000</div>
-                </div>
-                <div class="card-desc">Chat interface for vLLM + Ollama models</div>
-            </a>
-            <a class="card" href="/comfyui/" target="_blank">
-                <div class="card-header">
-                    <div class="card-name"><span class="dot dot-blue"></span>ComfyUI</div>
-                    <div class="card-port">:8188</div>
-                </div>
-                <div class="card-desc">Node-based image and video generation</div>
-            </a>
-        </div>
-
-        <div class="section-title">APIs</div>
-        <div class="grid">
             <a class="card" href="http://protolabs:8000/docs" target="_blank">
                 <div class="card-header">
                     <div class="card-name"><span class="dot dot-green"></span>vLLM API</div>
@@ -147,37 +127,30 @@
                 </div>
                 <div class="card-desc">OpenAI-compatible LLM endpoint</div>
             </a>
-            <a class="card" href="http://protolabs:4000/ui" target="_blank">
-                <div class="card-header">
-                    <div class="card-name"><span class="dot dot-green"></span>Gateway</div>
-                    <div class="card-port">:4000</div>
-                </div>
-                <div class="card-desc">LiteLLM proxy — routes to 25+ models</div>
-            </a>
-            <a class="card" href="http://protolabs:11434" target="_blank">
-                <div class="card-header">
-                    <div class="card-name"><span class="dot dot-yellow"></span>Ollama</div>
-                    <div class="card-port">:11434</div>
-                </div>
-                <div class="card-desc">Local GGUF model inference</div>
-            </a>
         </div>
 
-        <div class="section-title">Observability</div>
+        <div class="section-title">Exporters</div>
         <div class="grid">
-            <a class="card" href="http://protolabs:3001" target="_blank">
+            <a class="card" href="http://protolabs:9100/metrics" target="_blank">
                 <div class="card-header">
-                    <div class="card-name"><span class="dot dot-blue"></span>Langfuse</div>
-                    <div class="card-port">:3001</div>
+                    <div class="card-name"><span class="dot dot-blue"></span>Node Exporter</div>
+                    <div class="card-port">:9100</div>
                 </div>
-                <div class="card-desc">LLM tracing, evaluation scores, datasets</div>
+                <div class="card-desc">System metrics for Prometheus</div>
             </a>
-            <a class="card" href="http://protolabs:5050" target="_blank">
+            <a class="card" href="http://protolabs:8080/metrics" target="_blank">
                 <div class="card-header">
-                    <div class="card-name"><span class="dot dot-blue"></span>MLflow</div>
-                    <div class="card-port">:5050</div>
+                    <div class="card-name"><span class="dot dot-blue"></span>cAdvisor</div>
+                    <div class="card-port">:8080</div>
                 </div>
-                <div class="card-desc">Experiment tracking, model registry</div>
+                <div class="card-desc">Container metrics for Prometheus</div>
+            </a>
+            <a class="card" href="http://protolabs:9835/metrics" target="_blank">
+                <div class="card-header">
+                    <div class="card-name"><span class="dot dot-blue"></span>GPU Exporter</div>
+                    <div class="card-port">:9835</div>
+                </div>
+                <div class="card-desc">NVIDIA GPU metrics for Prometheus</div>
             </a>
         </div>
 
@@ -192,7 +165,7 @@
                 const el = document.getElementById('gpu-status');
                 el.innerHTML = gpus.map(g => {
                     const pct = (g.memory_used_mb / g.memory_total_mb * 100).toFixed(0);
-                    return `<div>GPU ${g.index}: <span>${(g.memory_used_mb/1024).toFixed(1)}/${(g.memory_total_mb/1024).toFixed(0)} GB</span> (${pct}%) &middot; ${g.temp_c}&deg;C &middot; ${g.power_draw_w.toFixed(0)}W</div>`;
+                    return `<div>GPU ${g.index}: <span>${(g.memory_used_mb/1024).toFixed(1)}/${(g.memory_total_mb/1024).toFixed(0)} GB</span> (${pct}) &middot; ${g.temp_c}&deg;C &middot; ${g.power_draw_w.toFixed(0)}W</div>`;
                 }).join('');
             } catch(e) {
                 document.getElementById('gpu-status').innerHTML = 'GPU status unavailable';

@@ -18,8 +18,6 @@ PORT = 80
 # Service proxy routes
 PROXIES = {
     "/dashboard/": "http://127.0.0.1:7860/",
-    "/webui/": "http://127.0.0.1:3000/",
-    "/comfyui/": "http://127.0.0.1:8188/",
 }
 
 
