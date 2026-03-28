@@ -8,29 +8,15 @@ model_list:
   - model_name: local
     litellm_params:
       model: openai/local
-      api_base: http://host.docker.internal:8000/v1
+      api_base: http://vllm:8000/v1
       api_key: os.environ/VLLM_API_KEY
 
-  # ─── Remote: Ollama on ava (Tailscale) ────────────────────────────
-  - model_name: ava-qwen3.5
-    litellm_params:
-      model: ollama/qwen3.5:latest
-      api_base: http://100.101.189.45:11434
-
-  - model_name: ava-qwen3-coder
-    litellm_params:
-      model: ollama/qwen3-coder:latest
-      api_base: http://100.101.189.45:11434
-
-  - model_name: ava-deepseek-r1
-    litellm_params:
-      model: ollama/deepseek-r1:32b
-      api_base: http://100.101.189.45:11434
-
-  - model_name: ava-gemma3
-    litellm_params:
-      model: ollama/gemma3:27b
-      api_base: http://100.101.189.45:11434
+  # ─── Local: Ollama ─────────────────────────────────────────────────
+  # Add specific Ollama models here as needed, e.g.:
+  # - model_name: ollama/llama3
+  #   litellm_params:
+  #     model: ollama/llama3
+  #     api_base: http://host.docker.internal:11434
 
   # ─── Anthropic (Claude) ────────────────────────────────────────────
   - model_name: claude-sonnet-4-6
@@ -41,11 +27,6 @@ model_list:
   - model_name: claude-opus-4-6
     litellm_params:
       model: anthropic/claude-opus-4-6
-      api_key: os.environ/ANTHROPIC_API_KEY
-
-  - model_name: claude-sonnet-4-0
-    litellm_params:
-      model: anthropic/claude-sonnet-4-20250514
       api_key: os.environ/ANTHROPIC_API_KEY
 
   - model_name: claude-haiku-4-5
@@ -74,19 +55,16 @@ model_list:
     litellm_params:
       model: openai/gpt-5.4
       api_key: os.environ/OPENAI_API_KEY
-      drop_params: true
 
   - model_name: gpt-5.4-mini
     litellm_params:
       model: openai/gpt-5.4-mini
       api_key: os.environ/OPENAI_API_KEY
-      drop_params: true
 
   - model_name: gpt-5.4-nano
     litellm_params:
       model: openai/gpt-5.4-nano
       api_key: os.environ/OPENAI_API_KEY
-      drop_params: true
 
   # ─── Google Gemini ─────────────────────────────────────────────────
   - model_name: gemini-2.5-pro
@@ -125,16 +103,16 @@ model_list:
       model: groq/llama-3.1-8b-instant
       api_key: os.environ/GROQ_API_KEY
 
-  # ─── xAI (Grok via OpenRouter) ─────────────────────────────────────
+  # ─── xAI (Grok) ───────────────────────────────────────────────────
   - model_name: grok-3
     litellm_params:
-      model: openrouter/x-ai/grok-3
-      api_key: os.environ/OPENROUTER_API_KEY
+      model: xai/grok-3
+      api_key: os.environ/XAI_API_KEY
 
   - model_name: grok-3-mini
     litellm_params:
-      model: openrouter/x-ai/grok-3-mini
-      api_key: os.environ/OPENROUTER_API_KEY
+      model: xai/grok-3-mini
+      api_key: os.environ/XAI_API_KEY
 
   # ─── OpenRouter ────────────────────────────────────────────────────
   - model_name: minimax-m2.5
@@ -170,16 +148,6 @@ model_list:
   - model_name: gpt-oss-20b
     litellm_params:
       model: openrouter/openai/gpt-oss-20b
-      api_key: os.environ/OPENROUTER_API_KEY
-
-  - model_name: mimo-v2-flash
-    litellm_params:
-      model: openrouter/xiaomi/mimo-v2-flash
-      api_key: os.environ/OPENROUTER_API_KEY
-
-  - model_name: grok-4.1-fast
-    litellm_params:
-      model: openrouter/x-ai/grok-4.1-fast
       api_key: os.environ/OPENROUTER_API_KEY
 
 litellm_settings:

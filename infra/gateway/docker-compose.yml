@@ -1,9 +1,45 @@
 services:
+  # ─── vLLM — Local Inference ──────────────────────────────────────
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: vllm
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - vllm-models:/root/.cache/huggingface
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}
+    command:
+      - --model
+      - ${VLLM_MODEL:-Qwen/Qwen3.5-9B}
+      - --served-model-name
+      - local
+      - --gpu-memory-utilization
+      - "0.49"
+      - --max-model-len
+      - "16384"
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 120s
+
   # ─── LiteLLM Gateway ──────────────────────────────────────────────
   gateway:
-    # PINNED: LiteLLM 1.82.3 — DO NOT upgrade past 1.82.6 (supply chain attack in 1.82.7-1.82.8)
-    # See: https://futuresearch.ai/blog/litellm-pypi-supply-chain-attack/
-    image: ghcr.io/berriai/litellm@sha256:657c8fc999a6c1d1099b07963cbfcd853c624fb447dfedad5f3b6a43405194d8
+    image: ghcr.io/berriai/litellm:main-stable
     container_name: gateway
     restart: unless-stopped
     ports:
@@ -29,8 +65,6 @@ services:
       # Database
       - DATABASE_URL=postgresql://litellm:${GATEWAY_DB_PASSWORD:-litellm}@gateway-db:5432/litellm
     command: ["--config", "/app/config.yaml", "--port", "4000", "--host", "0.0.0.0"]
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     depends_on:
       gateway-db:
         condition: service_healthy
@@ -219,6 +253,7 @@ services:
       start_period: 5s
 
 volumes:
+  vllm-models:
   gateway-pgdata:
   langfuse-pgdata:
   langfuse-clickhouse:
