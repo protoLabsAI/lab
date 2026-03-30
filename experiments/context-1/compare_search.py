@@ -34,6 +34,22 @@ Generate 3 alternative search queries for the given question. Each query should 
 approach the topic from a different angle or use different keywords. Return ONLY \
 the queries, one per line, no numbering or explanation."""
 
+HYDE_SYSTEM = """\
+Write a short paragraph (3-5 sentences) that would be a perfect answer to the \
+given question, as if it appeared in a technical document. Do not say "I don't know" \
+— write what the answer WOULD look like. This will be used for document retrieval."""
+
+COMPRESS_SYSTEM = """\
+Given a question and a retrieved document chunk, extract ONLY the sentences that \
+are directly relevant to answering the question. Return just those sentences, \
+nothing else. If nothing is relevant, return "NOT_RELEVANT"."""
+
+CLASSIFY_SYSTEM = """\
+Classify this query's complexity. Reply with exactly one word:
+- SIMPLE: factual lookup, single entity, direct answer expected
+- MODERATE: needs 2-3 pieces of information, some reasoning
+- COMPLEX: multi-hop, cross-document, needs synthesis from multiple sources"""
+
 
 def qwen_chat(messages, url, model="local", max_tokens=2048):
     resp = httpx.post(
@@ -92,6 +108,88 @@ def multi_query_search(query, store, qwen_url, k=20, use_rerank=False):
     return fused[:k]
 
 
+def hyde_search(query, store, qwen_url, k=20):
+    """HyDE: generate hypothetical answer, embed it, search for similar docs."""
+    # Generate hypothetical document
+    hypo = qwen_chat(
+        [{"role": "system", "content": HYDE_SYSTEM}, {"role": "user", "content": query}],
+        qwen_url, max_tokens=200,
+    )
+    # Search using both the original query and the hypothetical answer
+    results_q = store.hybrid_search(query, k=k)
+    results_h = store.hybrid_search(hypo, k=k)
+
+    # RRF fuse
+    rrf_k = 60
+    scores: dict[str, float] = {}
+    chunk_map: dict[str, any] = {}
+    for rank, c in enumerate(results_q):
+        scores[c.chunk_id] = scores.get(c.chunk_id, 0) + 1.0 / (rrf_k + rank + 1)
+        chunk_map[c.chunk_id] = c
+    for rank, c in enumerate(results_h):
+        scores[c.chunk_id] = scores.get(c.chunk_id, 0) + 1.0 / (rrf_k + rank + 1)
+        if c.chunk_id not in chunk_map:
+            chunk_map[c.chunk_id] = c
+
+    ranked = sorted(scores.items(), key=lambda x: -x[1])
+    return [chunk_map[cid] for cid, _ in ranked[:k]]
+
+
+def compress_chunks(query, chunks, qwen_url, max_chunks=10):
+    """Contextual compression: extract only relevant sentences from each chunk."""
+    compressed = []
+    for chunk in chunks[:max_chunks]:
+        try:
+            result = qwen_chat(
+                [
+                    {"role": "system", "content": COMPRESS_SYSTEM},
+                    {"role": "user", "content": f"Question: {query}\n\nChunk:\n{chunk.content}"},
+                ],
+                qwen_url, max_tokens=300,
+            )
+            if result.strip() and "NOT_RELEVANT" not in result:
+                # Create a new chunk-like object with compressed content
+                from tools import Chunk
+                compressed.append(Chunk(
+                    chunk_id=chunk.chunk_id,
+                    doc_id=chunk.doc_id,
+                    content=result.strip(),
+                ))
+        except Exception:
+            compressed.append(chunk)
+    return compressed
+
+
+def classify_query(query, qwen_url):
+    """Classify query complexity for adaptive routing."""
+    try:
+        result = qwen_chat(
+            [{"role": "system", "content": CLASSIFY_SYSTEM}, {"role": "user", "content": query}],
+            qwen_url, max_tokens=10,
+        )
+        word = result.strip().upper().split()[0]
+        if word in ("SIMPLE", "MODERATE", "COMPLEX"):
+            return word
+    except Exception:
+        pass
+    return "MODERATE"
+
+
+def adaptive_search(query, store, qwen_url, k=20):
+    """Adaptive retrieval: route based on query complexity."""
+    complexity = classify_query(query, qwen_url)
+
+    if complexity == "SIMPLE":
+        # Fast path: small k, vector only
+        return store.dense_search(query, k=min(k, 5))
+    elif complexity == "COMPLEX":
+        # Deep path: large k, hybrid + rerank
+        return store.hybrid_rerank_search(query, k=k, candidates=k * 2)
+    else:
+        # Default: standard hybrid
+        return store.hybrid_search(query, k=k)
+
+
 def reorder_lost_in_middle(chunks: list) -> list:
     """Reorder chunks to combat 'lost in the middle' attention bias.
 
@@ -123,9 +221,17 @@ def run_query(query, store, qwen_url, search_mode, k=20):
     use_reorder = "+reorder" in search_mode
     base_mode = search_mode.replace("+reorder", "")
 
+    # Parse additional flags
+    use_compress = "+compress" in base_mode
+    base_mode = base_mode.replace("+compress", "")
+
     # Retrieve
     t_search = time.time()
-    if base_mode == "multi-query":
+    if base_mode == "hyde":
+        chunks = hyde_search(query, store, qwen_url, k=k)
+    elif base_mode == "adaptive":
+        chunks = adaptive_search(query, store, qwen_url, k=k)
+    elif base_mode == "multi-query":
         chunks = multi_query_search(query, store, qwen_url, k=k, use_rerank=False)
     elif base_mode == "multi-query+rerank":
         chunks = multi_query_search(query, store, qwen_url, k=k, use_rerank=True)
@@ -139,9 +245,11 @@ def run_query(query, store, qwen_url, search_mode, k=20):
         chunks = store.search(query, k=k)
     search_ms = (time.time() - t_search) * 1000
 
-    # Apply lost-in-the-middle reordering
+    # Apply post-retrieval processing
     if use_reorder:
         chunks = reorder_lost_in_middle(chunks)
+    if use_compress:
+        chunks = compress_chunks(query, chunks, qwen_url)
 
     # Reason
     context_text = "\n\n---\n\n".join(
@@ -187,7 +295,7 @@ def main():
     store.load_reranker()
 
     queries = yaml.safe_load(Path(args.queries).read_text())
-    modes = ["hybrid", "hybrid+reorder", "hybrid+rerank", "hybrid+rerank+reorder"]
+    modes = ["hybrid", "hyde", "hybrid+compress", "adaptive"]
 
     results = []
     for i, q in enumerate(queries):
@@ -205,23 +313,14 @@ def main():
 
     # Summary
     print(f"\n{'='*60}")
-    print(f"{'Query':<45} {'keyword':>8} {'hybrid':>8} {'rerank':>8}")
-    print(f"{'':45} {'len/time':>8} {'len/time':>8} {'len/time':>8}")
-    print("-" * 75)
-    for r in results:
-        q = r["query"][:42] + "..." if len(r["query"]) > 42 else r["query"]
-        kw = r["keyword"]
-        hy = r["hybrid"]
-        rr = r["hybrid+rerank"]
-        print(f"{q:<45} {kw['answer_length']:>4}/{kw['total_s']:.1f}s {hy['answer_length']:>4}/{hy['total_s']:.1f}s {rr['answer_length']:>4}/{rr['total_s']:.1f}s")
-
-    # Averages
     n = len(results)
+    baseline_len = sum(r[modes[0]]["answer_length"] for r in results) / n
     for mode in modes:
         avg_len = sum(r[mode]["answer_length"] for r in results) / n
         avg_time = sum(r[mode]["total_s"] for r in results) / n
         avg_search = sum(r[mode]["search_ms"] for r in results) / n
-        print(f"\n{mode}: avg {avg_len:.0f} chars, {avg_time:.1f}s total, {avg_search:.0f}ms search")
+        delta = (avg_len - baseline_len) / baseline_len * 100 if mode != modes[0] else 0
+        print(f"{mode:>20}: {avg_len:>5.0f} chars, {avg_time:>5.1f}s total, {avg_search:>5.0f}ms search ({delta:+.0f}%)")
 
     Path(args.output).write_text(json.dumps(results, indent=2))
     print(f"\nSaved to {args.output}")
