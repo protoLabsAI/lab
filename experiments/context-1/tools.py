@@ -19,7 +19,10 @@ import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .format import ToolDef
+try:
+    from .format import ToolDef
+except ImportError:
+    from format import ToolDef
 
 # --- Tool Definitions (for prompt) ---
 
@@ -77,17 +80,78 @@ class DocumentStore:
     - Raw text files (one doc per file)
     - protoResearcher sqlite-vec database
     - JSON corpus files
+
+    Search modes:
+    - keyword: BM25-lite term frequency (default, no setup needed)
+    - dense: FAISS IndexFlatIP with sentence-transformers embeddings
+    - hybrid: RRF fusion of keyword + dense results
     """
 
     def __init__(self) -> None:
         self.documents: dict[str, str] = {}  # doc_id -> full content
         self.chunks: dict[str, Chunk] = {}  # chunk_id -> Chunk
-        self._embeddings: dict[str, list[float]] = {}  # chunk_id -> embedding
-        self._embed_fn = None
+        self._chunk_list: list[str] = []  # ordered chunk IDs for FAISS alignment
+        self._faiss_index = None
+        self._embed_model = None
 
-    def set_embed_fn(self, fn) -> None:
-        """Set embedding function: fn(text) -> list[float]."""
-        self._embed_fn = fn
+    def build_dense_index(
+        self,
+        model_name: str = "all-MiniLM-L6-v2",
+        device: str = "cuda:1",
+        batch_size: int = 2048,
+    ) -> None:
+        """Build FAISS dense vector index from all chunks. One-time cost."""
+        import faiss
+        import numpy as np
+        from sentence_transformers import SentenceTransformer
+        import time
+
+        print(f"Building dense index: {model_name} on {device}...")
+        self._embed_model = SentenceTransformer(model_name, device=device)
+
+        # Stable ordering for FAISS alignment
+        self._chunk_list = list(self.chunks.keys())
+        texts = [self.chunks[cid].content for cid in self._chunk_list]
+
+        t0 = time.perf_counter()
+        embeddings = self._embed_model.encode(
+            texts,
+            batch_size=batch_size,
+            show_progress_bar=True,
+            normalize_embeddings=True,
+            convert_to_numpy=True,
+        )
+        embed_time = time.perf_counter() - t0
+        print(f"Embedded {len(texts)} chunks in {embed_time:.1f}s ({len(texts)/embed_time:.0f}/s)")
+
+        dim = embeddings.shape[1]
+        self._faiss_index = faiss.IndexFlatIP(dim)
+        self._faiss_index.add(embeddings.astype(np.float32))
+        print(f"FAISS index: {self._faiss_index.ntotal} vectors, dim={dim}")
+
+    def save_dense_index(self, path: Path) -> None:
+        """Save FAISS index and chunk list to disk for reuse."""
+        import faiss
+        if self._faiss_index is None:
+            raise ValueError("No dense index to save")
+        faiss.write_index(self._faiss_index, str(path))
+        # Save chunk list alongside
+        chunk_list_path = path.with_suffix(".chunks.json")
+        chunk_list_path.write_text(json.dumps(self._chunk_list))
+        print(f"Saved index to {path} + {chunk_list_path}")
+
+    def load_dense_index(
+        self, path: Path, model_name: str = "all-MiniLM-L6-v2", device: str = "cpu"
+    ) -> None:
+        """Load a pre-built FAISS index from disk."""
+        import faiss
+        from sentence_transformers import SentenceTransformer
+
+        self._faiss_index = faiss.read_index(str(path))
+        chunk_list_path = path.with_suffix(".chunks.json")
+        self._chunk_list = json.loads(chunk_list_path.read_text())
+        self._embed_model = SentenceTransformer(model_name, device=device)
+        print(f"Loaded index: {self._faiss_index.ntotal} vectors from {path}")
 
     def add_document(self, doc_id: str, content: str, chunk_size: int = 512) -> None:
         """Add a document, automatically chunking it."""
@@ -187,6 +251,55 @@ class DocumentStore:
         # Sort by score descending
         scored.sort(key=lambda x: -x[0])
         return [c for _, c in scored[:k]]
+
+    def dense_search(
+        self, query: str, k: int = 20, exclude_ids: set[str] | None = None
+    ) -> list[Chunk]:
+        """Dense vector search via FAISS. Requires build_dense_index() first."""
+        if self._faiss_index is None or self._embed_model is None:
+            return self.search(query, k, exclude_ids)  # fallback to keyword
+
+        import numpy as np
+
+        exclude = exclude_ids or set()
+        q_emb = self._embed_model.encode(
+            [query], normalize_embeddings=True, convert_to_numpy=True
+        )
+        # Fetch extra to compensate for exclusions
+        fetch_k = k + len(exclude)
+        scores, indices = self._faiss_index.search(q_emb.astype(np.float32), fetch_k)
+
+        results = []
+        for score, idx in zip(scores[0], indices[0]):
+            if idx < 0:
+                continue
+            cid = self._chunk_list[idx]
+            if cid in exclude:
+                continue
+            results.append(self.chunks[cid])
+            if len(results) >= k:
+                break
+        return results
+
+    def hybrid_search(
+        self, query: str, k: int = 20, exclude_ids: set[str] | None = None
+    ) -> list[Chunk]:
+        """Hybrid search: RRF fusion of keyword + dense results."""
+        keyword_results = self.search(query, k=k * 2, exclude_ids=exclude_ids)
+        dense_results = self.dense_search(query, k=k * 2, exclude_ids=exclude_ids)
+
+        # Reciprocal Rank Fusion (RRF) with k=60
+        rrf_k = 60
+        scores: dict[str, float] = {}
+        for rank, chunk in enumerate(keyword_results):
+            scores[chunk.chunk_id] = scores.get(chunk.chunk_id, 0) + 1.0 / (rrf_k + rank + 1)
+        for rank, chunk in enumerate(dense_results):
+            scores[chunk.chunk_id] = scores.get(chunk.chunk_id, 0) + 1.0 / (rrf_k + rank + 1)
+
+        # Sort by RRF score
+        all_chunks = {c.chunk_id: c for c in keyword_results + dense_results}
+        ranked = sorted(scores.items(), key=lambda x: -x[1])
+        return [all_chunks[cid] for cid, _ in ranked[:k]]
 
     def grep(self, pattern: str, max_results: int = 5) -> list[Chunk]:
         """Regex search over all chunks."""

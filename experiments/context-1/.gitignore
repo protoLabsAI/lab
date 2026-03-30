@@ -1,1 +1,3 @@
 large_corpus.json
+large_corpus.faiss
+large_corpus.chunks.json

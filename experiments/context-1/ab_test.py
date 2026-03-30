@@ -116,17 +116,25 @@ def run_config_b(
     store: DocumentStore,
     qwen_url: str,
     qwen_model: str = "local",
-    k: int = 10,
+    k: int = 20,
+    search_mode: str = "hybrid",
     verbose: bool = True,
 ) -> dict:
-    """Config B: Qwen solo RAG (simple vector search + reasoning)."""
+    """Config B: Qwen solo RAG (search + reasoning).
+
+    search_mode: "keyword" (BM25-lite), "dense" (FAISS), "hybrid" (RRF fusion)
+    """
     t0 = time.time()
 
-    # Simple keyword search (same as what Context-1's tool does)
     if verbose:
-        print("\n[Config B] Qwen solo RAG — single-shot search + reason...")
+        print(f"\n[Config B] Qwen solo RAG — {search_mode} search + reason...")
 
-    chunks = store.search(query, k=k)
+    if search_mode == "dense":
+        chunks = store.dense_search(query, k=k)
+    elif search_mode == "hybrid":
+        chunks = store.hybrid_search(query, k=k)
+    else:
+        chunks = store.search(query, k=k)
     context_text = "\n\n---\n\n".join(
         f"[{c.chunk_id}]\n{c.content}" for c in chunks
     )
@@ -179,6 +187,7 @@ def run_ab_test(
     qwen_url: str,
     context1_model: str = "context-1",
     qwen_model: str = "local",
+    search_mode: str = "hybrid",
     verbose: bool = True,
 ) -> list[dict]:
     """Run A/B test across all queries.
@@ -197,7 +206,7 @@ def run_ab_test(
 
         # Run both configs
         result_a = run_config_a(query, store, context1_url, qwen_url, context1_model=context1_model, qwen_model=qwen_model, verbose=verbose)
-        result_b = run_config_b(query, store, qwen_url, qwen_model=qwen_model, verbose=verbose)
+        result_b = run_config_b(query, store, qwen_url, qwen_model=qwen_model, search_mode=search_mode, verbose=verbose)
 
         # Grade
         scores_a = grade_result(result_a, expected)
@@ -237,6 +246,11 @@ def main():
     parser.add_argument("--context1-model", default="context-1", help="Context-1 model name")
     parser.add_argument("--qwen-url", default="http://localhost:8000", help="Qwen vLLM URL")
     parser.add_argument("--qwen-model", default="local", help="Qwen model name")
+    parser.add_argument("--search-mode", default="hybrid", choices=["keyword", "dense", "hybrid"],
+                        help="Search mode for Config B")
+    parser.add_argument("--embed-model", default="all-MiniLM-L6-v2", help="Embedding model for dense search")
+    parser.add_argument("--embed-device", default="cpu", help="Device for embedding model")
+    parser.add_argument("--index-path", default=None, help="Path to save/load FAISS index (avoids re-embedding)")
     parser.add_argument("--output", default="ab_results.json", help="Output file")
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args()
@@ -255,6 +269,19 @@ def main():
         sys.exit(1)
     print(f"Loaded {n} items, {len(store.chunks)} chunks")
 
+    # Build or load dense index if needed
+    if args.search_mode in ("dense", "hybrid"):
+        index_path = Path(args.index_path) if args.index_path else None
+        if index_path and index_path.exists():
+            store.load_dense_index(index_path, model_name=args.embed_model, device=args.embed_device)
+        else:
+            store.build_dense_index(
+                model_name=args.embed_model,
+                device=args.embed_device,
+            )
+            if index_path:
+                store.save_dense_index(index_path)
+
     # Load queries
     queries = yaml.safe_load(Path(args.test_queries).read_text())
 
@@ -265,6 +292,7 @@ def main():
         context1_model=args.context1_model,
         qwen_url=args.qwen_url,
         qwen_model=args.qwen_model,
+        search_mode=args.search_mode,
         verbose=not args.quiet,
     )
 
