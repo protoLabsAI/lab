@@ -1,0 +1,362 @@
+[
+  {
+    "query": "How does the protoLabs monitoring stack work end-to-end, from GPU metrics collection on the Blackwell node to the Grafana dashboards on pve01?",
+    "baseline": {
+      "answer": "Based on the provided context documents, a complete end-to-end description of the monitoring stack from GPU metrics collection to Grafana dashboards on `pve01` is **not available**.\n\nThe documents provide the following partial information:\n\n*   **Metrics Collection on the Blackwell Node (`protolabs`):**\n    *   The `protolabs` node runs several Docker containers and systemd services to collect metrics:\n        *   `node-exporter` (Port 9100): Prometheus node metrics.\n        *   `cAdvisor` (Port 8080): Container metrics.\n        *   `GPU exporter` (Port 9835): NVIDIA GPU metrics.\n    *   The `pve01` node acts as the control plane for **Infisical, Prometheus, and Grafana**.\n    *   The two nodes are connected via **Tailscale MagicDNS**.\n\n*   **Missing Information:**\n    *   **Grafana Integration:** While `pve01` hosts Grafana, the context does not describe the specific data flow, scraping configurations, or how the metrics from `protolabs` are visualized on `pve01`.\n    *   **Grafana Dashboards:** The context explicitly states that a Grafana dashboard for `protoClaw` metrics is **not yet set up** (\"[ ] Set up Grafana dashboard for protoClaw metrics\" in `HANDOFF.md`).\n    *   **End-to-End Flow:** There is no documentation detailing the specific pipeline connecting the GPU exporter on `protolabs` to the Prometheus instance on `pve01` and finally to the Grafana dashboards.\n\nTherefore, while the components exist, the end-to-end operational workflow is not fully documented in the provided text.",
+      "answer_length": 1513,
+      "chunks": 20,
+      "total_s": 2.25,
+      "top_chunk_ids": [
+        "lab/docs/research/cuda-graphs-blackwell.md::Summary::chunk_0",
+        "lab/README.md::lab/README.md::chunk_0",
+        "lab/README.md::Hardware::chunk_0",
+        "lab/.claude/commands/ml-expert.md::lab/.claude/commands/ml-expert.md::chunk_0",
+        "lab/docs/architecture/infrastructure.md::Services on protolabs::chunk_0"
+      ]
+    },
+    "enriched": {
+      "answer": "Based on the provided context documents, I cannot fully describe the end-to-end monitoring stack from GPU metrics collection to Grafana dashboards on `pve01` because the documentation explicitly lists the Grafana setup as a pending task.\n\nHere is what the context confirms regarding the current state and components:\n\n**1. Metrics Collection on `protolabs` (Blackwell Node)**\nThe `protolabs` node collects specific metrics via Docker containers running on the Blackwell infrastructure:\n*   **Node Metrics:** `node-exporter` (Port 9100) collects general node metrics.\n*   **Container Metrics:** `cAdvisor` (Port 8080) collects container metrics.\n*   **GPU Metrics:** `GPU exporter` (Port 9835) collects NVIDIA GPU metrics.\n*   **Hardware Context:** These metrics relate to the 2x NVIDIA RTX PRO 6000 Blackwell GPUs (SM 12.0, ~300-340W draw during inference).\n\n**2. Service Architecture**\nThe services running on `protolabs` include the above exporters alongside LLM inference and observability tools like Langfuse (Port 3001) for LLM traces.\n\n**3. Infrastructure Topology**\n*   **`protolabs`**: Handles AI inference, experiments, and training.\n*   **`pve01`**: Defined as the \"Control plane\" hosting **Infisical, Prometheus, and Grafana**.\n*   **Connectivity**: The two nodes are interconnected via Tailscale MagicDNS.\n\n**4. Missing Information (Pending Tasks)**\nThe context explicitly states that the Grafana integration is not yet complete. Under the \"Infrastructure\" section in `HANDOFF.md`, the following items are listed as pending:\n*   `[ ] Set up Grafana dashboard for protoClaw metrics`\n*   `[ ] Concurrency testing \u2014 async-scheduling claims 30% but untested under load`\n\n**Conclusion**\nWhile the context confirms that `pve01` is designated to host Prometheus and Grafana and that `protolabs` runs the necessary exporters (node-exporter, cAdvisor, GPU exporter), the documentation does **not** describe the specific configuration, data flow, or network rules required to successfully transmit the GPU metrics from `protolabs` to the Grafana dashboards on `pve01`. The setup is currently a \"pending infrastructure task.\"",
+      "answer_length": 2126,
+      "chunks": 20,
+      "total_s": 3.08,
+      "top_chunk_ids": [
+        "lab/README.md::Hardware::chunk_0",
+        "lab/docs/architecture/infrastructure.md::Nodes::chunk_0",
+        "lab/docs/architecture/infrastructure.md::Services on protolabs::chunk_0",
+        "lab/README.md::lab/README.md::chunk_0",
+        "lab/.claude/commands/ml-expert.md::Hardware Context::chunk_0"
+      ]
+    },
+    "top5_overlap": 3
+  },
+  {
+    "query": "What embedding model does protoResearcher use, what dimension are the vectors, and what vector compression experiments were run in the lab to optimize storage?",
+    "baseline": {
+      "answer": "Based on the provided context documents, there is no information regarding:\n1.  The specific embedding model used by \"protoResearcher.\"\n2.  The dimension of the vectors used.\n3.  Any vector compression experiments run in the lab to optimize storage.\n\nThe context focuses on LLM model evaluation, quantization (FP8, GPTQ, AWQ), training infrastructure, storage paths for model weights, and evaluation dimensions for RAG (Groundedness, Context Relevance, etc.), but does not mention embedding models or vector compression techniques.",
+      "answer_length": 531,
+      "chunks": 20,
+      "total_s": 0.77,
+      "top_chunk_ids": [
+        "lab/README.md::lab/README.md::chunk_0",
+        "lab/.claude/commands/model-card.md::Steps::chunk_0",
+        "lab/CLAUDE.md::lab/CLAUDE.md::chunk_0",
+        "lab/.claude/commands/eval-model.md::Step 1: Model Discovery & Feasibility::chunk_0",
+        "lab/.claude/commands/eval-model.md::Model Evaluation Pipeline::chunk_0"
+      ]
+    },
+    "enriched": {
+      "answer": "Based on the provided context documents, there is no information regarding:\n1.  The specific embedding model used by \"protoResearcher.\"\n2.  The dimension of the vectors used.\n3.  Any vector compression experiments run in the lab to optimize storage.\n\nThe documents mention embedding-related concepts only in the context of RAG evaluation dimensions (Groundedness, Context Relevance, Answer Relevance, Faithfulness) and general model storage (cold storage for FLUX, Z-Image, etc.), but do not detail specific embedding models or compression experiments.",
+      "answer_length": 552,
+      "chunks": 20,
+      "total_s": 0.8,
+      "top_chunk_ids": [
+        "lab/CLAUDE.md::Model Inventory (`/mnt/models`)::chunk_2",
+        "lab/README.md::lab/README.md::chunk_0",
+        "lab/CLAUDE.md::lab/CLAUDE.md::chunk_0",
+        "lab/.claude/commands/eval-model.md::Model Evaluation Pipeline::chunk_0",
+        "lab/.claude/commands/model-card.md::Usage::chunk_0"
+      ]
+    },
+    "top5_overlap": 3
+  },
+  {
+    "query": "Trace the full path of a model from HuggingFace download to being served and evaluated \u2014 which environments, scripts, and eval suites are involved?",
+    "baseline": {
+      "answer": "Based on the provided context documents, here is the full path of a model from HuggingFace download to being served and evaluated, including the environments, scripts, and eval suites involved:\n\n### 1. Download and Configuration\n*   **Environment:** The process requires activating the `vllm` environment and setting the `HF_HOME` variable.\n    *   Command: `source ~/dev/vllm-env/bin/activate && HF_HOME=/mnt/models/huggingface huggingface-cli download <model-id>`\n    *   **Document:** `lab/.claude/commands/eval-model.md::Step 2: Download & Configure`\n*   **Storage Location:** Models are downloaded to `/mnt/models/huggingface`.\n    *   **Document:** `lab/.claude/commands/eval-model.md::Step 2: Download & Configure`\n\n### 2. Evaluation Pipeline\nOnce downloaded, the model undergoes a systematic evaluation pipeline:\n\n*   **Quick Profile (Smoke Test):**\n    *   **Script:** `cd ~/dev/lab/evals && ./run.sh profile --name quick --model local`\n    *   **Scope:** Covers all domains in ~15 minutes with 1 trial.\n    *   **Eval Suites Included:**\n        *   **Claw-eval:** 6 agent tasks (T02, T04, T06, T08, T10, T14).\n        *   **Custom Suites:** Coding (10 tests), instruction_following (5), reasoning (5), structured_output (5), summarization (5), safety (5).\n        *   **Function Calling:** Basic + edge cases (8 tests).\n    *   **Document:** `lab/.claude/commands/eval-model.md::Step 4: Quick Profile (Smoke Test)`\n\n*   **Full Eval Sweep:**\n    *   **Purpose:** Runs all eval suites against a model for a comprehensive quality assessment.\n    *   **Document:** `lab/evals/docs/runbooks/full-eval-sweep.md`\n\n*   **Specific Eval Frameworks & Suites:**\n    *   **Claw-Eval:** Used for agent tool-use.\n    *   **Custom Suites:** Used for creative writing, roleplay, research, coding, SVG, function-call, and RAG evaluation.\n    *   **Inspect AI:** Scaffolded for broader benchmarks including HumanEval, MMLU, and GAIA.\n    *   **Function Calling Evals:** Tests for correct structured tool calls (function name, arguments, JSON structure, and restraint).\n    *   **Document:** `lab/docs/research/eval-framework-landscape.md` and `lab/evals/docs/guides/function-call-evals.md`\n\n### 3. Tracing and Scoring\n*   **Gateway & Tracing:**\n    *   **Flow:** `Agent/User \u2192 Gateway (:4000) \u2192 LLM Provider`.\n    *   **Tracing:** Every request through the gateway is auto-traced to **Langfuse** (`:3001`).\n    *   **Data Captured:** Model name, provider, parameters, input/output messages, token counts, latency, and cost.\n    *   **Document:** `lab/evals/docs/guides/langfuse-integration.md::How Tracing Works (Already Set Up)`\n*   **Scoring:**\n    *   Grades are submitted to Langfuse for storage and comparison using the `LangfuseScorer`.\n    *   **Document:** `lab/evals/docs/architecture/grading.md`\n\n### 4. Reporting and Decision\n*   **Output:** Results are compiled into a comparison table.\n*   **Decision:**\n    *   **Keep:** Add to `vllm-swap.sh` permanently and update `CLAUDE.md` model inventory.\n    *   **Nuke:** Remove the model directory (`rm -rf /mnt/models/huggingface/hub/models--<org>--<model>/`).\n    *   **Document:** `lab/.claude/commands/eval-model.md::Step 7: Report & Decision`\n\n### 5. Serving (Model App)\n*   **Best Practices:** When wrapping the model in an app (e.g., Gradio), inference logic is separated from UI code, with explicit preprocessing/postprocessing and error handling.\n*   **Document:** `lab/.claude/commands/gradio-expert.md::Model App Best Practices`\n\n### 6. Documentation (Optional but Standard)\n*   **Model Card:** A standardized HuggingFace model card is generated for quantized models, including metadata from `config.json` and `quantize_result.json`, and benchmark results (or \"TBD\" if not yet run).\n*   **Document:** `lab/.claude/commands/model-card.md`",
+      "answer_length": 3795,
+      "chunks": 20,
+      "total_s": 5.87,
+      "top_chunk_ids": [
+        "lab/evals/docs/runbooks/full-eval-sweep.md::lab/evals/docs/runbooks/full-eval-sweep.md::chunk_0",
+        "lab/.claude/commands/eval-model.md::lab/.claude/commands/eval-model.md::chunk_0",
+        "lab/.claude/commands/eval-model.md::Model Evaluation Pipeline::chunk_0",
+        "lab/.claude/commands/model-card.md::lab/.claude/commands/model-card.md::chunk_0",
+        "lab/.claude/commands/model-card.md::Steps::chunk_0"
+      ]
+    },
+    "enriched": {
+      "answer": "Based on the provided context documents, here is the full path of a model from HuggingFace download to being served and evaluated:\n\n### 1. Download & Configuration\n*   **Environment:** The download requires a specific environment activation and a designated home directory for Hugging Face files.\n    *   **Command:** `source ~/dev/vllm-env/bin/activate && HF_HOME=/mnt/models/huggingface huggingface-cli download <model-id>`\n    *   **Prerequisite:** Verify available disk space on `/mnt/models` before downloading.\n*   **Configuration:** The model is deployed using vLLM.\n    *   **Arguments:** The inference script requires the path to the quantized model directory (e.g., `/mnt/models/quantized/Qwen3.5-9B-FP8`).\n    *   **Specific Flags:** For certain setups (e.g., TP=2), stability may require flags like `--disable-custom-all-reduce` and `--enforce-eager`.\n\n### 2. Serving\n*   **Tool:** The model is served using `vllm serve`.\n*   **Configuration:** The launch script is configured with specific arguments for tool calling, hardware constraints (tensor parallel size), and attention backends.\n\n### 3. Evaluation\nOnce served, the model undergoes evaluation using the following components:\n\n*   **Evaluation Framework:**\n    *   **Claw-Eval:** Used for agent tool-use.\n    *   **Custom Suites:** Used for creative writing, roleplay, research, coding, SVG, function-call, and RAG evaluation.\n    *   **Inspect AI:** Scaffolded for broader benchmarks (HumanEval, MMLU, GAIA).\n    *   **Total Scope:** A comprehensive suite includes 128 custom tests, 72 Claw tests, and 8 Function Call (FC) tests (208 total).\n\n*   **Execution Profiles:**\n    *   **Quick Profile:** 6 Claw tasks + 6 custom suites + FC, 1 trial (~15 min).\n    *   **Full Profile:** 20 Claw tasks + 10 custom suites + FC, 3 trials (pass^3) (~60-90 min).\n    *   **Command:** `./run.sh profile --name <quick|full> --model local`\n\n*   **Performance Optimization:**\n    *   **Parallel Cloud Evaluation:** Uses port offsets to allow multiple models to be tested simultaneously, reducing evaluation time from 30 minutes (sequential) to 5 minutes (parallel).\n\n*   **Scoring & Storage:**\n    *   **Integration:** Computed grades are submitted to **Langfuse** for storage, comparison, and to drive the continuous improvement \"eval flywheel.\"\n    *   **Implementation:** Uses `LangfuseScorer` to attach scores to Langfuse traces.\n\n### 4. Documentation (Optional Post-Evaluation)\n*   **Model Card:** A standardized `README.md` can be generated using the `model-card` command, which extracts metadata from `config.json` and `quantize_result.json` and uploads it to the Hugging Face repository via `huggingface-cli upload`.",
+      "answer_length": 2678,
+      "chunks": 20,
+      "total_s": 3.94,
+      "top_chunk_ids": [
+        "lab/evals/docs/runbooks/full-eval-sweep.md::lab/evals/docs/runbooks/full-eval-sweep.md::chunk_0",
+        "lab/HANDOFF.md::1. Comprehensive Eval Suite (128 custom tests + 72 claw + 8 FC)::chunk_0",
+        "lab/.claude/commands/model-card.md::Notes::chunk_1",
+        "lab/.claude/commands/eval-model.md::Model Evaluation Pipeline::chunk_0",
+        "lab/.claude/commands/eval-model.md::lab/.claude/commands/eval-model.md::chunk_0"
+      ]
+    },
+    "top5_overlap": 3
+  },
+  {
+    "query": "What are the differences between the claw-eval function calling tasks and the custom function-call eval suite, and how do their scoring methodologies compare?",
+    "baseline": {
+      "answer": "Based on the provided context, here is the comparison between the Claw-Eval function calling tasks and the custom function-call eval suite:\n\n**Differences in Scope and Integration**\n*   **Claw-Eval:** This is an external benchmark (integrated as a git submodule) designed as an \"end-to-end transparent benchmark for AI agents acts in the real world.\" It includes **104 tasks** across **15 services** and uses Docker sandboxes. It covers agent tool use broadly, including function calling as part of its suite.\n*   **Custom Function-Call Suite:** This is a specific, internal suite (described as \"Custom (BFCL-inspired)\") focused specifically on testing whether models produce correct structured tool calls. It is distinct from the broader Claw-Eval tasks and is listed separately in the \"Tier 1 \u2014 Ready Now\" architecture table.\n\n**Scoring Methodologies**\nThe provided documents explicitly detail the scoring methodology for the **custom function-call eval suite** but do not provide specific scoring details for the function-calling tasks within the broader Claw-Eval benchmark.\n\n*   **Custom Function-Call Suite Scoring:**\n    *   Uses a `FunctionCallGrader` that scores each expected tool call on two dimensions:\n        *   **Name accuracy (50%):** Did the model call the right function?\n        *   **Argument accuracy (50%):** Are the arguments correct (using fuzzy matching)?\n    *   **Penalties:** Extra unexpected calls incur a 5% penalty each, capped at 20%.\n\n*   **Claw-Eval Scoring:**\n    *   The context states that Claw-Eval uses \"robust grading\" and \"pass^3 scoring\" (requiring 3 successful trials out of 3 for the \"full\" profile).\n    *   It adheres to the principle of \"Grade outcomes, not paths,\" meaning it checks the final state rather than specific tool call sequences.\n    *   Specific weightings for function name vs. argument accuracy within Claw-Eval are not provided in the text.\n\n**Summary**\nWhile both evaluate function calling, the **custom suite** offers granular, weighted scoring (50/50 split on name/arguments with penalties for hallucinations), whereas **Claw-Eval** treats function calling as part of a larger 104-task agent benchmark with a focus on final outcome success (pass/fail) across real-world scenarios.",
+      "answer_length": 2247,
+      "chunks": 20,
+      "total_s": 2.99,
+      "top_chunk_ids": [
+        "lab/docs/research/eval-framework-landscape.md::Our Approach::chunk_0",
+        "lab/evals/docs/guides/function-call-evals.md::lab/evals/docs/guides/function-call-evals.md::chunk_0",
+        "lab/CLAUDE.md::Eval Profiles::chunk_0",
+        "lab/evals/claw/claw-eval/README.md::Claw-Eval::chunk_0",
+        "lab/HANDOFF.md::1. Comprehensive Eval Suite (128 custom tests + 72 claw + 8 FC)::chunk_0"
+      ]
+    },
+    "enriched": {
+      "answer": "Based on the provided context documents, there is **no information** describing \"claw-eval function calling tasks\" as a distinct category separate from the general Claw-Eval agent tasks, nor is there a specific description of a \"custom function-call eval suite\" that differs from the standard \"Function Call\" suite mentioned in the architecture overview.\n\nThe documents provide the following related details, but do not support a direct comparison between two distinct function-calling methodologies as requested:\n\n*   **Claw-Eval Scope:** The documents state that Claw-Eval is used for \"agent tool-use\" and covers tasks like email triage, scheduling, drafting, and todo management (e.g., T02, T04, T06, T08). It does not explicitly list specific \"function calling tasks\" as a separate sub-category within Claw-Eval distinct from its agent tasks.\n*   **Function Call Suite:** The \"Function Call\" suite is listed in the Tier 1 architecture as a \"Custom (BFCL-inspired)\" suite that tests \"Structured tool call accuracy.\"\n*   **Scoring Methodology:** The context details the scoring for the **FunctionCallGrader** (used for the Function Call suite) as follows:\n    *   **Name accuracy:** 50% weight (Did the model call the right function?).\n    *   **Argument accuracy:** 50% weight (Are the arguments correct? fuzzy matching).\n    *   **Penalties:** Extra unexpected calls incur a 5% penalty each (capped at 20%).\n*   **Claw-Eval Scoring:** The context mentions Claw-Eval uses a `pass^3` metric (all 3 trials must pass) with a threshold of 0.75 for its agent tasks, but it does not specify a separate internal scoring breakdown for function calls within Claw-Eval that differs from the FunctionCallGrader.\n\n**Conclusion:** The provided text does not contain information distinguishing \"claw-eval function calling tasks\" from a \"custom function-call eval suite,\" nor does it provide a comparative scoring methodology for two separate function-calling systems. It only describes a single \"Function Call\" suite with specific scoring rules and a general \"Claw-Eval\" benchmark for agent tasks.",
+      "answer_length": 2086,
+      "chunks": 20,
+      "total_s": 2.79,
+      "top_chunk_ids": [
+        "lab/docs/research/eval-framework-landscape.md::Our Approach::chunk_0",
+        "lab/CLAUDE.md::Eval Profiles::chunk_0",
+        "lab/evals/docs/guides/function-call-evals.md::Scoring::chunk_0",
+        "lab/CLAUDE.md::Individual runs::chunk_0",
+        "lab/docs/benchmarks/claw-eval-leaderboard.md::lab/docs/benchmarks/claw-eval-leaderboard.md::chunk_0"
+      ]
+    },
+    "top5_overlap": 2
+  },
+  {
+    "query": "Which vLLM optimization flags actually improved throughput in benchmarks, and which ones were found to have no measurable impact?",
+    "baseline": {
+      "answer": "Based on the provided context, here are the findings regarding vLLM optimization flags and their impact on throughput:\n\n**Optimizations with Measurable Impact:**\n*   **MTP (Multi-Token Prediction) Speculative Decoding:** This provided significant throughput improvements, resulting in **+32% on 27B** models, **+22% on 9B** models, but a **-11% decrease on 35B MoE** models.\n*   **Prefix Caching on TP=2:** While primarily noted for latency, it showed a **-70% reduction in TTFT** (Time to First Token) on a 35B model (dropping from 1.8s to 0.5s).\n*   **P1+P2 Flags (Async Scheduling, Prefix Caching, FP8 KV):** In single-request benchmarks, these provided minimal throughput gains of **+1-3% tok/s**. However, the context notes that \"real wins are under concurrent load and multi-turn (prefix caching).\"\n\n**Optimizations with No Measurable Impact:**\n*   **NCCL Tuning for TP=2:** This was found to have **zero impact** on decode speed.\n\n**Additional Notes on Optimization Flags:**\n*   The P1+P2 flags (`--async-scheduling`, `--enable-prefix-caching`, `--performance-mode interactivity`, `--kv-cache-dtype fp8`) are designed to overlap scheduling with execution, reuse KV cache, auto-tune for latency, and halve KV cache memory, respectively.\n*   **MoE FP8 env vars** caused crashes on 122B FP8 quantizations but provided a **+2% increase** on BF16 MoE models.",
+      "answer_length": 1360,
+      "chunks": 20,
+      "total_s": 2.2,
+      "top_chunk_ids": [
+        "lab/CLAUDE.md::Optimization Flags (`-opt` configs)::chunk_0",
+        "lab/.claude/commands/eval-model.md::Step 1: Model Discovery & Feasibility::chunk_0",
+        "lab/.claude/commands/model-card.md::Steps::chunk_0",
+        "lab/.claude/commands/eval-model.md::Uses vLLM /metrics for accurate TTFT, TPOT, and decode tok/s::chunk_0",
+        "lab/docs/research/cuda-graphs-blackwell.md::Single GPU \u2014 CUDA graphs enabled (no enforce-eager)::chunk_0"
+      ]
+    },
+    "enriched": {
+      "answer": "Based on the provided context, here are the vLLM optimization flags and their measured impact on throughput:\n\n**Flags that improved throughput:**\n*   **MTP speculative decoding:** This provided significant gains, resulting in **+32% on 27B** models, **+22% on 9B** models, but a **-11% decrease on 35B MoE** models.\n*   **Prefix caching (on TP=2):** While primarily noted for reducing Time to First Token (TTFT) by **-70%** on 35B models (1.8s\u21920.5s), it is listed under speed optimization testing.\n*   **P1+P2 flags (async-scheduling, prefix-caching, FP8 KV):** These showed a minimal **+1-3% increase** in single-request throughput. However, the context notes that the \"real wins are under concurrent load and multi-turn (prefix caching).\"\n\n**Flags with no measurable impact:**\n*   **NCCL tuning for TP=2:** This was found to have **zero impact on decode speed**.\n\n**Additional Context on Stability vs. Throughput:**\n*   **MoE FP8 env vars:** These caused crashes on 122B FP8 quantizations but provided a **+2% increase** on BF16 MoE models.\n*   **FP8 KV cache (`--kv-cache-dtype fp8`):** While this halves KV cache memory and doubles context capacity, the specific throughput impact is grouped with the P1+P2 flags (minimal +1-3% single-request), with the primary benefit being capacity under concurrent load rather than raw decode speed.",
+      "answer_length": 1340,
+      "chunks": 20,
+      "total_s": 2.11,
+      "top_chunk_ids": [
+        "lab/CLAUDE.md::Optimization Flags (`-opt` configs)::chunk_1",
+        "lab/docs/research/cuda-graphs-blackwell.md::Single GPU \u2014 CUDA graphs enabled (no enforce-eager)::chunk_0",
+        "lab/.claude/commands/model-card.md::Usage::chunk_0",
+        "lab/docs/research/cuda-graphs-blackwell.md::TP=2 \u2014 enforce-eager required for stability::chunk_0",
+        "lab/CLAUDE.md::Optimization Flags (`-opt` configs)::chunk_0"
+      ]
+    },
+    "top5_overlap": 2
+  },
+  {
+    "query": "What is the relationship between the TurboQuant KV cache experiment and the vector search compression experiments? Do they share any techniques or findings?",
+    "baseline": {
+      "answer": "Based on the provided context documents, there is no mention of a \"TurboQuant KV cache experiment\" or \"vector search compression experiments.\"\n\nThe documents do discuss:\n*   **KV Cache Optimization:** Using `--kv-cache-dtype fp8` to halve KV cache memory and double context capacity (lab/CLAUDE.md).\n*   **MoE Quantization:** Comparing BF16 and INT4 quantization on MoE models like Qwen3.5-35B-A3B (lab/docs/research/moe-quantization.md).\n*   **General Quantization:** Using FP8, GPTQ-Int4, and AWQ for model deployment (lab/.claude/commands/eval-model.md).\n\nHowever, none of these sections describe a specific \"TurboQuant\" experiment or any \"vector search compression\" experiments, nor do they describe a relationship or shared techniques between them. Therefore, I cannot answer the question using the provided context.",
+      "answer_length": 821,
+      "chunks": 20,
+      "total_s": 1.29,
+      "top_chunk_ids": [
+        "lab/CLAUDE.md::Optimization Flags (`-opt` configs)::chunk_0",
+        "lab/.claude/commands/eval-model.md::Step 1: Model Discovery & Feasibility::chunk_0",
+        "lab/evals/claw/claw-eval/tasks/T104_packet_decoder/fixtures/protocol_spec.md::CRC Checksum::chunk_0",
+        "lab/evals/docs/references/anthropic-eval-principles.md::Anti-Patterns to Avoid::chunk_0",
+        "lab/docs/research/cuda-graphs-blackwell.md::Why MoE Benefits More::chunk_0"
+      ]
+    },
+    "enriched": {
+      "answer": "Based on the provided context documents, there is no mention of a \"TurboQuant KV cache experiment\" or \"vector search compression experiments.\"\n\nThe documents discuss:\n*   **KV Cache Optimization:** The `--kv-cache-dtype fp8` flag, which halves KV cache memory usage and doubles context capacity (Source: `lab/CLAUDE.md::Optimization Flags`).\n*   **Quantization:** Strategies for dense models (INT4) vs. MoE models (BF16/FP8) and the use of FP8 for MoE models (Source: `lab/.claude/commands/eval-model.md::MoE vs Dense quantization`).\n*   **Speed Optimization:** Results for speculative decoding, prefix caching, and CUDA graphs (Source: `lab/HANDOFF.md::2. Speed Optimization Testing`, `lab/docs/research/cuda-graphs-blackwell.md`).\n\nHowever, none of these sections reference \"TurboQuant\" or \"vector search compression,\" nor do they describe a relationship or shared techniques between such experiments. Therefore, I cannot answer this question using the provided context.",
+      "answer_length": 972,
+      "chunks": 20,
+      "total_s": 1.46,
+      "top_chunk_ids": [
+        "lab/CLAUDE.md::Optimization Flags (`-opt` configs)::chunk_1",
+        "lab/CLAUDE.md::Optimization Flags (`-opt` configs)::chunk_0",
+        "lab/evals/docs/guides/writing-tasks.md::Principles (from Anthropic)::chunk_0",
+        "lab/evals/docs/architecture/overview.md::Data Flow::chunk_0",
+        "lab/HANDOFF.md::4. Models Tested and Eliminated::chunk_0"
+      ]
+    },
+    "top5_overlap": 1
+  },
+  {
+    "query": "How are secrets managed across the protoLabs nodes, and how does the LiteLLM gateway on the ava node authenticate with vLLM on the protolabs node?",
+    "baseline": {
+      "answer": "Based on the provided context, here is the information regarding secrets and authentication:\n\n**Secrets Management**\n*   **Storage:** All secrets are managed by **Infisical** and stored at `secrets.proto-labs.ai` (hosted on the `pve01` control plane node).\n*   **Policy:** No secrets are committed to the repository.\n*   **Injection:** Secrets are injected at runtime via **Machine Identity** (Universal Auth) using `start.sh` wrappers. This applies to the Gateway, Langfuse, and protoClaw services.\n*   **Consumers:** The `secret-management` project in Infisical is consumed by the Gateway, Langfuse, and protoClaw.\n\n**Gateway Authentication**\nThe provided context **does not contain specific information** on how the LiteLLM gateway on the `ava` node authenticates with vLLM on the `protolabs` node.\n*   The context confirms that the Gateway runs on the `ava` node (via `infra/` notes) and vLLM runs on the `protolabs` node.\n*   It confirms that the Gateway authenticates via Machine Identity to inject its *own* secrets at runtime.\n*   However, it does not explicitly describe the internal network authentication or credential exchange mechanism between the Gateway and the vLLM inference service.",
+      "answer_length": 1200,
+      "chunks": 20,
+      "total_s": 1.72,
+      "top_chunk_ids": [
+        "lab/README.md::Secrets::chunk_0",
+        "lab/evals/docs/guides/langfuse-integration.md::lab/evals/docs/guides/langfuse-integration.md::chunk_0",
+        "lab/README.md::lab/README.md::chunk_0",
+        "lab/.claude/commands/ml-expert.md::lab/.claude/commands/ml-expert.md::chunk_0",
+        "lab/evals/docs/guides/langfuse-integration.md::How Tracing Works (Already Set Up)::chunk_0"
+      ]
+    },
+    "enriched": {
+      "answer": "Based on the provided context documents, here is the information regarding secret management and authentication:\n\n**Secret Management**\n*   **Centralized Storage:** All secrets are managed centrally using the **Infisical** platform, hosted on the **pve01** node at `secrets.proto-labs.ai`. No sensitive credentials are stored directly in the codebase.\n*   **Injection Mechanism:** Secrets are injected at runtime via the `start.sh` wrapper scripts. This process uses **Machine Identity authentication** (specifically Universal Auth) to authenticate the services and inject environment variables securely.\n*   **Consumers:** The `secret-management` project in Infisical is consumed by the **Gateway**, **Langfuse**, and **protoClaw** services.\n\n**Gateway Authentication and Architecture**\n*   **Gateway Location:** The context documents state that the **Gateway** (running LiteLLM) runs on the **ava node** (mentioned in `lab/CLAUDE.md::Structure`), while **vLLM** runs on the **protolabs** node.\n*   **Authentication:** The provided text **does not contain specific details** on how the Gateway on the `ava` node authenticates specifically with the vLLM instance on the `protolabs` node.\n    *   The documents confirm that the Gateway acts as a unified API proxy for all providers (including local vLLM instances) and that it uses Infisical for its own secret injection.\n    *   The documents mention that the Gateway routes traffic to `vLLM :8000` (local models) but do not explicitly describe the internal authentication protocol (e.g., API keys, mutual TLS) used between the Gateway and the vLLM service itself.\n\n**Relevant Context Sources:**\n*   `[lab/README.md::Secrets::chunk_0]`: \"Gateway `start.sh` authenticates via Machine Identity and injects env vars at runtime.\"\n*   `[lab/CLAUDE.md::Secrets::chunk_0]`: \"Gateway `start.sh` injects at runtime via Machine Identity.\"\n*   `[lab/docs/architecture/infrastructure.md::Secrets::chunk_0]`: \"All secrets in Infisical at `secrets.proto-labs.ai`... Machine Identity (Universal Auth) for automated injection via `start.sh` wrappers.\"\n*   `[lab/CLAUDE.md::Structure::chunk_0]`: \"infra/... gateway runs on ava node\"\n*   `[lab/docs/architecture/infrastructure.md::Services on protolabs::chunk_0]`: Lists vLLM on port 8000 and Gateway on port 4000.",
+      "answer_length": 2296,
+      "chunks": 20,
+      "total_s": 3.33,
+      "top_chunk_ids": [
+        "lab/README.md::Secrets::chunk_0",
+        "lab/docs/architecture/infrastructure.md::System Diagram::chunk_0",
+        "lab/docs/architecture/infrastructure.md::Nodes::chunk_0",
+        "lab/CLAUDE.md::Secrets::chunk_0",
+        "lab/.claude/commands/ml-expert.md::lab/.claude/commands/ml-expert.md::chunk_0"
+      ]
+    },
+    "top5_overlap": 2
+  },
+  {
+    "query": "What services run on each node in the protoLabs homelab, and how do they communicate with each other?",
+    "baseline": {
+      "answer": "Based on the provided context, here are the services running on each node and their communication methods:\n\n**Node Roles and Hardware**\n*   **protolabs (this machine):** Runs AI inference, experiments, and training. Hardware: 2x RTX PRO 6000 Blackwell (192 GB VRAM).\n*   **pve01:** Runs the control plane (Infisical, Prometheus, Grafana).\n\n**Services Running on Each Node**\n\n*   **On the `protolabs` node:**\n    *   **vLLM** (Port 8000, systemd): LLM inference (models swapped via `vllm-swap.sh`).\n    *   **Gateway** (Port 4000, Docker): LiteLLM proxy providing a unified API for all providers.\n    *   **Langfuse** (Port 3001, Docker): LLM observability (traces, scores, experiments).\n    *   **Open WebUI** (Port 3000, Docker): Chat UI.\n    *   **ComfyUI** (Port 8188, systemd): Image/video generation.\n    *   **protoClaw** (Port 7865, Docker): Sandboxed AI agent.\n    *   **node-exporter** (Port 9100, Docker): Prometheus node metrics.\n    *   **cAdvisor** (Port 8080, Docker): Container metrics.\n    *   **GPU exporter** (Port 9835, Docker): NVIDIA GPU metrics.\n\n*   **On the `pve01` node:**\n    *   **Infisical:** Secret management.\n    *   **Prometheus:** Metrics collection.\n    *   **Grafana:** Metrics visualization.\n\n**Communication and Architecture**\n*   **Internal Network:** The nodes are connected via **Tailscale MagicDNS**.\n*   **External Access:** The system uses a **Cloudflare Tunnel** to expose services to the internet.\n*   **Service Routing:**\n    *   The Gateway (`ai.proto-labs.ai`, Port 4000) acts as a unified API, routing requests to:\n        *   Local models via vLLM (Port 8000).\n        *   Cloud APIs (Claude, GPT, Gemini).\n        *   OpenRouter (DeepSeek, GLM, Kimi, etc.).\n    *   The Gateway also handles **Langfuse auto-tracing**.\n*   **Secrets Management:** Secrets are managed by Infisical (hosted on `pve01`) and injected at runtime into consumers (Gateway, Langfuse, protoClaw) via Machine Identity (Universal Auth) using `start.sh` wrappers.",
+      "answer_length": 1984,
+      "chunks": 20,
+      "total_s": 3.46,
+      "top_chunk_ids": [
+        "lab/README.md::lab/README.md::chunk_0",
+        "lab/.claude/commands/ml-expert.md::lab/.claude/commands/ml-expert.md::chunk_0",
+        "lab/evals/docs/references/claw-eval.md::Key Concepts::chunk_0",
+        "lab/.claude/commands/eval-model.md::lab/.claude/commands/eval-model.md::chunk_0",
+        "lab/CLAUDE.md::lab/CLAUDE.md::chunk_0"
+      ]
+    },
+    "enriched": {
+      "answer": "Based on the provided context, here are the services running on each node and their communication methods:\n\n**Node: protolabs**\nThis node serves as the primary machine for AI inference, experiments, and training. It hosts the following services (as detailed in `lab/docs/architecture/infrastructure.md`):\n\n| Service | Port | Runtime | Purpose |\n| :--- | :--- | :--- | :--- |\n| **vLLM** | :8000 | systemd | LLM inference (model swapped via `vllm-swap.sh`) |\n| **Gateway** | :4000 | Docker | LiteLLM proxy \u2014 unified API for all providers |\n| **Langfuse** | :3001 | Docker | LLM observability (traces, scores, experiments) |\n| **Open WebUI** | :3000 | Docker | Chat UI |\n| **ComfyUI** | :8188 | systemd | Image/video generation |\n| **protoClaw** | :7865 | Docker | Sandboxed AI agent |\n| **node-exporter** | :9100 | Docker | Prometheus node metrics |\n| **cAdvisor** | :8080 | Docker | Container metrics |\n| **GPU exporter** | :9835 | Docker | NVIDIA GPU metrics |\n\n**Node: pve01**\nThis node functions as the control plane. It hosts the following services:\n*   **Infisical** (Secret management)\n*   **Prometheus**\n*   **Grafana**\n\n**Communication**\nThe two nodes are interconnected via **Tailscale MagicDNS** (`lab/docs/architecture/infrastructure.md`).\n\nAdditionally, the system diagram indicates that external traffic is routed via a **Cloudflare Tunnel** to the Gateway (`ai.proto-labs.ai`), Open WebUI (`chat.proto-labs.ai`), and Langfuse (`traces.proto-labs.ai`) on the `protolabs` node. The Gateway then routes requests to local vLLM instances, cloud APIs (Claude, GPT, Gemini), and OpenRouter (`lab/docs/architecture/infrastructure.md`).",
+      "answer_length": 1640,
+      "chunks": 20,
+      "total_s": 2.76,
+      "top_chunk_ids": [
+        "lab/README.md::lab/README.md::chunk_0",
+        "lab/.claude/commands/ml-expert.md::lab/.claude/commands/ml-expert.md::chunk_0",
+        "lab/.claude/commands/model-card.md::Usage::chunk_0",
+        "lab/evals/docs/guides/quickstart.md::Prerequisites::chunk_0",
+        "lab/docs/architecture/infrastructure.md::Nodes::chunk_0"
+      ]
+    },
+    "top5_overlap": 2
+  },
+  {
+    "query": "What training experiments have been set up for Qwen models in the lab, and what base models and datasets were used?",
+    "baseline": {
+      "answer": "Based on the provided context, here are the training experiments and models set up for Qwen in the lab:\n\n**Training Experiments and Base Models:**\n*   **Qwen 2B + Base:** Used for training experiments. The context notes this model achieved \"5/5 reasoning\" at the 2B size.\n*   **Qwen 0.8B + Base:** Used for training experiments.\n*   **Qwen 4B BF16:** Used as a LoRA base.\n*   **Qwen 4B Base:** Used for pretraining.\n*   **Qwen3.5-9B:** Used for specific fine-tuning tasks:\n    *   **First LoRA:** Fine-tuned on `protoClaw` tool-use traces.\n    *   **Creative writing LoRA:** Fine-tuned on curated creative data with a target score improvement from 11 to 20+/25.\n\n**Datasets and Data Sources:**\n*   **protoClaw tool-use traces:** Exported from Langfuse to be used as training data for the Qwen3.5-9B LoRA.\n*   **Curated creative data:** Used for the creative writing LoRA on Qwen3.5-9B.\n*   **HuggingFace Dataset:** A dataset named `ArtificialCitizens/protoclaw-agent-v1` is being created.\n\n**Additional Context:**\n*   Base models (0.8B, 2B, 4B) were also downloaded specifically for pretraining.\n*   All fine-tuning efforts are focused on the Qwen architecture.",
+      "answer_length": 1161,
+      "chunks": 20,
+      "total_s": 2.06,
+      "top_chunk_ids": [
+        "lab/CLAUDE.md::Model Inventory (`/mnt/models`)::chunk_1",
+        "lab/.claude/commands/model-card.md::Steps::chunk_0",
+        "lab/HANDOFF.md::Fine-Tuning (Primary Goal)::chunk_0",
+        "lab/.claude/commands/model-card.md::Notes::chunk_0",
+        "lab/HANDOFF.md::Training / Fine-tune Bases::chunk_0"
+      ]
+    },
+    "enriched": {
+      "answer": "Based on the provided context documents, the following training experiments and configurations have been set up for Qwen models:\n\n**Base Models Used for Training and Experiments:**\n*   **Qwen 4B BF16 (8.8GB):** Used as the base for LoRA adaptation.\n*   **Qwen 4B Base (8.8GB):** Used for pretraining.\n*   **Qwen 2B + Base (8.6GB):** Used for training experiments, noted for achieving \"5/5 reasoning at 2B!\".\n*   **Qwen 0.8B + Base (3.4GB):** Used for training experiments.\n*   **Qwen 2B BF16 (4GB):** Listed for training with \"5/5 reasoning!\" capabilities.\n*   **Qwen 0.8B BF16 (1.5GB):** Listed for training.\n*   **Qwen3.5-9B:** Identified as the target for creating specific LoRA adapters (see below).\n\n**Datasets and Specific Experiments:**\n*   **protoClaw Tool-Use Traces:** The immediate plan involves exporting tool-use traces from Langfuse (production traffic) to create a LoRA adapter for the **Qwen3.5-9B** model.\n*   **Curated Creative Data:** A specific \"Creative writing LoRA\" is being developed for **Qwen3.5-9B** using curated creative data, with a target performance improvement from 11/25 to 20+/25.\n*   **HuggingFace Dataset:** A dataset named `ArtificialCitizens/protoclaw-agent-v1` is being created to host these training assets.\n*   **General Pretraining:** Base models (0.8B, 2B, 4B) were downloaded specifically for pretraining purposes.\n\n**Infrastructure and Tools:**\n*   **LLaMA-Factory:** The setup includes installing LLaMA-Factory (`pip install llamafactory`) in the training virtual environment to handle fine-tuning.\n*   **Langfuse:** Used to set up online evaluators and export production traces for training data.\n\n*Sources: [lab/HANDOFF.md::Training / Fine-tune Bases::chunk_0], [lab/CLAUDE.md::Model Inventory (`/mnt/models`)::chunk_1], [lab/HANDOFF.md::Fine-Tuning (Primary Goal)::chunk_0]*",
+      "answer_length": 1824,
+      "chunks": 20,
+      "total_s": 3.11,
+      "top_chunk_ids": [
+        "lab/HANDOFF.md::Training / Fine-tune Bases::chunk_0",
+        "lab/CLAUDE.md::Model Inventory (`/mnt/models`)::chunk_1",
+        "lab/HANDOFF.md::Fine-Tuning (Primary Goal)::chunk_0",
+        "lab/.claude/commands/model-card.md::{MODEL_NAME}::chunk_0",
+        "lab/CLAUDE.md::Model Inventory (`/mnt/models`)::chunk_2"
+      ]
+    },
+    "top5_overlap": 3
+  },
+  {
+    "query": "Compare the voice agent experiment and the TTS comparison experiment \u2014 what models were tested and what were the findings?",
+    "baseline": {
+      "answer": "The provided context documents do not contain information about a \"voice agent experiment\" or a \"TTS comparison experiment,\" nor do they list specific models tested or findings for such experiments.\n\nThe documents mention:\n*   **TTS (Text-to-Speech)**: Only in the context of domain expertise, listing \"text-to-speech (Fish Speech)\" as a technology the team works with ([lab/.claude/commands/ml-expert.md::Domain Expertise::chunk_1]).\n*   **Experiments**: General instructions on how to run experiments using Langfuse and Claw-Eval, and a \"Quick Profile\" smoke test that covers domains like coding, reasoning, and safety, but does not specify voice or TTS comparisons ([lab/.claude/commands/eval-model.md::Step 4: Quick Profile (Smoke Test)::chunk_0], [lab/evals/docs/guides/langfuse-integration.md::Run experiment::chunk_0]).\n\nTherefore, I cannot answer your question using the provided context.",
+      "answer_length": 896,
+      "chunks": 20,
+      "total_s": 1.3,
+      "top_chunk_ids": [
+        "lab/docs/research/eval-framework-landscape.md::Our Approach::chunk_0",
+        "lab/evals/docs/architecture/task-format.md::Writing Good Tasks::chunk_0",
+        "lab/evals/docs/guides/langfuse-integration.md::Run experiment::chunk_0",
+        "lab/CLAUDE.md::lab/CLAUDE.md::chunk_0",
+        "lab/evals/docs/guides/writing-tasks.md::Principles (from Anthropic)::chunk_0"
+      ]
+    },
+    "enriched": {
+      "answer": "The provided context does not contain information regarding a \"voice agent experiment\" or a \"TTS comparison experiment,\" nor does it list specific models tested or findings for such experiments.\n\nThe context mentions:\n*   **Non-LLM models** for TTS, specifically `fishaudio/s2-pro` (11GB), but does not describe a comparison experiment involving it ([lab/HANDOFF.md::Non-LLM::chunk_0]).\n*   **Models tested and eliminated** in section \"4. Models Tested and Eliminated,\" but the content of that section is empty in the provided context ([lab/HANDOFF.md::4. Models Tested and Eliminated::chunk_0]).\n*   **General evaluation experiments** using Langfuse, but these focus on agent tool use (e.g., `opus-27b-v1`) rather than voice or TTS comparisons ([lab/evals/docs/guides/langfuse-integration.md::Run experiment::chunk_0], [lab/evals/docs/guides/langfuse-integration.md::Running Experiments::chunk_0]).\n\nTherefore, I cannot answer the question based on the provided documents.",
+      "answer_length": 973,
+      "chunks": 20,
+      "total_s": 1.5,
+      "top_chunk_ids": [
+        "lab/evals/docs/guides/langfuse-integration.md::Run experiment::chunk_0",
+        "lab/evals/docs/references/anthropic-eval-principles.md::Capability vs Regression Evals::chunk_0",
+        "lab/evals/docs/guides/langfuse-integration.md::Running Experiments::chunk_0",
+        "lab/evals/docs/guides/function-call-evals.md::Key scenarios to test::chunk_0",
+        "lab/CLAUDE.md::A/B compare baseline vs optimized config::chunk_0"
+      ]
+    },
+    "top5_overlap": 1
+  },
+  {
+    "query": "What is the claw-eval scoring system and how are tasks graded?",
+    "baseline": {
+      "answer": "Based on the provided context, the Claw-Eval scoring system and task grading methodology are as follows:\n\n**Primary Scoring Metric: Pass^3**\n*   **Definition:** To earn a success credit, a model must consistently pass a task across **three independent trials** ($N=3$).\n*   **Strict Criterion:** A task is only marked as passed if the model meets the success criteria in **all three runs**. This method is designed to eliminate \"lucky runs.\"\n*   **Thresholds:** In some contexts (e.g., the leaderboard), a threshold of 0.75 is mentioned for the pass^3 metric.\n\n**Task Grading Principles**\nTasks are graded based on the following principles and dimensions:\n*   **Grade Outcomes, Not Paths:** Evaluators check the final state produced by the agent rather than specific tool call sequences. This allows for creative solutions that the evaluator designer may not have anticipated. Asserting specific tool sequences is considered brittle.\n*   **Multi-dimensional Scoring with Partial Credit:** Tasks are scored across multiple dimensions. An agent that gets the right answer but uses the wrong tool is treated differently than one that fails entirely.\n*   **Unambiguous Verdicts:** Tasks must be written so that two experts can independently reach the same pass/fail verdict.\n*   **Balanced Testing:** Tasks test both when behavior should occur (positive cases) and when it should not (negative cases).\n*   **Real-World Basis:** Tasks are derived from actual agent failures rather than synthetic puzzles.\n\n**Specific Grading Examples**\n*   **Function Calling:** The `FunctionCallGrader` scores expected tool calls on two dimensions:\n    *   **Name accuracy (50%):** Did the model call the right function?\n    *   **Argument accuracy (50%):** Are the arguments correct (using fuzzy matching)?\n    *   **Penalties:** Extra unexpected calls incur a 5% penalty each (capped at 20%).\n*   **RAG Evaluation:** Uses LLM-as-judge scoring across four dimensions.\n\n**Environment and Reliability**\n*   **Reproducibility:** Each trial starts in a clean environment with no shared state between runs (e.g., mocking external dependencies).\n*   **Grading Quality:** Grading bugs can significantly impact scores (e.g., a model's score jumping from 42% to 95% after fixing grading bugs), so transcripts must be read to verify the eval measures what matters.",
+      "answer_length": 2334,
+      "chunks": 20,
+      "total_s": 3.07,
+      "top_chunk_ids": [
+        "lab/evals/claw/claw-eval/README.md::Claw-Eval::chunk_0",
+        "lab/docs/research/eval-framework-landscape.md::Our Approach::chunk_0",
+        "lab/evals/docs/architecture/overview.md::Multi-dimensional scoring with partial credit::chunk_0",
+        "lab/evals/docs/architecture/task-format.md::Writing Good Tasks::chunk_0",
+        "lab/evals/docs/references/anthropic-eval-principles.md::The 8-Step Roadmap::chunk_0"
+      ]
+    },
+    "enriched": {
+      "answer": "Based on the provided documents, the Claw-Eval scoring system and task grading process operate as follows:\n\n**Scoring Formula and Metrics**\n*   **Base Calculation:** The final score is calculated using a weighted combination of completion and robustness metrics, adjusted by a safety factor:\n    *   `base = 0.80 * completion + 0.20 * robustness`\n    *   `final = base * safety_factor`\n*   **Pass/Fail Threshold:** A task is marked as passed if the `final` score is greater than or equal to **0.75** (this threshold is configurable per grader).\n*   **Pass^3 Requirement:** To earn a success credit, a model must consistently pass a task across **three independent trials** ($N=3$). All three trials must pass; a single failure results in the task being marked as failed. This methodology was updated in March 2026 to eliminate \"lucky runs.\"\n*   **Dimensional Scoring:** Tasks are scored across multiple dimensions. The task score is the mean of these dimension scores.\n    *   `task_score = mean(dimension_scores)`\n    *   `passed = all(dimension_score >= threshold for each dimension)`\n\n**Grading Principles and Methods**\n*   **Partial Credit:** Partial credit is enabled by default. Graders assess multiple dimensions with weighted scoring, allowing for granular assessment (e.g., an agent getting the right answer but using the wrong tool is treated differently than a total failure).\n*   **Outcome-Based:** Graders focus on grading outcomes rather than the path taken to achieve them.\n*   **Specific Graders:**\n    *   **FunctionCallGrader:** Scores tool calls on two dimensions: **Name accuracy (50%)** and **Argument accuracy (50%)**. Extra unexpected calls incur a 5% penalty each (capped at 20%).\n*   **Task Design Requirements:** Tasks must be unambiguous (two experts should agree on pass/fail), reproducible (no shared state between trials), and balanced (testing when behavior should and should not occur). If a task fails 100% of the time, it is likely a flaw in the task design rather than the agent.\n\n**Execution and Configuration**\n*   **Trials:** The default number of trials is 3. This can be configured via CLI flags (e.g., `--trials N`).\n*   **Task Examples:** Specific tasks include T02 (email triage), T04 (calendar scheduling), T06 (email reply draft), and T08 (todo management).\n*   **Integration:** Scores are aggregated and flow into Langfuse for the evaluation flywheel.\n\n**References:**\n*   `lab/docs/benchmarks/claw-eval-leaderboard.md`\n*   `lab/evals/docs/architecture/grading.md`\n*   `lab/evals/docs/references/claw-eval.md`\n*   `lab/evals/claw/claw-eval/README.md`\n*   `lab/evals/docs/guides/function-call-evals.md`\n*   `lab/evals/docs/architecture/task-format.md`",
+      "answer_length": 2696,
+      "chunks": 20,
+      "total_s": 3.97,
+      "top_chunk_ids": [
+        "lab/docs/benchmarks/claw-eval-leaderboard.md::lab/docs/benchmarks/claw-eval-leaderboard.md::chunk_0",
+        "lab/evals/docs/architecture/grading.md::Scoring Formula::chunk_0",
+        "lab/evals/docs/references/claw-eval.md::CLI Reference::chunk_0",
+        "lab/docs/research/eval-framework-landscape.md::Our Approach::chunk_0",
+        "lab/evals/docs/references/claw-eval.md::Scoring Formula::chunk_0"
+      ]
+    },
+    "top5_overlap": 1
+  },
+  {
+    "query": "How does the vllm-swap.sh script handle graceful model swapping?",
+    "baseline": {
+      "answer": "The provided context documents do not contain information on how the `vllm-swap.sh` script handles graceful model swapping.\n\nThe documents mention:\n- The existence of the script and how to run it (e.g., `bash models/vllm-swap.sh qwen-35b`) in `lab/CLAUDE.md`.\n- Steps to verify the swap after running the script in `lab/.claude/commands/eval-model.md` (Step 3: Swap & Verify).\n- A decision step to \"Keep\" or \"Nuke\" models after evaluation in `lab/.claude/commands/eval-model.md`.\n\nHowever, none of the snippets describe the internal logic, mechanisms, or specific commands within `vllm-swap.sh` that facilitate the actual swapping process or ensure it is graceful.",
+      "answer_length": 664,
+      "chunks": 20,
+      "total_s": 1.1,
+      "top_chunk_ids": [
+        "lab/.claude/commands/eval-model.md::Step 7: Report & Decision::chunk_0",
+        "lab/.claude/commands/eval-model.md::lab/.claude/commands/eval-model.md::chunk_0",
+        "lab/.claude/commands/model-card.md::Arguments::chunk_0",
+        "lab/.claude/commands/gradio-expert.md::Model App Best Practices::chunk_0",
+        "lab/.claude/commands/model-card.md::lab/.claude/commands/model-card.md::chunk_0"
+      ]
+    },
+    "enriched": {
+      "answer": "The provided context does not contain specific details on how the `vllm-swap.sh` script handles graceful model swapping (e.g., whether it stops the current server, waits for connections to drain, or uses a specific restart mechanism).\n\nThe context only provides the following information regarding the script:\n*   It is used to load and swap models into vLLM (e.g., `bash models/vllm-swap.sh qwen-35b`) [lab/CLAUDE.md::Running Models::chunk_0].\n*   It requires specific command-line arguments to be added to the script, such as `--served-model-name local`, tool-call parsers, and hardware constraints like `--enforce-eager` or `--tensor-parallel-size` [lab/.claude/commands/eval-model.md::Step 2: Download & Configure::chunk_1].\n*   Users are instructed to run the script to verify it starts correctly [lab/.claude/commands/eval-model.md::Step 3: Swap & Verify::chunk_0].\n\nTo understand the specific logic for graceful swapping, the content of the `vllm-swap.sh` script itself would be required.",
+      "answer_length": 995,
+      "chunks": 20,
+      "total_s": 1.55,
+      "top_chunk_ids": [
+        "lab/.claude/commands/eval-model.md::Step 2: Download & Configure::chunk_0",
+        "lab/.claude/commands/eval-model.md::Step 7: Report & Decision::chunk_0",
+        "lab/.claude/commands/model-card.md::Usage::chunk_0",
+        "lab/evals/docs/guides/quickstart.md::Run same tasks on two models::chunk_0",
+        "lab/CLAUDE.md::Speed Testing::chunk_0"
+      ]
+    },
+    "top5_overlap": 1
+  }
+]
