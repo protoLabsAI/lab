@@ -129,7 +129,9 @@ def run_config_b(
     if verbose:
         print(f"\n[Config B] Qwen solo RAG — {search_mode} search + reason...")
 
-    if search_mode == "dense":
+    if search_mode == "hybrid+rerank":
+        chunks = store.hybrid_rerank_search(query, k=k, candidates=k * 2)
+    elif search_mode == "dense":
         chunks = store.dense_search(query, k=k)
     elif search_mode == "hybrid":
         chunks = store.hybrid_search(query, k=k)
@@ -246,7 +248,7 @@ def main():
     parser.add_argument("--context1-model", default="context-1", help="Context-1 model name")
     parser.add_argument("--qwen-url", default="http://localhost:8000", help="Qwen vLLM URL")
     parser.add_argument("--qwen-model", default="local", help="Qwen model name")
-    parser.add_argument("--search-mode", default="hybrid", choices=["keyword", "dense", "hybrid"],
+    parser.add_argument("--search-mode", default="hybrid", choices=["keyword", "dense", "hybrid", "hybrid+rerank"],
                         help="Search mode for Config B")
     parser.add_argument("--embed-model", default="all-MiniLM-L6-v2", help="Embedding model for dense search")
     parser.add_argument("--embed-device", default="cpu", help="Device for embedding model")
@@ -270,7 +272,7 @@ def main():
     print(f"Loaded {n} items, {len(store.chunks)} chunks")
 
     # Build or load dense index if needed
-    if args.search_mode in ("dense", "hybrid"):
+    if args.search_mode in ("dense", "hybrid", "hybrid+rerank"):
         index_path = Path(args.index_path) if args.index_path else None
         if index_path and index_path.exists():
             store.load_dense_index(index_path, model_name=args.embed_model, device=args.embed_device)
@@ -281,6 +283,10 @@ def main():
             )
             if index_path:
                 store.save_dense_index(index_path)
+
+    # Load reranker if needed
+    if args.search_mode == "hybrid+rerank":
+        store.load_reranker()
 
     # Load queries
     queries = yaml.safe_load(Path(args.test_queries).read_text())

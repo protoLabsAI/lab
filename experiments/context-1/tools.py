@@ -85,6 +85,7 @@ class DocumentStore:
     - keyword: BM25-lite term frequency (default, no setup needed)
     - dense: FAISS IndexFlatIP with sentence-transformers embeddings
     - hybrid: RRF fusion of keyword + dense results
+    - hybrid+rerank: hybrid retrieval + cross-encoder reranking
     """
 
     def __init__(self) -> None:
@@ -93,6 +94,7 @@ class DocumentStore:
         self._chunk_list: list[str] = []  # ordered chunk IDs for FAISS alignment
         self._faiss_index = None
         self._embed_model = None
+        self._reranker = None
 
     def build_dense_index(
         self,
@@ -300,6 +302,39 @@ class DocumentStore:
         all_chunks = {c.chunk_id: c for c in keyword_results + dense_results}
         ranked = sorted(scores.items(), key=lambda x: -x[1])
         return [all_chunks[cid] for cid, _ in ranked[:k]]
+
+    def load_reranker(self, model_name: str = "mixedbread-ai/mxbai-rerank-xsmall-v1") -> None:
+        """Load a cross-encoder reranker for result reranking."""
+        from sentence_transformers import CrossEncoder
+        import time
+
+        print(f"Loading reranker: {model_name}...")
+        t0 = time.perf_counter()
+        self._reranker = CrossEncoder(model_name, max_length=512, device="cpu")
+        print(f"Reranker loaded in {time.perf_counter() - t0:.1f}s")
+
+    def rerank(self, query: str, chunks: list[Chunk], top_k: int = 10) -> list[Chunk]:
+        """Rerank chunks using cross-encoder. Falls back to input order if no reranker."""
+        if self._reranker is None:
+            return chunks[:top_k]
+
+        pairs = [[query, c.content] for c in chunks]
+        scores = self._reranker.predict(pairs, batch_size=len(pairs))
+        scored = sorted(zip(chunks, scores), key=lambda x: -x[1])
+        return [c for c, _ in scored[:top_k]]
+
+    def hybrid_rerank_search(
+        self, query: str, k: int = 10, candidates: int = 40,
+        exclude_ids: set[str] | None = None,
+    ) -> list[Chunk]:
+        """Hybrid retrieval + cross-encoder reranking pipeline.
+
+        1. Retrieve top `candidates` via hybrid search (RRF of keyword + dense)
+        2. Rerank with cross-encoder
+        3. Return top `k`
+        """
+        raw = self.hybrid_search(query, k=candidates, exclude_ids=exclude_ids)
+        return self.rerank(query, raw, top_k=k)
 
     def grep(self, pattern: str, max_results: int = 5) -> list[Chunk]:
         """Regex search over all chunks."""

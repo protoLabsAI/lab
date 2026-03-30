@@ -1,0 +1,542 @@
+[
+  {
+    "query": "How does the protoLabs monitoring stack work end-to-end, from GPU metrics collection on the Blackwell node to the Grafana dashboards on pve01?",
+    "keyword": {
+      "answer": "Based on the provided context documents, I cannot fully answer how the protoLabs monitoring stack works end-to-end.\n\nThe context documents contain the following relevant but incomplete information:\n*   **Prometheus Targets:** The documents `lab/infra/prometheus/prometheus.yml` and `protolabs-node/lab/infra/prometheus/prometheus.yml` indicate that there is a Prometheus configuration for the \"protoLabs (Blackwell) node\" and that these targets should be added to a monitoring server's config.\n*   **Query Definition:** The document `protolabs-node/lab/experiments/context-1/hard_queries.yaml` lists the specific question \"How does the protoLabs monitoring stack work end-to-end, from GPU metrics collection on the Blackwell node to the Grafana dashboards on pve01?\" as a \"Hard multi-hop query\" requiring information from multiple repos/sections.\n\nHowever, the provided text does not contain the actual implementation details, the specific GPU metrics being collected, the data flow between components, or the configuration for the Grafana dashboards on pve01. Therefore, the end-to-end workflow cannot be described using only the available context.",
+      "answer_length": 1149,
+      "chunks": 20,
+      "search_ms": 2647,
+      "total_s": 4.13,
+      "chunk_ids": [
+        "lab/infra/prometheus/prometheus.yml::chunk_0",
+        "protolabs-node/lab/infra/prometheus/prometheus.yml::chunk_0",
+        "protolabs-node/quant-env/lib/python3.12/site-packages/networkx/algorithms/flow/networksimplex.py::trace_path::chunk_0",
+        "protolabs-node/tq-env/lib/python3.12/site-packages/networkx/algorithms/flow/networksimplex.py::trace_path::chunk_0",
+        "protolabs-node/tts-env/lib/python3.12/site-packages/networkx/algorithms/flow/networksimplex.py::trace_path::chunk_0"
+      ]
+    },
+    "hybrid": {
+      "answer": "Based on the provided context documents, here is how the protoLabs monitoring stack works end-to-end:\n\n**1. Metrics Collection on the Blackwell Node**\nThe monitoring stack begins on the **protoLabs (Blackwell) node** (also referred to as \"ava\" in the architecture diagram). This node collects metrics from:\n*   **Local Exporters:** These include `node`, `cadvisor`, and `gpu` exporters running locally on the Blackwell node.\n*   **vLLM Metrics:** The vLLM service exposes metrics at `:8000/metrics` on the protolabs node.\n*   **Specific Applications:** For example, `protoClaw` exposes a `/metrics` endpoint for scraping (though the context notes this is currently a pending task for pve01 integration).\n\n**2. Scraping via Prometheus**\nA central **Prometheus** instance scrapes these targets. The architecture indicates that Prometheus scrapes:\n*   Local exporters on the Blackwell node.\n*   The `automaker server` at `:3008/api/metrics/prometheus`.\n*   Exporters from `pve01` (node, cadvisor) via Tailscale.\n*   Exporters from `protolabs` (node, cadvisor, gpu) via Tailscale.\n*   The `vLLM :8000/metrics` endpoint on the protolabs node.\n\n*Note: While the documents mention a `prometheus.yml` file for the Blackwell node, they do not explicitly detail the configuration of the Prometheus server itself, only that it scrapes the targets listed above.*\n\n**3. Visualization on Grafana**\nThe scraped data is visualized in **Grafana**.\n*   The architecture diagram shows a direct link from Prometheus to Grafana.\n*   Grafana dashboards are available for specific components, such as the **vLLM performance and metrics** dashboards located in `protolabs-node/vllm-turboquant/examples/online_serving/dashboards/grafana/`.\n*   There is a pending task to create a specific Grafana dashboard for `protoClaw` metrics on `pve01`.\n\n**4. Alerting**\nThe stack includes alerting capabilities where **Grafana** is connected to a **Discord #alerts webhook** to notify users of issues.\n\n**Summary of the Path:**\n`Blackwell Node (GPU/Node/Cadvisor/vLLM metrics)` \u2192 `Prometheus (scrapes via local/Tailscale)` \u2192 `Grafana (Dashboards)` \u2192 `Discord (Alerts)`.\n\n*Limitations:* The provided context does not contain specific details regarding the exact scripts used for the initial GPU metrics collection on the Blackwell node, nor does it explicitly confirm that the Grafana dashboards are hosted *on* pve01, only that pve01 has exporters and is part of the scraping topology.",
+      "answer_length": 2450,
+      "chunks": 20,
+      "search_ms": 2928,
+      "total_s": 6.55,
+      "chunk_ids": [
+        "protolabs-node/lab/experiments/context-1/hard_queries.yaml::chunk_0",
+        "lab/infra/prometheus/prometheus.yml::chunk_0",
+        "protolabs-node/lab/infra/prometheus/prometheus.yml::chunk_0",
+        "protolabs-node/homelab-iac/docs/observability/stack.md::Architecture::chunk_0",
+        "homelab-iac/docs/observability/stack.md::Architecture::chunk_0"
+      ]
+    },
+    "hybrid+rerank": {
+      "answer": "Based on the provided context documents, here is how the protoLabs monitoring stack works end-to-end:\n\n**1. Infrastructure and Node Roles**\nThe monitoring infrastructure is managed across a multi-node homelab. The **protolabs** node (the Blackwell GPU machine) is responsible for AI inference and experiments, while **pve01** acts as the Proxmox control plane hosting the monitoring services (Grafana and Prometheus) and CI runners. All nodes are connected via Tailscale MagicDNS ([protolabs-node/CLAUDE.md::Infrastructure Context::chunk_0], [protolabs-node/homelab-iac/docs/infrastructure/hardware.md::pve01 - Infrastructure Node::chunk_0]).\n\n**2. Metrics Collection (Scraping)**\nPrometheus, running on the **ava** node (A6000), scrapes metrics from the various nodes over Tailscale. Specifically for the Blackwell node:\n*   It scrapes **vLLM** metrics directly from the `protolabs` node at `:8000/metrics` ([homelab-iac/docs/observability/stack.md::Architecture::chunk_0]).\n*   It also scrapes standard node and GPU exporters (node, cadvisor, gpu) from the `protolabs` node via Tailscale ([homelab-iac/docs/observability/stack.md::Architecture::chunk_0]).\n*   While the `protolabs` node hosts the Blackwell GPU, the context notes that Prometheus targets for the Blackwell node are defined in `lab/infra/prometheus/prometheus.yml`, which are added to the Prometheus config on the monitoring server ([lab/infra/prometheus/prometheus.yml::chunk_0], [protolabs-node/lab/infra/prometheus/prometheus.yml::chunk_0]).\n\n**3. Visualization (Grafana)**\n*   **Location:** The context states that the Observability Stack (Prometheus + Grafana) runs on the **ava** node, not pve01, though pve01 is the control plane. The stack scrapes all three nodes (pve01, ava, protolabs) over Tailscale ([protolabs-node/homelab-iac/docs/observability/stack.md::protolabs-node/homelab-iac/docs/observability/stack.md::chunk_0]).\n*   **Dashboards:** Grafana dashboards are used to visualize vLLM performance and metrics. Specific configurations for vLLM monitoring (including end-to-end request latency and prompt tokens) are available in the `vllm-turboquant` repository under `examples/online_serving/dashboards/grafana` ([protolabs-node/vllm-turboquant/examples/online_serving/dashboards/grafana/README.md::chunk_0], [protolabs-node/vllm-turboquant/docs/design/metrics.md::Grafana Dashboard::chunk_0]).\n*   **Alerting:** Grafana is configured to send alerts via a Discord webhook ([homelab-iac/docs/observability/stack.md::Architecture::chunk_0]).\n\n**Summary of the Flow:**\n1.  **Collection:** The Blackwell node (`protolabs`) exposes metrics via vLLM (`:8000/metrics`) and standard GPU/node exporters.\n2.  **Ingestion:** Prometheus (hosted on `ava`) scrapes these metrics over the Tailscale network.\n3.  **Visualization:** Grafana (hosted on `ava`) queries Prometheus to render dashboards, such as those for vLLM performance, and triggers Discord alerts if necessary.\n\n*Note: The user's question asks about Grafana on `pve01`, but the provided documents explicitly state that the Prometheus and Grafana stack runs on the `ava` node, which scrapes `pve01` as well as `protolabs` and `ava` ([protolabs-node/homelab-iac/docs/observability/stack.md::protolabs-node/homelab-iac/docs/observability/stack.md::chunk_0]).*",
+      "answer_length": 3290,
+      "chunks": 20,
+      "search_ms": 5088,
+      "total_s": 10.15,
+      "chunk_ids": [
+        "protolabs-node/lab/experiments/context-1/hard_queries.yaml::chunk_0",
+        "lab/infra/prometheus/prometheus.yml::chunk_0",
+        "protolabs-node/lab/infra/prometheus/prometheus.yml::chunk_0",
+        "protolabs-node/protoMaker/docs/concepts/how-it-works.md::protoLabs Dev Cycle \u2014 Idea to Merged PR::chunk_0",
+        "protolabs-node/CLAUDE.md::Infrastructure Context::chunk_0"
+      ]
+    }
+  },
+  {
+    "query": "What embedding model does protoResearcher use, what dimension are the vectors, and what vector compression experiments were run in the lab to optimize storage?",
+    "keyword": {
+      "answer": "The provided context documents do not contain the specific information required to answer your question regarding the embedding model used by protoResearcher, the vector dimensions, or the specific vector compression experiments run in the lab.\n\nWhile the document `protolabs-node/lab/experiments/context-1/hard_queries.yaml::chunk_0` lists this exact question as a \"Hard multi-hop query\" requiring cross-document retrieval, the actual answers are not present in the provided text snippets.\n\nThe only related information found is in `protolabs-node/vllm-turboquant/docs/contributing/model/multimodal.md::chunk_5`, which notes that text embedding and embedding merge are handled automatically by a default implementation of `embed_input_ids` in vLLM, but it does not specify the model name, dimensions, or compression experiments for protoResearcher.",
+      "answer_length": 849,
+      "chunks": 20,
+      "search_ms": 2942,
+      "total_s": 4.02,
+      "chunk_ids": [
+        "protolabs-node/vllm-turboquant/docs/contributing/model/multimodal.md::1. Update the base vLLM model::chunk_5",
+        "protolabs-node/vllm-turboquant/docs/features/speculative_decoding/eagle.md::Pre-Trained Eagle Draft Models::chunk_1",
+        "protolabs-node/quant-env/lib/python3.12/site-packages/huggingface_hub/errors.py::GatedRepoError::chunk_1",
+        "protolabs-node/tts-env/lib/python3.12/site-packages/huggingface_hub/errors.py::GatedRepoError::chunk_1",
+        "protolabs-node/vllm-turboquant/.deps/vllm-flash-attn-src/flash_attn/utils/generation.py::class::chunk_0"
+      ]
+    },
+    "hybrid": {
+      "answer": "Based on the provided context documents, I cannot answer your question fully.\n\nWhile the documents mention **protoResearcher** and **vector compression** in separate contexts, they do not contain the specific details you requested:\n\n1.  **Embedding Model & Dimensions:** The context lists `protoResearcher` as a source for loading papers via `load_from_protoresearcher` ([protolabs-node/lab/experiments/context-1/tools.py::chunk_0], [lab/experiments/context-1/tools.py::chunk_0]), but it does not specify which embedding model protoResearcher uses or the dimension of its vectors. The only embedding model mentioned in the context is `nomic-embed-text` used by **protoClaw** for vector memory ([protolabs-node/protoClaw/tools/vector_memory.py::chunk_0]), not protoResearcher.\n2.  **Vector Compression Experiments:** The context mentions \"vector compression experiments\" in the list of hard queries ([protolabs-node/lab/experiments/context-1/hard_queries.yaml::chunk_0]) and references a \"TurboQuant KV cache experiment\" and \"vector search compression experiments\" in a query about their relationship, but the provided text does not describe the results or details of these experiments.\n\nTherefore, the specific information regarding protoResearcher's embedding model, vector dimensions, and the specific compression experiments run is not present in the provided snippets.",
+      "answer_length": 1372,
+      "chunks": 20,
+      "search_ms": 2734,
+      "total_s": 4.47,
+      "chunk_ids": [
+        "protolabs-node/lab/experiments/context-1/hard_queries.yaml::chunk_0",
+        "protolabs-node/vllm-turboquant/docs/contributing/model/multimodal.md::1. Update the base vLLM model::chunk_5",
+        "protolabs-node/vllm-turboquant/docs/models/pooling_models/embed.md::protolabs-node/vllm-turboquant/docs/models/pooling_models/embed.md::chunk_0",
+        "protolabs-node/vllm-turboquant/docs/features/speculative_decoding/eagle.md::Pre-Trained Eagle Draft Models::chunk_1",
+        "protolabs-node/tts-env/lib/python3.12/site-packages/transformers/models/xlm/configuration_xlm.py::XLMConfig::chunk_6"
+      ]
+    },
+    "hybrid+rerank": {
+      "answer": "Based on the provided context documents, I cannot fully answer your question.\n\nWhile the documents mention **protoResearcher** and **embedding models**, they do not contain the specific details you requested:\n\n1.  **Specific Model and Dimensions:** The documents do not state which specific embedding model `protoResearcher` uses or the dimension of its vectors.\n    *   The document `protolabs-node/lab/experiments/context-1/hard_queries.yaml` lists this as a \"Hard multi-hop query\" requiring cross-document retrieval, implying the answer is not in a single file.\n    *   The document `protolabs-node/protoClaw/tools/vector_memory.py` mentions using `nomic-embed-text` for `protoClaw` (not `protoResearcher`), but this is a different component.\n    *   Other documents discuss embedding dimensions generally (e.g., `vllm/pooling_params.py` mentions reducing dimensions if a model supports matryoshka representation) but do not specify the values for `protoResearcher`.\n\n2.  **Vector Compression Experiments:** The documents do not describe specific vector compression experiments run in the lab to optimize storage.\n    *   The `hard_queries.yaml` file lists \"what vector compression experiments were run in the lab\" as a required piece of information, but the content of those experiments is not present in the provided text.\n    *   The `vllm/pooling_params.py` files mention the *capability* to reduce dimensions but do not detail experimental results or specific compression techniques applied in the lab.\n\nTo answer this question, you would need to access the specific `protoResearcher` configuration files, database schemas, or experiment logs that are referenced in the `hard_queries.yaml` file but not included in the current context.",
+      "answer_length": 1743,
+      "chunks": 20,
+      "search_ms": 5329,
+      "total_s": 7.53,
+      "chunk_ids": [
+        "protolabs-node/lab/experiments/context-1/hard_queries.yaml::chunk_0",
+        "protolabs-node/vllm-turboquant/docs/models/pooling_models/embed.md::protolabs-node/vllm-turboquant/docs/models/pooling_models/embed.md::chunk_0",
+        "protolabs-node/vllm-turboquant/examples/pooling/embed/openai_embedding_long_text/README.md::\ud83e\udd1d Contributing::chunk_0",
+        "protolabs-node/vllm-turboquant/docs/models/pooling_models/README.md::Pooling Usages::chunk_1",
+        "protolabs-node/lab/experiments/context-1/tools.py::load_from_protoresearcher::chunk_0"
+      ]
+    }
+  },
+  {
+    "query": "Trace the full path of a model from HuggingFace download to being served and evaluated \u2014 which environments, scripts, and eval suites are involved?",
+    "keyword": {
+      "answer": "Based on the provided context documents, I cannot provide a complete trace of the full path from HuggingFace download to being served and evaluated, as the documents do not contain information regarding the serving infrastructure, specific evaluation suites, or the scripts that connect these stages.\n\nHowever, the documents do provide details on specific components involved in the **download** and **model loading** phases:\n\n**1. Downloading from HuggingFace Hub**\n*   **Function:** `with_retry`\n*   **Location:** `vllm/transformers_utils/repo_utils.py` (found in `vllm-env`, `vllm-omni-env`, and `vllm-turboquant` environments).\n*   **Functionality:** Attempts to download a file from HuggingFace Hub. It returns the local path on success or `None` on failure. It skips the download if the model is already a local directory.\n*   **Alternative Download:** The `get_model` function in `ray/llm/_internal/common/utils/download_utils.py` (found in `vllm-env`) can get a model from cloud storage and store it locally, with options to download only tokenizer files or exclude safetensors.\n\n**2. Model Loading and State Management**\n*   **Sharded State Loading:** The `pre_load_state_dict_transform` function in `torch/distributed/fsdp/_fsdp_extensions.py` (found in `vllm-env`, `vllm-omni-env`, `quant-env`, `tq-env`, and `tts-env`) is called before loading a sharded model state dict to return the tensor and list of shards.\n*   **Internal Modules:** The `InternalModule` class in `compressed_tensors/utils/internal.py` (found in `vllm-env`, `vllm-omni-env`, `quant-env`, and `tq-env`) defines abstract base classes for modules not part of the model definition, used to skip applying configs to Observers and Transforms.\n\n**3. Other Related Utilities**\n*   **Progress Reporting:** A note in `ray/rllib/examples/ray_tune/custom_progress_reporter.py` distinguishes custom progress reporters from custom `Logger`s, which handle result formatting.\n*   **Tensor Storage:** An example script `tensorize_vllm_model.py` mentions that the path for saved tensors can be a local directory or S3 URI, combining the supplied directory with the model reference ID.\n\n**Missing Information:**\nThe provided text does not contain:\n*   Scripts responsible for **serving** the model.\n*   Specific **evaluation suites** or scripts used to evaluate the model.\n*   The orchestration flow connecting the download phase to the serving/evaluation phase.",
+      "answer_length": 2426,
+      "chunks": 20,
+      "search_ms": 2741,
+      "total_s": 6.07,
+      "chunk_ids": [
+        "protolabs-node/vllm-env/lib/python3.12/site-packages/vllm/transformers_utils/repo_utils.py::with_retry::chunk_0",
+        "protolabs-node/vllm-omni-env/lib/python3.12/site-packages/vllm/transformers_utils/repo_utils.py::with_retry::chunk_0",
+        "protolabs-node/vllm-turboquant/vllm/transformers_utils/repo_utils.py::with_retry::chunk_0",
+        "protolabs-node/quant-env/lib/python3.12/site-packages/torch/distributed/fsdp/_fsdp_extensions.py::pre_load_state_dict_transform::chunk_0",
+        "protolabs-node/tq-env/lib/python3.12/site-packages/torch/distributed/fsdp/_fsdp_extensions.py::pre_load_state_dict_transform::chunk_0"
+      ]
+    },
+    "hybrid": {
+      "answer": "Based on the provided context documents, I can trace the following steps and components involved in downloading, loading, and evaluating a model from HuggingFace, though the specific scripts for \"serving\" and the full end-to-end workflow are not fully detailed in the text.\n\n**1. Downloading the Model**\n*   **Mechanism:** The process begins by downloading a model from the HuggingFace Hub.\n*   **Functions Involved:**\n    *   `from_pretrained`: This function downloads a model from the HuggingFace Hub and instantiates it. It accepts a `pretrained_model_name_or_path` (either a Hub model ID like `bigscience/bloom` or a local directory path) and an optional `revision`. This function is present in multiple environments:\n        *   `protolabs-node/quant-env`\n        *   `protolabs-node/tq-env`\n        *   `protolabs-node/tts-env`\n        *   `protolabs-node/vllm-env`\n        *   `protolabs-node/vllm-omni-env`\n    *   `with_retry`: This utility attempts to download a file from the HuggingFace Hub, returning the local path on success or `None` on failure. It skips the download if the model is already a local directory. This is found in:\n        *   `protolabs-node/vllm-env`\n        *   `protolabs-node/vllm-omni-env`\n        *   `protolabs-node/vllm-turboquant`\n\n**2. Loading and State Management**\n*   **Sharded Models:** For loading *sharded* model state dicts, the function `pre_load_state_dict_transform` is called before loading. It returns the tensor and list of shards from which to load data. This is available in:\n    *   `protolabs-node/quant-env`\n    *   `protolabs-node/vllm-env`\n    *   `protolabs-node/vllm-omni-env`\n    *   `protolabs-node/tq-env`\n    *   `protolabs-node/tts-env`\n\n**3. Evaluation and Results**\n*   **Evaluation Utilities:** The system includes utilities for handling evaluation results in the `.eval_results/*.yaml` format.\n    *   **Documentation:** Specifications are available at `https://github.com/huggingface/hub-docs/blob/main/eval_results.yaml`.\n    *   **Module:** `huggingface_hub._eval_results` handles these utilities.\n*   **Model Index and Card Data:** The `huggingface_hub.repocard_data` module (specifically `__init__`) processes a model index (likely from a `README.md` file) to extract the model name and a list of `huggingface_hub.EvalResult` objects. This is present in:\n    *   `protolabs-node/quant-env`\n    *   `protolabs-node/tq-env`\n    *   `protolabs-node/vllm-env`\n    *   `protolabs-node/vllm-omni-env`\n    *   `protolabs-node/tts-env`\n*   **Evaluation Command:** There is a specific command file `lab/.claude/commands/eval-model.md` designed to \"Evaluate a new LLM model for the protoLabs system \u2014 download, configure, benchmark, and compare.\" It accepts a `<model-name-or-huggingface-id>` as an argument.\n\n**4. Environments Identified**\nThe context explicitly lists the following environments where these components reside:\n*   `protolabs-node/vllm-env`\n*   `protolabs-node/vllm-omni-env`\n*   `protolabs-node/vllm-turboquant`\n*   `protolabs-node/quant-env`\n*   `protolabs-node/tq-env`\n*   `protolabs-node/tts-env`\n\n**Missing Information:**\nThe provided context **does not** contain:\n*   Specific scripts responsible for **serving** the model (e.g., API endpoints, inference servers).\n*   The specific names of the **eval suites** beyond the generic `huggingface_hub` utilities and the `eval-model` command.\n*   The detailed workflow connecting the download step directly to the serving step.",
+      "answer_length": 3462,
+      "chunks": 20,
+      "search_ms": 3032,
+      "total_s": 8.38,
+      "chunk_ids": [
+        "protolabs-node/vllm-env/lib/python3.12/site-packages/vllm/transformers_utils/repo_utils.py::with_retry::chunk_0",
+        "protolabs-node/vllm-omni-env/lib/python3.12/site-packages/vllm/transformers_utils/repo_utils.py::with_retry::chunk_0",
+        "protolabs-node/vllm-turboquant/vllm/transformers_utils/repo_utils.py::with_retry::chunk_0",
+        "protolabs-node/quant-env/lib/python3.12/site-packages/huggingface_hub/hub_mixin.py::from_pretrained::chunk_0",
+        "protolabs-node/tq-env/lib/python3.12/site-packages/huggingface_hub/hub_mixin.py::from_pretrained::chunk_0"
+      ]
+    },
+    "hybrid+rerank": {
+      "answer": "Based on the provided context documents, here is the trace of a model from HuggingFace download to evaluation, identifying the involved environments, scripts, and utilities:\n\n**1. Download and Instantiation**\n*   **Environments:** The download process is available across multiple Python environments, specifically:\n    *   `protolabs-node/quant-env`\n    *   `protolabs-node/tq-env`\n    *   `protolabs-node/tts-env`\n    *   `protolabs-node/vllm-env`\n    *   `protolabs-node/vllm-omni-env`\n*   **Scripts/Functions:**\n    *   `huggingface_hub.hub_mixin.from_pretrained`: This function downloads a model from the Huggingface Hub and instantiates it. It accepts a `model_id` (e.g., `bigscience/bloom`) or a local directory path.\n    *   `vllm.transformers_utils.repo_utils.with_retry`: Used to try downloading a file from the HuggingFace Hub, returning the local path on success or `None` on failure. It skips the download if the model is already a local directory.\n    *   `ray.llm._internal.common.utils.download_utils.get_model`: Retrieves a model from cloud storage and stores it locally. It supports options to download only tokenizer files or exclude safetensors files.\n\n**2. Model Configuration and Parsing**\n*   **Scripts/Functions:**\n    *   `huggingface_hub.repocard_data.__init__`: Parses a model index (likely from a `README.md` file on the Hub) to extract the model name and a list of `huggingface_hub.EvalResult` objects.\n    *   `vllm.tool_parsers` (specifically `pythonic_tool_parser`, `phi4mini_tool_parser`, and `olmo3_tool_parser`): These scripts extract tool calls from a complete model response.\n\n**3. Evaluation**\n*   **Utilities:**\n    *   `huggingface_hub._eval_results`: Provides utilities for the `.eval_results/*.yaml` format. Specifications for this format are available at the Hugging Face Hub documentation and GitHub.\n*   **Evaluation Workflow:**\n    *   A specific command script exists for the evaluation process: `lab/.claude/commands/eval-model.md`.\n    *   **Description:** This command is designed to \"Evaluate a new LLM model for the protoLabs system \u2014 download, configure, benchmark, and compare.\"\n    *   **Arguments:** It takes a `<model-name-or-huggingface-id>` as an argument.\n    *   **Allowed Tools:** The evaluation process utilizes Read, Write, Edit, Bash, Glob, Grep, Agent, WebSearch, and WebFetch tools.\n\n**Summary of the Path:**\n1.  **Download:** Initiated via `from_pretrained` or `get_model` within specific environments (`quant-env`, `vllm-env`, etc.).\n2.  **Retry/Verification:** Handled by `with_retry` in `vllm` environments.\n3.  **Configuration:** Model metadata and evaluation results are parsed using `repocard_data` and `_eval_results`.\n4.  **Serving/Processing:** Tool calls are extracted via specific parsers (`pythonic_tool_parser`, etc.) within the `vllm` environment.\n5.  **Evaluation:** Executed via the `eval-model` command script, which orchestrates downloading, configuring, benchmarking, and comparing the model.",
+      "answer_length": 2979,
+      "chunks": 20,
+      "search_ms": 3772,
+      "total_s": 8.07,
+      "chunk_ids": [
+        "protolabs-node/quant-env/lib/python3.12/site-packages/huggingface_hub/hub_mixin.py::from_pretrained::chunk_0",
+        "protolabs-node/tq-env/lib/python3.12/site-packages/huggingface_hub/hub_mixin.py::from_pretrained::chunk_0",
+        "protolabs-node/tts-env/lib/python3.12/site-packages/huggingface_hub/hub_mixin.py::from_pretrained::chunk_0",
+        "protolabs-node/vllm-env/lib/python3.12/site-packages/huggingface_hub/hub_mixin.py::from_pretrained::chunk_0",
+        "protolabs-node/vllm-omni-env/lib/python3.12/site-packages/huggingface_hub/hub_mixin.py::from_pretrained::chunk_0"
+      ]
+    }
+  },
+  {
+    "query": "What are the differences between the claw-eval function calling tasks and the custom function-call eval suite, and how do their scoring methodologies compare?",
+    "keyword": {
+      "answer": "The provided context documents do not contain information regarding the differences between the \"claw-eval function calling tasks\" and the \"custom function-call eval suite,\" nor do they describe their scoring methodologies.\n\nWhile the document `[protolabs-node/lab/experiments/context-1/hard_queries.yaml::chunk_0]` lists this specific question as a \"Deep lab query\" requiring 2 hops of information, the actual content or answers to this query are not included in the provided text.",
+      "answer_length": 482,
+      "chunks": 20,
+      "search_ms": 2663,
+      "total_s": 3.33,
+      "chunk_ids": [
+        "protolabs-node/tq-env/lib/python3.12/site-packages/torchvision/models/feature_extraction.py::_warn_graph_differences::chunk_0",
+        "protolabs-node/vllm-env/lib/python3.12/site-packages/torchvision/models/feature_extraction.py::_warn_graph_differences::chunk_0",
+        "protolabs-node/vllm-omni-env/lib/python3.12/site-packages/torchvision/models/feature_extraction.py::_warn_graph_differences::chunk_0",
+        "protolabs-node/lab/experiments/context-1/hard_queries.yaml::chunk_0",
+        "protolabs-node/quant-env/lib/python3.12/site-packages/sympy/functions/elementary/miscellaneous.py::eval::chunk_0"
+      ]
+    },
+    "hybrid": {
+      "answer": "Based on the provided context documents, there is no information detailing the specific differences between the Claw-Eval function calling tasks and the custom function-call eval suite, nor is there information comparing their scoring methodologies.\n\nThe document `protolabs-node/lab/experiments/context-1/hard_queries.yaml` lists this exact question as a \"Hard multi-hop query\" requiring cross-document retrieval, indicating that the answer is not contained within the provided snippets.\n\nThe available context only confirms:\n*   **Claw-Eval** is a 104-task benchmark for evaluating LLMs as autonomous agents in personal assistant scenarios, which includes agent tool-use (source: `lab/evals/docs/references/claw-eval.md`, `protolabs-node/lab/docs/research/eval-framework-landscape.md`).\n*   **Custom suites** include a specific \"function-call\" suite used alongside Claw-Eval (source: `protolabs-node/lab/docs/research/eval-framework-landscape.md`, `lab/.claude/commands/eval-model.md`).\n*   The **Quick Profile** runs 6 Claw-Eval tasks and 8 function-calling tests (basic + edge cases) as part of the custom suites (source: `lab/.claude/commands/eval-model.md`).\n\nTo answer the question fully, additional documentation describing the specific tasks and scoring logic for both suites would be required.",
+      "answer_length": 1303,
+      "chunks": 20,
+      "search_ms": 2696,
+      "total_s": 4.41,
+      "chunk_ids": [
+        "protolabs-node/tq-env/lib/python3.12/site-packages/torchvision/models/feature_extraction.py::_warn_graph_differences::chunk_0",
+        "lab/evals/docs/guides/function-call-evals.md::lab/evals/docs/guides/function-call-evals.md::chunk_0",
+        "protolabs-node/vllm-env/lib/python3.12/site-packages/torchvision/models/feature_extraction.py::_warn_graph_differences::chunk_0",
+        "protolabs-node/vllm-env/lib/python3.12/site-packages/langsmith/evaluation/evaluator.py::__call__::chunk_0",
+        "protolabs-node/vllm-omni-env/lib/python3.12/site-packages/torchvision/models/feature_extraction.py::_warn_graph_differences::chunk_0"
+      ]
+    },
+    "hybrid+rerank": {
+      "answer": "Based on the provided context documents, here is the information regarding the differences and scoring methodologies:\n\n**Differences in Scope and Definition:**\n*   **Claw-Eval:** This is described as a \"104-task benchmark for evaluating LLMs as autonomous agents in personal assistant scenarios\" (specifically for agent tool-use). It includes specific tasks such as T02 (email triage), T04 (calendar scheduling), T06 (email reply draft), and T08 (todo management) (Documents: `protolabs-node/lab/experiments/context-1/hard_queries.yaml`, `lab/docs/benchmarks/claw-eval-leaderboard.md`, `protolabs-node/lab/evals/docs/references/claw-eval.md`).\n*   **Custom Function-Call Suite:** This is part of a broader set of \"custom suites\" used for specific domains including \"function-call\" alongside creative writing, roleplay, research, coding, SVG, and RAG. The specific function-call tests focus on \"basic + edge cases\" (8 tests) and verify if models produce \"correct structured tool calls: right function name, correct arguments, proper JSON structure, and appropriate restraint (not calling tools when they shouldn't)\" (Documents: `protolabs-node/lab/experiments/context-1/hard_queries.yaml`, `lab/.claude/commands/eval-model.md`, `protolabs-node/lab/evals/docs/guides/function-call-evals.md`).\n\n**Scoring Methodologies:**\n*   **Claw-Eval:** The scoring metric is **`pass^3`**, meaning \"all 3 trials must pass\" with a threshold of **0.75** (Document: `lab/docs/benchmarks/claw-eval-leaderboard.md`).\n*   **Custom Function-Call Suite:** The context documents describe the *criteria* for the grader (name accuracy, argument accuracy, structural validity, parallel call accuracy) but **do not explicitly state the specific scoring formula or threshold** used for the custom function-call suite in the provided text. The grader (`function_call.py`) evaluates \"structured tool call accuracy\" based on these specific dimensions (Documents: `protolabs-node/lab/evals/graders/function_call.py`, `lab/evals/graders/function_call.py`).\n\n**Summary of Comparison:**\nWhile both evaluate tool use, Claw-Eval is a broader agent benchmark with a defined `pass^3` scoring method requiring a 0.75 threshold, whereas the custom suite is a targeted set of 8 tests for basic and edge cases that relies on a grader checking specific structural and logical accuracy criteria, though the exact scoring metric for the custom suite is not detailed in the provided context.",
+      "answer_length": 2442,
+      "chunks": 20,
+      "search_ms": 5324,
+      "total_s": 8.64,
+      "chunk_ids": [
+        "protolabs-node/lab/experiments/context-1/hard_queries.yaml::chunk_0",
+        "protolabs-node/lab/docs/research/eval-framework-landscape.md::Our Approach::chunk_0",
+        "lab/docs/research/eval-framework-landscape.md::Our Approach::chunk_0",
+        "lab/docs/benchmarks/claw-eval-leaderboard.md::lab/docs/benchmarks/claw-eval-leaderboard.md::chunk_0",
+        "protolabs-node/lab/evals/docs/references/claw-eval.md::Overview::chunk_0"
+      ]
+    }
+  },
+  {
+    "query": "Which vLLM optimization flags actually improved throughput in benchmarks, and which ones were found to have no measurable impact?",
+    "keyword": {
+      "answer": "The provided context documents do not contain information regarding which specific vLLM optimization flags improved throughput in benchmarks or which ones had no measurable impact.\n\nWhile the document `[protolabs-node/lab/experiments/context-1/hard_queries.yaml::chunk_0]` lists this exact question as a \"Deep lab query\" requiring 2 hops of information, the actual data or results answering this question are not present in the provided text snippets. The other documents contain unrelated information about SymPy, anyio, torch.export, and numba.",
+      "answer_length": 546,
+      "chunks": 20,
+      "search_ms": 2581,
+      "total_s": 3.3,
+      "chunk_ids": [
+        "protolabs-node/quant-env/lib/python3.12/site-packages/sympy/physics/quantum/transforms.py::module-doc::chunk_1",
+        "protolabs-node/tq-env/lib/python3.12/site-packages/sympy/physics/quantum/transforms.py::module-doc::chunk_1",
+        "protolabs-node/tts-env/lib/python3.12/site-packages/sympy/physics/quantum/transforms.py::module-doc::chunk_1",
+        "protolabs-node/vllm-env/lib/python3.12/site-packages/sympy/physics/quantum/transforms.py::module-doc::chunk_1",
+        "protolabs-node/vllm-omni-env/lib/python3.12/site-packages/sympy/physics/quantum/transforms.py::module-doc::chunk_1"
+      ]
+    },
+    "hybrid": {
+      "answer": "The provided context documents do not contain specific information regarding which vLLM optimization flags actually improved throughput in benchmarks or which ones were found to have no measurable impact.\n\nWhile the documents mention the existence of four optimization levels (`-O0`, `-O1`, `-O2`, `-O3`) and describe their general characteristics (e.g., `-O0` offers the fastest startup but lowest performance, while `-O3` is aggressive), they do not provide the specific benchmark results or comparative analysis of their impact on throughput.\n\nOne of the context documents lists this exact question as a \"Hard multi-hop query\" requiring information from multiple repos/sections, indicating that the answer is not present in the provided text snippets.\n\n**Relevant Context:**\n*   `[protolabs-node/lab/experiments/context-1/hard_queries.yaml::chunk_0]`: Lists the question \"Which vLLM optimization flags actually improved throughput in benchmarks, and which ones were found to have no measurable impact?\" as a query requiring 2 hops of information.\n*   `[protolabs-node/vllm-turboquant/docs/design/optimization_levels.md::Overview::chunk_0]` and `[protolabs-node/vllm-turboquant/docs/configuration/optimization.md::Optimization Levels::chunk_0]`: Describe the optimization levels (`-O0` to `-O3`) but do not list specific throughput improvement results.",
+      "answer_length": 1354,
+      "chunks": 20,
+      "search_ms": 2897,
+      "total_s": 4.66,
+      "chunk_ids": [
+        "protolabs-node/quant-env/lib/python3.12/site-packages/sympy/physics/quantum/transforms.py::module-doc::chunk_1",
+        "protolabs-node/vllm-turboquant/docs/benchmarking/README.md::chunk_0",
+        "protolabs-node/tq-env/lib/python3.12/site-packages/sympy/physics/quantum/transforms.py::module-doc::chunk_1",
+        "protolabs-node/vllm-turboquant/benchmarks/auto_tune/README.md::How It Works::chunk_1",
+        "protolabs-node/tts-env/lib/python3.12/site-packages/sympy/physics/quantum/transforms.py::module-doc::chunk_1"
+      ]
+    },
+    "hybrid+rerank": {
+      "answer": "Based on the provided context documents, there is **no information** specifying which specific vLLM optimization flags actually improved throughput in benchmarks or which ones were found to have no measurable impact.\n\nThe documents mention:\n*   **Optimization Levels:** The existence of four levels (`-O0`, `-O1`, `-O2`, `-O3`) that trade off startup time for performance, with `-O0` having the lowest performance and `-O3` being \"Aggressive optimization\" (`[protolabs-node/vllm-turboquant/docs/design/optimization_levels.md::Overview::chunk_0]`, `[protolabs-node/vllm-turboquant/docs/configuration/optimization.md::Optimization Levels::chunk_0]`).\n*   **Performance Tuning:** General advice on tuning parameters like `max-num-batched-tokens` and `max-num-seqs` to improve throughput (`[protolabs-node/vllm-turboquant/benchmarks/auto_tune/README.md::chunk_0]`, `[protolabs-node/vllm-turboquant/docs/getting_started/installation/cpu.md::chunk_0]`).\n*   **Benchmarking Tools:** The existence of benchmark suites and CLI tools (`[protolabs-node/vllm-turboquant/docs/benchmarking/README.md::chunk_0]`).\n\nHowever, none of the provided text contains the specific results of benchmark comparisons identifying which flags were successful or ineffective.",
+      "answer_length": 1245,
+      "chunks": 20,
+      "search_ms": 4927,
+      "total_s": 6.79,
+      "chunk_ids": [
+        "protolabs-node/lab/experiments/context-1/hard_queries.yaml::chunk_0",
+        "protolabs-node/vllm-turboquant/docs/design/optimization_levels.md::Overview::chunk_0",
+        "protolabs-node/vllm-turboquant/docs/configuration/optimization.md::Optimization Levels::chunk_0",
+        "protolabs-node/vllm-turboquant/docs/getting_started/installation/cpu.md::How to do performance tuning for vLLM CPU?::chunk_1",
+        "protolabs-node/vllm-turboquant/benchmarks/auto_tune/README.md::protolabs-node/vllm-turboquant/benchmarks/auto_tune/README.md::chunk_0"
+      ]
+    }
+  },
+  {
+    "query": "What is the relationship between the TurboQuant KV cache experiment and the vector search compression experiments? Do they share any techniques or findings?",
+    "keyword": {
+      "answer": "Based on the provided context documents, there is no information regarding \"vector search compression experiments\" or any relationship between them and the \"TurboQuant KV cache experiment.\"\n\nThe documents mention:\n*   **KV Cache Sharing:** The file `protolabs-node/vllm-turboquant/examples/others/lmcache/README.md` mentions a `kv_cache_sharing_lmcache_v1.py` example that demonstrates how to share KV caches between vLLM v1 instances.\n*   **KV Cache Storage:** Several documents regarding `vllm` and `attention` layers mention that the KV cache is stored inside the class and accessed via `self.kv_cache`.\n*   **Pass Manager:** Documents regarding `torch.fx` mention constructing a `PassManager` without sharing state.\n\nHowever, none of the provided text connects these concepts to vector search compression or details specific findings shared between them. Therefore, I cannot answer the question using the provided context.",
+      "answer_length": 926,
+      "chunks": 20,
+      "search_ms": 2683,
+      "total_s": 3.91,
+      "chunk_ids": [
+        "protolabs-node/rabbit-hole.io/packages/mcp-server/plugins/rabbit-hole/commands/research.md::Step 0: Check the Graph First::chunk_0",
+        "protolabs-node/quant-env/lib/python3.12/site-packages/sympy/physics/optics/utils.py::fresnel_coefficients::chunk_1",
+        "protolabs-node/tq-env/lib/python3.12/site-packages/sympy/physics/optics/utils.py::fresnel_coefficients::chunk_1",
+        "protolabs-node/tts-env/lib/python3.12/site-packages/sympy/physics/optics/utils.py::fresnel_coefficients::chunk_1",
+        "protolabs-node/vllm-env/lib/python3.12/site-packages/sympy/physics/optics/utils.py::fresnel_coefficients::chunk_1"
+      ]
+    },
+    "hybrid": {
+      "answer": "Based on the provided context documents, the TurboQuant KV cache experiment and the vector search compression experiments are directly related through the use of the **TurboQuant algorithm** and **compressed vectors**.\n\n**Shared Techniques and Findings:**\n\n*   **Core Algorithm:** Both experiments utilize the TurboQuant algorithm, described as a \"two-stage vector quantization algorithm for compressing LLM key-value caches\" (`protolabs-node/turboquant-pytorch/README.md::chunk_0`).\n*   **Compression Mechanism:** The experiments share the technique of compressing vectors from FP16 (16-bit) to a 3.5-bit effective representation. This achieves approximately **4.5x compression** (`protolabs-node/lab/experiments/quantize/TURBOQUANT.md::chunk_0`).\n*   **Implementation:** The context indicates a shared codebase or implementation strategy where a `TurboQuantKVCache` acts as a \"drop-in replacement concept for a standard KV cache\" (`protolabs-node/turboquant-pytorch/turboquant.py::chunk_0`).\n*   **Vector Search Integration:** There is a specific script, `turboquant_vector_search.py`, designed to perform \"Search using TurboQuant compressed vectors (batched)\" (`protolabs-node/lab/experiments/quantize/turboquant_vector_search.py::chunk_0`). This suggests the vector search experiments are a direct application or validation of the compression techniques developed for the KV cache.\n*   **Validation:** The TurboQuant implementation was validated on \"synthetic vectors\" before being tested against a real model's KV cache (`protolabs-node/turboquant-pytorch/README.md::chunk_0`). Additionally, the test suite for TurboQuant includes running \"needle-in-haystack retrieval on synthetic vectors\" (`protolabs-node/turboquant-pytorch/README.md::chunk_1`), which is a standard vector search task.\n\nIn summary, the vector search experiments appear to be a method for validating the efficacy of the TurboQuant compression technique (specifically on synthetic data) before or alongside its application to the LLM KV cache.",
+      "answer_length": 2016,
+      "chunks": 20,
+      "search_ms": 2963,
+      "total_s": 5.59,
+      "chunk_ids": [
+        "protolabs-node/rabbit-hole.io/packages/mcp-server/plugins/rabbit-hole/commands/research.md::Step 0: Check the Graph First::chunk_0",
+        "protolabs-node/turboquant-pytorch/README.md::`test_turboquant.py` \u2014 Synthetic Validation::chunk_1",
+        "protolabs-node/quant-env/lib/python3.12/site-packages/sympy/physics/optics/utils.py::fresnel_coefficients::chunk_1",
+        "protolabs-node/lab/experiments/quantize/TURBOQUANT.md::What TurboQuant Does::chunk_0",
+        "protolabs-node/tq-env/lib/python3.12/site-packages/sympy/physics/optics/utils.py::fresnel_coefficients::chunk_1"
+      ]
+    },
+    "hybrid+rerank": {
+      "answer": "Based on the provided context documents, there is **no explicit information** describing a direct relationship, shared techniques, or shared findings between the TurboQuant KV cache experiments and the vector search compression experiments.\n\nThe documents treat them as distinct use cases with different performance characteristics:\n\n*   **TurboQuant KV Cache:** The documents describe TurboQuant as a method to compress LLM key-value caches to enable long context (e.g., 8K tokens) by trading decode speed for capacity. It uses asymmetric attention estimators to compute scores directly from compressed data (Document: `compressors.py::module-doc::chunk_0`, `lab/experiments/quantize/TURBOQUANT.md::What TurboQuant Does::chunk_0`).\n*   **Vector Search:** The documents explicitly state that TurboQuant is **not suitable** for vector search tasks at specific dimensions. One test query and expected answer note: \"TurboQuant is not suitable for vector search at d=768, achieving only 25-50% recall@10 with 4-bit compression\" (Document: `lab/experiments/context-1/test_queries.yaml::chunk_2`).\n*   **Separate Implementation:** While there is a file named `turboquant_vector_search.py` (Document: `protolabs-node/lab/experiments/quantize/turboquant_vector_search.py::turboquant_search::chunk_0`), the context does not explain if this uses the same asymmetric attention techniques as the KV cache or if it shares findings, other than the negative result regarding recall at d=768.\n\nTherefore, the only relationship defined in the text is that the compression technique (TurboQuant) performs poorly for vector search compared to its intended use for KV cache, but the documents do not detail shared underlying techniques or positive findings between the two.",
+      "answer_length": 1753,
+      "chunks": 20,
+      "search_ms": 3632,
+      "total_s": 5.87,
+      "chunk_ids": [
+        "protolabs-node/turboquant-pytorch/README.md::Background::chunk_0",
+        "protolabs-node/turboquant-pytorch/README.md::Module Details::chunk_1",
+        "protolabs-node/turboquant-pytorch/compressors.py::module-doc::chunk_0",
+        "lab/experiments/context-1/test_queries.yaml::chunk_2",
+        "protolabs-node/lab/experiments/context-1/test_queries.yaml::chunk_2"
+      ]
+    }
+  },
+  {
+    "query": "How are secrets managed across the protoLabs nodes, and how does the LiteLLM gateway on the ava node authenticate with vLLM on the protolabs node?",
+    "keyword": {
+      "answer": "Based on the provided context documents, I cannot fully answer the specific technical details regarding how the LiteLLM gateway on the `ava` node authenticates with vLLM on the `protolabs` node.\n\nHowever, the documents do provide the following relevant information:\n\n*   **Secrets Management:** The `protoLabs AI Gateway` documentation states that secrets are managed by **Infisical** across the homelab.\n    *   *Source:* `[lab/infra/gateway/README.md::lab/infra/gateway/README.md::chunk_0]` and `[protolabs-node/lab/infra/gateway/README.md::protolabs-node/lab/infra/gateway/README.md::chunk_0]` (\"...with full tracing via Langfuse and secrets managed by Infisical.\")\n*   **Node Architecture:** The context confirms that `ava` is the AI inference node and that the `protoLabs AI Gateway` routes requests through a single OpenAI-compatible endpoint.\n    *   *Source:* `[protolabs-node/CLAUDE.md::protolabs-node/CLAUDE.md::chunk_0]` (identifies `ava` as the AI inference node) and `[lab/infra/gateway/README.md::lab/infra/gateway/README.md::chunk_0]`.\n*   **The Specific Question:** The exact question you asked appears in the `hard_queries.yaml` file as a target for investigation, but the document does not contain the answer itself.\n    *   *Source:* `[protolabs-node/lab/experiments/context-1/hard_queries.yaml::chunk_1]` (\"- query: 'How are secrets managed across the protoLabs nodes, and how does the LiteLLM gateway on the ava node authenticate with vLLM on the protolabs node?'\")\n\nTherefore, while I can confirm secrets are managed by Infisical, the specific authentication mechanism between the LiteLLM gateway and vLLM is not described in the provided text.",
+      "answer_length": 1666,
+      "chunks": 20,
+      "search_ms": 2677,
+      "total_s": 5.15,
+      "chunk_ids": [
+        "lab/infra/gateway/README.md::lab/infra/gateway/README.md::chunk_0",
+        "protolabs-node/lab/infra/gateway/README.md::protolabs-node/lab/infra/gateway/README.md::chunk_0",
+        "protolabs-node/lab/experiments/context-1/hard_queries.yaml::chunk_1",
+        "protolabs-node/quant-env/lib/python3.12/site-packages/torch/ao/quantization/fx/utils.py::_insert_dequant_stub::chunk_0",
+        "protolabs-node/tq-env/lib/python3.12/site-packages/torch/ao/quantization/fx/utils.py::_insert_dequant_stub::chunk_0"
+      ]
+    },
+    "hybrid": {
+      "answer": "Based on the provided context documents, here is the information regarding secret management and the authentication mechanism:\n\n**Secret Management Across Nodes**\n*   **Centralized Storage:** All secrets are managed centrally using **Infisical**, hosted at `secrets.proto-labs.ai` on the `pve01` node (specifically in container `CT104`) [protolabs-node/lab/docs/architecture/infrastructure.md::Secrets::chunk_0][lab/docs/architecture/infrastructure.md::Secrets::chunk_0][protolabs-node/homelab-iac/docs/infrastructure/architecture.md::Secrets Layer::chunk_0].\n*   **Consumers:** The `secret-management` project in Infisical is consumed by the **Gateway**, **Langfuse**, and **protoClaw** services [protolabs-node/lab/docs/architecture/infrastructure.md::Secrets::chunk_0].\n*   **Injection Method:** Secrets are injected into services using **Machine Identity (Universal Auth)**. Automated injection is handled via `start.sh` wrappers [protolabs-node/lab/docs/architecture/infrastructure.md::Secrets::chunk_0].\n*   **Setup Process:** To set up the gateway, a Machine Identity named `gateway-ava-ai` is created with an Admin role. Universal Auth is enabled, and the Client ID and Client Secret are used during the `./start.sh --setup` command on the `ava-ai` node [protolabs-node/lab/infra/gateway/README.md::First-time Infisical setup::chunk_0].\n*   **Security:** Secrets are never stored in Git; services fetch credentials from Infisical at runtime [protolabs-node/homelab-iac/docs/infrastructure/architecture.md::Secrets Layer::chunk_0].\n\n**Authentication Between LiteLLM Gateway and vLLM**\nThe provided context documents **do not contain specific information** regarding how the LiteLLM gateway on the `ava` node specifically authenticates with vLLM on the `protolabs` node.\n\nWhile the documents confirm that:\n1.  The gateway routes LLM requests through a single OpenAI-compatible endpoint [protolabs-node/lab/infra/gateway/README.md::chunk_0].\n2.  Secrets (including LLM keys) are fetched from Infisical at runtime [protolabs-node/homelab-iac/docs/infrastructure/architecture.md::Secrets Layer::chunk_0].\n3.  The gateway project consumes secrets from Infisical [protolabs-node/lab/docs/architecture/infrastructure.md::Secrets::chunk_0].\n\nThere is no explicit documentation in the provided text describing the specific authentication protocol (e.g., API keys, mTLS, internal tokens) used for the inter-service communication between the gateway and the vLLM backend.",
+      "answer_length": 2467,
+      "chunks": 20,
+      "search_ms": 2939,
+      "total_s": 6.46,
+      "chunk_ids": [
+        "protolabs-node/lab/infra/gateway/README.md::protolabs-node/lab/infra/gateway/README.md::chunk_0",
+        "lab/infra/gateway/README.md::lab/infra/gateway/README.md::chunk_0",
+        "protolabs-node/lab/experiments/context-1/hard_queries.yaml::chunk_1",
+        "protolabs-node/protoMaker/docs/self-hosting/secrets.md::protolabs-node/protoMaker/docs/self-hosting/secrets.md::chunk_0",
+        "protolabs-node/lab/docs/architecture/infrastructure.md::Secrets::chunk_0"
+      ]
+    },
+    "hybrid+rerank": {
+      "answer": "Based on the provided context documents, here is the information regarding secret management and the specific authentication between the LiteLLM gateway and vLLM:\n\n**Secret Management Across Nodes**\n*   **Centralized System:** All secrets are managed via **Infisical**, which is self-hosted in an LXC container (CT104) on the `pve01` node at `secrets.proto-labs.ai`.\n*   **Security:** No secrets are committed to the repository; all services fetch credentials from Infisical at runtime.\n*   **Authentication Mechanism:** The system uses **Machine Identity (Universal Auth)** for automated injection. Services use `start.sh` wrappers to inject secrets.\n*   **Specific Setup:** For the AI Gateway, a Machine Identity named `gateway-ava-ai` is created with Admin role. Universal Auth is enabled, and the Client ID and Client Secret are used during the `./start.sh --setup` process on the `ava-ai` node to authenticate with Infisical.\n\n**LiteLLM Gateway Authentication with vLLM**\nThe provided context documents **do not contain information** regarding how the LiteLLM gateway on the `ava` node specifically authenticates with vLLM on the `protolabs` node.\n\nWhile the documents confirm that:\n1.  The **protoLabs AI Gateway** (running on `ava`) is a LiteLLM proxy on port 4000.\n2.  The Gateway manages secrets (including LLM keys) via Infisical.\n3.  The Gateway routes LLM requests.\n\nThere is no explicit description of the internal authentication protocol or credentials used for the specific communication link between the LiteLLM gateway and the vLLM instance on the `protolabs` node.\n\n**Relevant Documents:**\n*   `protolabs-node/lab/experiments/context-1/hard_queries.yaml` (Lists the question but does not provide the answer).\n*   `homelab-iac/docs/infrastructure/secrets.md`\n*   `protolabs-node/lab/docs/architecture/infrastructure.md`\n*   `protolabs-node/lab/infra/gateway/README.md`\n*   `homelab-iac/docs/infrastructure/architecture.md`",
+      "answer_length": 1939,
+      "chunks": 20,
+      "search_ms": 4851,
+      "total_s": 7.65,
+      "chunk_ids": [
+        "protolabs-node/protoMaker/docs/self-hosting/secrets.md::protolabs-node/protoMaker/docs/self-hosting/secrets.md::chunk_0",
+        "protolabs-node/lab/experiments/context-1/hard_queries.yaml::chunk_1",
+        "protolabs-node/homelab-iac/docs/infrastructure/secrets.md::Overview::chunk_0",
+        "homelab-iac/docs/infrastructure/secrets.md::Overview::chunk_0",
+        "homelab-iac/README.md::Secrets::chunk_0"
+      ]
+    }
+  },
+  {
+    "query": "What services run on each node in the protoLabs homelab, and how do they communicate with each other?",
+    "keyword": {
+      "answer": "Based on the provided context documents, there is **no information** regarding the specific services that run on each node in the protoLabs homelab or how those services communicate with each other.\n\nThe documents contain snippets related to:\n*   **Distributed training setup:** Mentions that \"Ray Train sets up the necessary coordinator processes and environment variables for your workers to communicate with each other\" for XGBoost and LightGBM training (Documents: `xgboost_trainer.py`, `lightgbm_trainer.py`).\n*   **Subagents:** Describes them as isolated AI instances that \"return results to the caller\" (Document: `agent-systems-best-practices.md`).\n*   **NIXL connectors:** Mentions backend availability depending on the build (Document: `nixl_connector_usage.md`).\n*   **Code testing and configuration:** Snippets from `numba` and `opentelemetry` libraries regarding argument handling and context propagation.\n\nNone of these snippets describe the overall architecture, node services, or communication protocols of the protoLabs homelab itself.",
+      "answer_length": 1052,
+      "chunks": 20,
+      "search_ms": 2894,
+      "total_s": 4.26,
+      "chunk_ids": [
+        "protolabs-node/vllm-env/lib/python3.12/site-packages/ray/train/v2/xgboost/xgboost_trainer.py::XGBoostTrainer::chunk_2",
+        "protolabs-node/vllm-env/lib/python3.12/site-packages/ray/train/xgboost/v2.py::XGBoostTrainer::chunk_2",
+        "protolabs-node/vllm-env/lib/python3.12/site-packages/ray/train/xgboost/xgboost_trainer.py::_xgboost_train_fn_per_worker::chunk_2",
+        "protolabs-node/mythxengine/docs/research/agent-systems-best-practices.md::1.4 Subagents::chunk_0",
+        "protolabs-node/vllm-turboquant/docs/features/nixl_connector_usage.md::Example: using LIBFABRIC backend::chunk_1"
+      ]
+    },
+    "hybrid": {
+      "answer": "Based on the provided context documents, here is the breakdown of services running on each node and their communication methods:\n\n**Node Services:**\n*   **pve01:** Runs the Proxmox control plane, including Infisical, Grafana, Prometheus, and CI runners.\n*   **ava (A6000):** Functions as an AI gateway (LiteLLM + Langfuse), a media platform, and runs vLLM (Qwen3.5-9B).\n*   **protolabs (this machine):** Handles AI inference and experiments, running Blackwell GPU, vLLM, and the lab monorepo.\n*   **pi:** Runs Home Assistant OS.\n\n**Communication:**\n*   All nodes are connected via **Tailscale MagicDNS**.\n*   Additionally, the **pi** node (Home Assistant) is specifically noted as being connected to the lab via a **Tailscale mesh**.\n*   The **protoLabs** instance also uses **Discord** as a real-time coordination layer for development teams (specifically for multi-instance topology coordination).\n\n*Source: [protolabs-node/CLAUDE.md::Infrastructure Context::chunk_0], [protolabs-node/homelab-iac/docs/infrastructure/home-assistant.md::chunk_0], [protolabs-node/protoMaker/docs/integrations/discord.md::chunk_0]*",
+      "answer_length": 1114,
+      "chunks": 20,
+      "search_ms": 2624,
+      "total_s": 4.38,
+      "chunk_ids": [
+        "protolabs-node/protoMaker/docs/self-hosting/ci-cd.md::protolabs-node/protoMaker/docs/self-hosting/ci-cd.md::chunk_0",
+        "protolabs-node/vllm-env/lib/python3.12/site-packages/ray/train/v2/xgboost/xgboost_trainer.py::XGBoostTrainer::chunk_2",
+        "protolabs-node/homelab-iac/.claude/agents/homelab.md::protolabs-node/homelab-iac/.claude/agents/homelab.md::chunk_0",
+        "protolabs-node/vllm-env/lib/python3.12/site-packages/ray/train/xgboost/v2.py::XGBoostTrainer::chunk_2",
+        "protolabs-node/homelab-iac/docs/infrastructure/home-assistant.md::protolabs-node/homelab-iac/docs/infrastructure/home-assistant.md::chunk_0"
+      ]
+    },
+    "hybrid+rerank": {
+      "answer": "Based on the provided context documents, here is the breakdown of services running on each node and their communication method:\n\n**Node Services:**\n*   **pve01:** Runs the Proxmox control plane, including Infisical, Grafana, Prometheus, and CI runners.\n*   **ava (A6000):** Functions as an AI gateway (LiteLLM + Langfuse), a media platform, and runs vLLM (Qwen3.5-9B).\n*   **protolabs (this machine):** Handles AI inference and experiments, running Blackwell GPU, vLLM, and the lab monorepo.\n*   **pi:** Runs Home Assistant.\n\n**Communication:**\nAll nodes are connected via **Tailscale MagicDNS**.\n\n*Sources:*\n*   `[protolabs-node/CLAUDE.md::Infrastructure Context::chunk_0]`\n*   `[protolabs-node/homelab-iac/docs/infrastructure/home-assistant.md::protolabs-node/homelab-iac/docs/infrastructure/home-assistant.md::chunk_0]`",
+      "answer_length": 822,
+      "chunks": 20,
+      "search_ms": 7507,
+      "total_s": 8.95,
+      "chunk_ids": [
+        "protolabs-node/CLAUDE.md::Infrastructure Context::chunk_0",
+        "protolabs-node/protoMaker/docs/self-hosting/systemd.md::protolabs-node/protoMaker/docs/self-hosting/systemd.md::chunk_0",
+        "protolabs-node/protoMaker/docs/self-hosting/ci-cd.md::protolabs-node/protoMaker/docs/self-hosting/ci-cd.md::chunk_0",
+        "protolabs-node/protoMaker/docs/self-hosting/architecture.md::protolabs-node/protoMaker/docs/self-hosting/architecture.md::chunk_0",
+        "protolabs-node/homelab-iac/docs/infrastructure/home-assistant.md::protolabs-node/homelab-iac/docs/infrastructure/home-assistant.md::chunk_0"
+      ]
+    }
+  },
+  {
+    "query": "What training experiments have been set up for Qwen models in the lab, and what base models and datasets were used?",
+    "keyword": {
+      "answer": "The provided context documents do not contain information regarding the specific training experiments set up for Qwen models, nor do they list the base models or datasets used for these experiments.\n\nWhile the context includes a query template asking \"What training experiments have been set up for Qwen models in the lab, and what base models and datasets were used?\" within the file `protolabs-node/lab/experiments/context-1/hard_queries.yaml`, it does not provide the actual answers or data associated with that query. Other documents mention general distributed training capabilities (e.g., up to 2.7B parameters) or specific model registries, but none detail the Qwen experiments.",
+      "answer_length": 685,
+      "chunks": 20,
+      "search_ms": 2883,
+      "total_s": 3.75,
+      "chunk_ids": [
+        "protolabs-node/tts-env/lib/python3.12/site-packages/pandas/core/internals/array_manager.py::_make_na_array::chunk_0",
+        "protolabs-node/vllm-env/lib/python3.12/site-packages/pandas/core/internals/array_manager.py::_make_na_array::chunk_0",
+        "protolabs-node/vllm-omni-env/lib/python3.12/site-packages/pandas/core/internals/array_manager.py::_make_na_array::chunk_0",
+        "protolabs-node/quant-env/lib/python3.12/site-packages/aiohttp/web_exceptions.py::HTTPException::chunk_0",
+        "protolabs-node/tq-env/lib/python3.12/site-packages/aiohttp/web_exceptions.py::HTTPException::chunk_0"
+      ]
+    },
+    "hybrid": {
+      "answer": "Based on the provided context documents, the following information is available regarding training experiments for Qwen models:\n\n*   **Experiment Setup:** The `LabBenchTool` is used to \"Run autonomous training experiments on tiny Qwen models\" ([protolabs-node/protoResearcher/tools/lab_bench.py::LabBenchTool::chunk_0], [protoResearcher/tools/lab_bench.py::LabBenchTool::chunk_0]).\n*   **Methodology:** These experiments utilize **LLaMA-Factory** with **LoRA DPO training** on a local GPU. The workflow involves initializing, editing the configuration, running the experiment, and then deciding to keep or discard the results before repeating ([protolabs-node/protoResearcher/tools/lg_tools.py::lab_bench::chunk_0], [protoResearcher/tools/lg_tools.py::lab_bench::chunk_0]).\n*   **Base Models:** The context mentions \"tiny Qwen models\" generally but does not specify exact base model versions used for these specific experiments, other than referencing `Qwen2-7B-beta` in the context of configuration defaults for the Qwen2 model ([protolabs-node/vllm-omni-env/lib/python3.12/site-packages/transformers/models/qwen2/configuration_qwen2.py::chunk_3]).\n*   **Datasets:** The provided documents **do not contain information** regarding the specific datasets used for these training experiments.\n\nIn summary, the lab has set up autonomous training experiments for tiny Qwen models using LLaMA-Factory and LoRA DPO, but the specific datasets and exact base model versions are not detailed in the provided text.",
+      "answer_length": 1504,
+      "chunks": 20,
+      "search_ms": 2651,
+      "total_s": 4.69,
+      "chunk_ids": [
+        "protolabs-node/lab/experiments/context-1/hard_queries.yaml::chunk_1",
+        "protolabs-node/tts-env/lib/python3.12/site-packages/pandas/core/internals/array_manager.py::_make_na_array::chunk_0",
+        "protolabs-node/protoResearcher/tools/lab_bench.py::LabBenchTool::chunk_0",
+        "protolabs-node/vllm-env/lib/python3.12/site-packages/pandas/core/internals/array_manager.py::_make_na_array::chunk_0",
+        "protoResearcher/tools/lab_bench.py::LabBenchTool::chunk_0"
+      ]
+    },
+    "hybrid+rerank": {
+      "answer": "Based on the provided context documents, the following training experiments have been set up for Qwen models in the lab:\n\n**Experiment Type and Workflow**\n*   **Autonomous Training:** The lab uses a tool called `LabBenchTool` (or `lab_bench`) to run autonomous training experiments on tiny Qwen models.\n*   **Methodology:** The workflow involves initializing experiments, editing configurations, running training, and then deciding to keep or discard results.\n*   **Training Framework:** The experiments utilize **LLaMA-Factory** with **LoRA DPO** (Direct Preference Optimization) training on local GPUs.\n\n**Specific Experiment Configuration**\nA specific DPO fine-tuning experiment is defined in the configuration file `dpo_qwen_0.8b/config.yaml`:\n*   **Base Model:** `Qwen/Qwen3.5-0.8B` (Qwen3.5-0.8B).\n*   **Training Stage:** DPO (`stage: dpo`).\n*   **Finetuning Type:** LoRA (`finetuning_type: lora`) with `lora_target: all`, `lora_rank: 32`, and `lora_alpha: 64`.\n*   **Dataset:** The experiment uses the `wildbench_dpo_9b` dataset located in the `{lab_data}` directory.\n*   **Template:** The configuration uses the `qwen3` template.\n\n**Additional Model Inventory for Training**\nThe lab's model inventory (`/mnt/models`) lists the following Qwen models specifically designated for training:\n*   **Qwen 2B BF16:** Used for training (noted as having \"5/5 reasoning!\").\n*   **Qwen 0.8B BF16:** Used for training.\n*   **Base Models:** The 0.8B, 2B, and 4B base models are also downloaded for pretraining purposes.\n\n**References:**\n*   `protolabs-node/lab/experiments/context-1/hard_queries.yaml` (Query: \"What training experiments have been set up for Qwen models in the lab, and what base models and datasets were used?\")\n*   `protolabs-node/protoResearcher/tools/lab_bench.py::LabBenchTool`\n*   `protoResearcher/tools/lg_tools.py::lab_bench`\n*   `protolabs-node/protoResearcher/lab/templates/dpo_qwen_0.8b/config.yaml`\n*   `protolabs-node/lab/CLAUDE.md::Model Inventory`",
+      "answer_length": 1972,
+      "chunks": 20,
+      "search_ms": 5476,
+      "total_s": 8.72,
+      "chunk_ids": [
+        "protolabs-node/lab/experiments/context-1/hard_queries.yaml::chunk_1",
+        "protolabs-node/protoResearcher/tools/lg_tools.py::lab_bench::chunk_0",
+        "protoResearcher/tools/lg_tools.py::lab_bench::chunk_0",
+        "protolabs-node/protoResearcher/tools/lab_bench.py::LabBenchTool::chunk_0",
+        "protoResearcher/tools/lab_bench.py::LabBenchTool::chunk_0"
+      ]
+    }
+  },
+  {
+    "query": "Compare the voice agent experiment and the TTS comparison experiment \u2014 what models were tested and what were the findings?",
+    "keyword": {
+      "answer": "Based on the provided context documents, I cannot answer your question about the specific models tested or the findings of the voice agent experiment and the TTS comparison experiment.\n\nWhile the document `protolabs-node/lab/experiments/context-1/hard_queries.yaml` lists the query \"Compare the voice agent experiment and the TTS comparison experiment \u2014 what models were tested and what were the findings?\" as a test case with a difficulty of 2, the document itself does not contain the answers or the experimental data.\n\nThe only information available regarding the TTS comparison experiment is found in `lab/experiments/tts-compare/README.md` and `protolabs-node/lab/experiments/tts-compare/README.md`, which state:\n> \"A/B/C comparison of three text-to-speech models \u2014 same text, side-by-side playback with latency and RTF metrics.\"\n\nNo details regarding the specific models used or the results/findings are provided in the context.",
+      "answer_length": 934,
+      "chunks": 20,
+      "search_ms": 2555,
+      "total_s": 3.76,
+      "chunk_ids": [
+        "lab/experiments/tts-compare/README.md::lab/experiments/tts-compare/README.md::chunk_0",
+        "protolabs-node/lab/experiments/tts-compare/README.md::protolabs-node/lab/experiments/tts-compare/README.md::chunk_0",
+        "lab/evals/graders/outcome.py::module-doc::chunk_0",
+        "protolabs-node/lab/evals/graders/outcome.py::module-doc::chunk_0",
+        "protolabs-node/quant-env/lib/python3.12/site-packages/compressed_tensors/compressors/dense/base.py::DenseCompressor::chunk_0"
+      ]
+    },
+    "hybrid": {
+      "answer": "Based on the provided context documents, here is the comparison between the **Voice Agent** experiment and the **TTS Compare** experiment:\n\n### 1. Voice Agent Experiment\n*   **Models Tested:**\n    *   **STT:** Whisper Turbo (specifically Whisper large-v3-turbo or distil-large-v3 in the broader experiment list).\n    *   **LLM:** Qwen 4B.\n    *   **TTS:** Kokoro 82M (referred to as \"Kokoro TTS\" or \"TTS chunked\").\n    *   **VAD:** Silero VAD.\n    *   *Source:* `lab/experiments/voice-agent/README.md`, `protolabs-node/lab/experiments/voice-agent/README.md`, `protolabs-node/protoVoice/app.py`.\n*   **Findings/Performance:**\n    *   The system is a real-time conversational voice agent designed to operate on a Blackwell GPU.\n    *   **Latency Breakdown:** Mic (~1ms) \u2192 Silero VAD (~1ms) \u2192 Whisper Turbo STT (~55ms) \u2192 Qwen 4B LLM streaming (~150ms) \u2192 TTS chunked (~95ms).\n    *   **Total Performance:** The `protoVoice` implementation achieved a Time To First Audio (TTFA) of **165ms** and a total latency of **210ms** on an RTX PRO 6000 Blackwell.\n    *   **Goal:** To provide spoken responses in under 1 second (<1s).\n    *   *Source:* `lab/experiments/voice-agent/README.md`, `protolabs-node/protoVoice/app.py`.\n\n### 2. TTS Compare Experiment\n*   **Models Tested:**\n    *   The experiment is described as an \"A/B/C comparison of three text-to-speech models.\"\n    *   **Specific Models:** The provided text **does not explicitly name** the three specific TTS models being compared in the `tts-compare` experiment itself.\n    *   *Note:* While the `fish-speech` documentation mentions benchmark results for \"S2\" (Fish Speech) comparing it against **Seed-TTS** and **MiniMax-Speech**, the context does not explicitly state that these specific models were the ones used in the `tts-compare` experiment folder, only that the experiment compares \"three text-to-speech models.\"\n    *   *Source:* `lab/experiments/tts-compare/README.md`, `protolabs-node/lab/experiments/README.md`.\n*   **Findings/Performance:**\n    *   **Metrics:** The experiment measures **latency** and **RTF (Real-Time Factor)** metrics.\n    *   **Methodology:** It uses the same text for side-by-side playback.\n    *   **Specific Results:** The provided context **does not contain the specific findings or latency/RTF results** for the `tts-compare` experiment.\n    *   *Source:* `lab/experiments/tts-compare/README.md`.\n\n### Summary of Differences\n*   **Voice Agent** focuses on an integrated pipeline (STT + LLM + TTS) with specific latency targets (<1s total response time) using Whisper Turbo, Qwen 4B, and Kokoro.\n*   **TTS Compare** focuses on isolating and comparing three different TTS models based on latency and RTF, but the specific models and their comparative results are not detailed in the provided text.",
+      "answer_length": 2786,
+      "chunks": 20,
+      "search_ms": 2580,
+      "total_s": 6.93,
+      "chunk_ids": [
+        "lab/experiments/tts-compare/README.md::lab/experiments/tts-compare/README.md::chunk_0",
+        "protolabs-node/lab/experiments/tts-compare/README.md::protolabs-node/lab/experiments/tts-compare/README.md::chunk_0",
+        "protolabs-node/lab/experiments/README.md::Active Experiments::chunk_3",
+        "lab/experiments/README.md::Active Experiments::chunk_3",
+        "lab/experiments/voice-agent/README.md::lab/experiments/voice-agent/README.md::chunk_0"
+      ]
+    },
+    "hybrid+rerank": {
+      "answer": "Based on the provided context documents, here is the comparison between the **Voice Agent** and **TTS Compare** experiments:\n\n### **Models Tested**\n\n*   **Voice Agent Experiment:**\n    *   **Silero VAD:** Used for voice activity detection (~1ms latency).\n    *   **Whisper Turbo:** Used for Speech-to-Text (STT) (~55ms latency).\n    *   **Qwen 4B:** Used as the streaming LLM (~150ms latency).\n    *   **Kokoro TTS (82M):** Used for Text-to-Speech (~50ms\u201395ms latency depending on the specific README version).\n    *   *Source:* `lab/experiments/voice-agent/README.md`, `protolabs-node/protoVoice/app.py`, `lab/experiments/README.md`, `protolabs-node/lab/experiments/README.md`.\n\n*   **TTS Compare Experiment:**\n    *   The documents state this experiment performs an \"A/B/C comparison of three text-to-speech models\" using the same text for side-by-side playback.\n    *   *Specific models tested in this experiment are not explicitly named in the provided text snippets*, though the experiment is designed to compare latency and RTF (Real-Time Factor) metrics.\n    *   *Note:* Other documents mention **Fish-Speech** and **Seed-TTS** in the context of benchmark results (Audio Turing Test scores), but the specific TTS Compare experiment description does not list which of these (or others) are included in its specific A/B/C comparison.\n    *   *Source:* `lab/experiments/tts-compare/README.md`, `protolabs-node/lab/experiments/tts-compare/README.md`, `lab/experiments/README.md`.\n\n### **Findings and Metrics**\n\n*   **Voice Agent Findings:**\n    *   **Performance:** Achieved a **165ms Time-to-First-Audio (TTFA)** and **210ms end-to-end** latency on an RTX PRO 6000 Blackwell GPU.\n    *   **Goal:** Demonstrated a \"sub-200ms real-time voice agent\" capable of spoken responses faster than human conversational turn-taking with \"zero cold start\" (all models pre-warmed).\n    *   *Source:* `protolabs-node/protoVoice/app.py`, `protolabs-node/protoVoice/README.md`.\n\n*   **TTS Compare Findings:**\n    *   **Methodology:** The experiment allows for side-by-side playback of three models to compare **latency** and **RTF metrics**.\n    *   **Specific Results:** The provided text does not contain the specific numerical findings or the winner of the TTS Compare experiment, only its purpose and configuration.\n    *   *Source:* `lab/experiments/tts-compare/README.md`.\n\n### **Shared Techniques**\n*   Both experiments utilize **Whisper Turbo** for speech-to-text (in the voice agent) or are part of a broader lab infrastructure that supports STT comparisons (`stt-whisper` experiment).\n*   Both experiments rely on **FastRTC/WebRTC** streaming capabilities (explicitly mentioned for the voice agent) to handle real-time audio.\n*   Both are part of the `lab/experiments` directory structure and are run via `uv run python`.",
+      "answer_length": 2818,
+      "chunks": 20,
+      "search_ms": 4612,
+      "total_s": 8.73,
+      "chunk_ids": [
+        "protolabs-node/lab/experiments/context-1/hard_queries.yaml::chunk_1",
+        "lab/experiments/voice-agent/README.md::lab/experiments/voice-agent/README.md::chunk_0",
+        "protolabs-node/protoVoice/app.py::chunk_0",
+        "protolabs-node/lab/experiments/voice-agent/README.md::protolabs-node/lab/experiments/voice-agent/README.md::chunk_0",
+        "protolabs-node/lab/experiments/README.md::Active Experiments::chunk_3"
+      ]
+    }
+  },
+  {
+    "query": "What is the claw-eval scoring system and how are tasks graded?",
+    "keyword": {
+      "answer": "The provided context documents do not contain information about the \"claw-eval scoring system\" or how tasks are graded. The documents cover topics such as application information architecture, documentation standards, custom progress reporters, NIXL backends, pooling tasks, CMake presets, linear equation solving, and data model testing, but none mention claw-eval.",
+      "answer_length": 366,
+      "chunks": 20,
+      "search_ms": 2542,
+      "total_s": 3.04,
+      "chunk_ids": [
+        "protolabs-node/mythxengine/handoffs/024-app-layout-information-architecture.md::Overview/Summary::chunk_0",
+        "protolabs-node/protoMaker/docs/internal/dev/docs-standard.md::protolabs-node/protoMaker/docs/internal/dev/docs-standard.md::chunk_0",
+        "protolabs-node/vllm-env/lib/python3.12/site-packages/ray/rllib/examples/ray_tune/custom_progress_reporter.py::module-doc::chunk_2",
+        "protolabs-node/vllm-turboquant/docs/features/nixl_connector_usage.md::Example: using LIBFABRIC backend::chunk_1",
+        "protolabs-node/vllm-env/lib/python3.12/site-packages/vllm/v1/worker/gpu/pool/pooling_runner.py::chunk_1"
+      ]
+    },
+    "hybrid": {
+      "answer": "Based on the provided documents, here is the information regarding the Claw-Eval scoring system and task grading:\n\n**Overall Scoring Metric**\nThe primary metric used for the benchmark is **`pass^3`**, which requires that all 3 trials of a task must pass to count as a success. The threshold for this metric is **0.75** (as noted in the leaderboard documentation).\n\n**Task-Specific Grading**\nGrading is performed using specific `grader.py` files for individual tasks. The documents provide a detailed example of how **Task T92 (Pinbench Daily Research Brief)** is graded, which illustrates the general approach:\n\n*   **Tool Usage Scoring:** The grader checks for specific tool calls (e.g., `rss_list_articles` and `rss_get_article`). The score is calculated based on the frequency of these calls relative to expected counts.\n*   **Keyword Hits:** The system checks the final assistant text for specific keywords (e.g., \"executive summary\", \"follow-up\", \"action\", \"recommendation\", \"next step\").\n*   **Structure:** It analyzes the text for section headings (using regex to find `#` markers). A score of 1.0 is given if there are 3 or more headings, 0.5 for 1 or more, and 0.0 otherwise.\n*   **Word Count:** The ideal word count is 500\u2013800 words. Scores are 1.0 for this range, 0.7 for 400\u2013499 or 801\u20131000, and 0.4 otherwise.\n*   **Length Threshold:** A binary score is applied based on whether the total text length is at least 2000 characters.\n*   **Final Calculation:** These components are combined into a weighted `completion` score (e.g., 30% tool usage, 25% keywords, 20% structure, 15% word count, 10% length).\n*   **Additional Metrics:** The grader also calculates `robustness` and `efficiency_turns` (counting assistant messages).\n\n**General Evaluation Metrics**\nWhen running full evaluation sweeps, the following key metrics are captured to assess agent performance:\n*   **`pass^3` rate:** Agent reliability.\n*   **Function call accuracy:** Tool use correctness.\n*   **RAG faithfulness:** Hallucination rate.\n*   **Average wall time per trial:** Speed.\n*   **Tokens per task:** Cost efficiency.\n\n**Benchmark Scope**\nClaw-Eval is a 104-task benchmark designed for evaluating LLMs as autonomous agents in personal assistant scenarios, utilizing Docker sandboxes and 15 services for robust grading.",
+      "answer_length": 2303,
+      "chunks": 20,
+      "search_ms": 2784,
+      "total_s": 8.83,
+      "chunk_ids": [
+        "protolabs-node/mythxengine/handoffs/024-app-layout-information-architecture.md::Overview/Summary::chunk_0",
+        "lab/docs/benchmarks/claw-eval-leaderboard.md::lab/docs/benchmarks/claw-eval-leaderboard.md::chunk_0",
+        "protolabs-node/protoMaker/docs/internal/dev/docs-standard.md::protolabs-node/protoMaker/docs/internal/dev/docs-standard.md::chunk_0",
+        "protolabs-node/lab/evals/docs/references/claw-eval.md::Overview::chunk_0",
+        "protolabs-node/vllm-env/lib/python3.12/site-packages/ray/rllib/examples/ray_tune/custom_progress_reporter.py::module-doc::chunk_2"
+      ]
+    },
+    "hybrid+rerank": {
+      "answer": "Based on the provided documents, the Claw-Eval scoring system and task grading process are defined as follows:\n\n**Primary Evaluation Metric: Pass^3**\n*   **Definition:** To eliminate \"lucky runs,\" a model must consistently pass a task across **three independent trials** ($N=3$) to earn a success credit.\n*   **Strict Criterion:** A task is only marked as passed if the model meets the success criteria in **all three runs**.\n*   **Thresholds:** Some specific leaderboards (e.g., for tasks T02, T04, T06, T08) specify a threshold of **0.75** for the pass^3 metric.\n\n**Task-Specific Grading Logic**\nGrading is performed using specific grader classes (e.g., `PinbenchDailyResearchBriefGrader`, `PinbenchProjectAlphaSummaryGrader`) that calculate a `completion` score based on weighted criteria. Examples of grading components include:\n\n*   **Tool Usage:** Scores are assigned based on the correct usage of specific tools (e.g., `rss_list_articles`, `rss_get_article`, `gmail_get_message`).\n    *   *Example:* In the `T92` task, tool score is calculated as the average of `rss_list_articles` usage (max 1) and `rss_get_article` usage (max 3).\n*   **Keyword Hits:** The presence of required keywords (e.g., \"executive summary\", \"follow-up\", \"action\") in the final text.\n*   **Structure:** Scoring based on the number of section headings (e.g., requiring at least 3 headings for a full score).\n*   **Content Requirements:**\n    *   *Word Count:* Ideal ranges (e.g., 500\u2013800 words) receive full points; deviations receive partial points.\n    *   *Specific Data:* Checks for specific numbers, dates, or phrases (e.g., \"340k\", \"May 6\", \"security\", \"cross-tenant\").\n    *   *Required Sections:* Presence of specific sections (e.g., \"overview\", \"timeline\", \"risk\").\n*   **Negative Constraints:** Penalizing the inclusion of specific unwanted phrases (e.g., \"team appreciation lunch\" must not be present).\n\n**Additional Metrics Captured**\nBeyond the primary pass/fail status, the evaluation captures:\n*   **Function call accuracy:** Tool use correctness.\n*   **RAG faithfulness:** Hallucination rate.\n*   **Average wall time per trial:** Speed.\n*   **Tokens per task:** Cost efficiency.\n*   **Efficiency turns:** Count of assistant messages.\n*   **Robustness:** Computed based on dispatches.\n\n**Integration**\nScores are attached to traces to enable an \"eval flywheel\" (production traces \u2192 failing traces \u2192 datasets \u2192 experiments), often integrated with systems like Langfuse or using LLM-as-Judge graders with clear rubrics.",
+      "answer_length": 2513,
+      "chunks": 20,
+      "search_ms": 7455,
+      "total_s": 11.23,
+      "chunk_ids": [
+        "protolabs-node/lab/evals/docs/references/claw-eval.md::Overview::chunk_0",
+        "lab/evals/docs/references/claw-eval.md::Overview::chunk_0",
+        "protolabs-node/lab/evals/claw/claw-eval/README.md::Leaderboard::chunk_0",
+        "lab/evals/claw/claw-eval/README.md::Leaderboard::chunk_0",
+        "lab/docs/benchmarks/claw-eval-leaderboard.md::lab/docs/benchmarks/claw-eval-leaderboard.md::chunk_0"
+      ]
+    }
+  },
+  {
+    "query": "How does the vllm-swap.sh script handle graceful model swapping?",
+    "keyword": {
+      "answer": "The provided context documents do not contain information about a `vllm-swap.sh` script or how it handles graceful model swapping. The documents mention `vllm-env` and functions related to model request IDs or compilation handling in `diffusers`, but they do not describe the specific script or its swapping logic.",
+      "answer_length": 314,
+      "chunks": 20,
+      "search_ms": 2732,
+      "total_s": 3.19,
+      "chunk_ids": [
+        "protolabs-node/tq-env/lib/python3.12/site-packages/scipy/special/tests/test_nan_inputs.py::module-doc::chunk_0",
+        "protolabs-node/tts-env/lib/python3.12/site-packages/scipy/special/tests/test_nan_inputs.py::module-doc::chunk_0",
+        "protolabs-node/vllm-env/lib/python3.12/site-packages/scipy/special/tests/test_nan_inputs.py::module-doc::chunk_0",
+        "protolabs-node/vllm-omni-env/lib/python3.12/site-packages/scipy/special/tests/test_nan_inputs.py::module-doc::chunk_0",
+        "protolabs-node/tq-env/lib/python3.12/site-packages/numba/core/base.py::call_internal_no_propagate::chunk_0"
+      ]
+    },
+    "hybrid": {
+      "answer": "Based on the provided context documents, the `vllm-swap.sh` script handles graceful model swapping by performing the following steps:\n\n1.  **Gracefully stops vLLM**: It initiates a graceful shutdown of the currently running vLLM service.\n2.  **Waits for port release**: It pauses execution until the network port previously used by vLLM is released.\n3.  **Starts new model**: Once the port is free, it starts the new model specified as an argument (e.g., `./vllm-swap.sh <model-name>`).\n\nThis process is described in the usage comments found in the script files (e.g., `protolabs-node/vllm-swap.sh`, `lab/models/vllm-swap.sh`).",
+      "answer_length": 627,
+      "chunks": 20,
+      "search_ms": 2542,
+      "total_s": 3.57,
+      "chunk_ids": [
+        "protolabs-node/tq-env/lib/python3.12/site-packages/scipy/special/tests/test_nan_inputs.py::module-doc::chunk_0",
+        "protolabs-node/vllm-swap.sh::chunk_0",
+        "protolabs-node/tts-env/lib/python3.12/site-packages/scipy/special/tests/test_nan_inputs.py::module-doc::chunk_0",
+        "protolabs-node/lab/models/vllm-swap.sh::chunk_0",
+        "protolabs-node/vllm-env/lib/python3.12/site-packages/scipy/special/tests/test_nan_inputs.py::module-doc::chunk_0"
+      ]
+    },
+    "hybrid+rerank": {
+      "answer": "Based on the provided context documents, the `vllm-swap.sh` script handles graceful model swapping by performing the following steps:\n\n1.  **Gracefully stops vLLM:** The script initiates a graceful shutdown of the currently running vLLM instance.\n2.  **Waits for port release:** After stopping the service, the script waits to ensure the network port is released before proceeding.\n3.  **Starts the new model:** Once the port is free, the script starts the new model specified as an argument (e.g., `./vllm-swap.sh <model-name>`).\n\nThis process is described in the usage comments found in the script files:\n*   `protolabs-node/vllm-swap.sh::chunk_0`\n*   `protolabs-node/lab/models/vllm-swap.sh::chunk_0`\n*   `lab/models/vllm-swap.sh::chunk_0`\n\nAll state these comments explicitly: \"Gracefully stops vLLM, waits for port release, starts new model.\"",
+      "answer_length": 847,
+      "chunks": 20,
+      "search_ms": 7429,
+      "total_s": 8.86,
+      "chunk_ids": [
+        "protolabs-node/vllm-swap.sh::chunk_0",
+        "protolabs-node/lab/models/vllm-swap.sh::chunk_0",
+        "lab/models/vllm-swap.sh::chunk_0",
+        "protolabs-node/CLAUDE.md::Swap vLLM models (graceful stop, port release, start new model)::chunk_0",
+        "protolabs-node/lab/evals/docs/runbooks/model-comparison.md::When to Use::chunk_0"
+      ]
+    }
+  }
+]
