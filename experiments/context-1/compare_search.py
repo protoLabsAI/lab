@@ -29,6 +29,11 @@ QWEN_RAG_SYSTEM = """\
 You are a research assistant. Answer the user's question using ONLY the provided context documents. \
 If the context doesn't contain enough information, say so. Cite specific documents when possible."""
 
+QUERY_EXPAND_SYSTEM = """\
+Generate 3 alternative search queries for the given question. Each query should \
+approach the topic from a different angle or use different keywords. Return ONLY \
+the queries, one per line, no numbering or explanation."""
+
 
 def qwen_chat(messages, url, model="local", max_tokens=2048):
     resp = httpx.post(
@@ -46,12 +51,57 @@ def qwen_chat(messages, url, model="local", max_tokens=2048):
     return resp.json()["choices"][0]["message"]["content"] or ""
 
 
+def expand_query(query: str, url: str, model: str = "local") -> list[str]:
+    """Generate query variants using LLM. Returns original + 3 expansions."""
+    try:
+        result = qwen_chat(
+            [
+                {"role": "system", "content": QUERY_EXPAND_SYSTEM},
+                {"role": "user", "content": query},
+            ],
+            url, model=model, max_tokens=200,
+        )
+        variants = [line.strip().lstrip("0123456789.-) ") for line in result.strip().split("\n") if line.strip()]
+        return [query] + variants[:3]
+    except Exception:
+        return [query]
+
+
+def multi_query_search(query, store, qwen_url, k=20, use_rerank=False):
+    """Expand query into variants, search each, RRF fuse all results."""
+    queries = expand_query(query, qwen_url)
+
+    # Collect results from all query variants
+    all_chunks: dict[str, tuple[int, any]] = {}  # chunk_id -> (best_rank, chunk)
+    rrf_scores: dict[str, float] = {}
+    rrf_k = 60
+
+    for qi, q in enumerate(queries):
+        results = store.hybrid_search(q, k=k)
+        for rank, chunk in enumerate(results):
+            rrf_scores[chunk.chunk_id] = rrf_scores.get(chunk.chunk_id, 0) + 1.0 / (rrf_k + rank + 1)
+            if chunk.chunk_id not in all_chunks:
+                all_chunks[chunk.chunk_id] = chunk
+
+    # Sort by RRF score
+    ranked_ids = sorted(rrf_scores.items(), key=lambda x: -x[1])
+    fused = [all_chunks[cid] for cid, _ in ranked_ids[:k * 2 if use_rerank else k]]
+
+    if use_rerank:
+        return store.rerank(query, fused, top_k=k)
+    return fused[:k]
+
+
 def run_query(query, store, qwen_url, search_mode, k=20):
     t0 = time.time()
 
     # Retrieve
     t_search = time.time()
-    if search_mode == "hybrid+rerank":
+    if search_mode == "multi-query":
+        chunks = multi_query_search(query, store, qwen_url, k=k, use_rerank=False)
+    elif search_mode == "multi-query+rerank":
+        chunks = multi_query_search(query, store, qwen_url, k=k, use_rerank=True)
+    elif search_mode == "hybrid+rerank":
         chunks = store.hybrid_rerank_search(query, k=k, candidates=k * 2)
     elif search_mode == "hybrid":
         chunks = store.hybrid_search(query, k=k)
@@ -105,7 +155,7 @@ def main():
     store.load_reranker()
 
     queries = yaml.safe_load(Path(args.queries).read_text())
-    modes = ["keyword", "hybrid", "hybrid+rerank"]
+    modes = ["keyword", "hybrid", "hybrid+rerank", "multi-query", "multi-query+rerank"]
 
     results = []
     for i, q in enumerate(queries):
