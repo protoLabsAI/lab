@@ -43,7 +43,7 @@ QWEN35_PREFIX_FLAGS="--enable-prefix-caching --mamba-cache-mode align --mamba-bl
 O3="-O3"
 usage() {
     echo "Production:"
-    echo "  $0 {qwen-35b|qwen-9b-fp8|qwen-4b-fp8|qwen-27b-int4|qwen-27b-int4-mtp|qwen-9b-mtp|qwen-4b-int4}"
+    echo "  $0 {qwen-35b|qwen-9b-fp8|qwen-4b-fp8|qwen-27b-int4|qwen-27b-int4-mtp|qwen-9b-mtp|qwen-4b-int4|context-1}"
     echo ""
     echo "Training / LoRA:"
     echo "  $0 {qwen-9b|qwen-4b|qwen-2b|qwen-0.8b}"
@@ -371,6 +371,27 @@ case "$1" in
             --gpu-memory-utilization 0.90 \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
+    # ─── Context-1 (Chroma retrieval agent) ────────────────────────────
+    context-1)
+        echo "Starting Context-1 20B MoE retrieval agent (GPU 0, 32K)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve chromadb/context-1 \
+            --host 0.0.0.0 --port $PORT \
+            --served-model-name local \
+            --max-model-len 32768 \
+            --gpu-memory-utilization 0.90 \
+            --trust-remote-code \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+    context-1-gpu1)
+        echo "Starting Context-1 20B MoE retrieval agent (GPU 1, port 8001, 32K)..."
+        CUDA_VISIBLE_DEVICES=1 $VLLM_BIN serve chromadb/context-1 \
+            --host 0.0.0.0 --port 8001 \
+            --served-model-name context-1 \
+            --max-model-len 32768 \
+            --gpu-memory-utilization 0.90 \
+            --trust-remote-code \
+            >> "${LOG_DIR}/vllm-swap-ctx1.log" 2>&1 &
+        ;;
     # ─── Qwen3-Coder configs ─────────────────────────────────────────
     qwen3-coder-30b)
         echo "Starting Qwen3-Coder-30B-A3B FP8 (GPU 0, 256K)..."
@@ -433,7 +454,7 @@ case "$1" in
     # NCCL_P2P_DISABLE=1 required for stable CUDA graphs on Blackwell PCIe
     # (ACS on PCIe bridges corrupts P2P during graph replay)
     qwen-27b-fp8-tp2)
-        echo "Starting Qwen3.5-27B FP8 official (TP=2, 131K, 70 tok/s)..."
+        echo "Starting Qwen3.5-27B FP8 official (TP=2, 131K, 70 tok/s, vision)..."
         NCCL_P2P_DISABLE=1 \
         NCCL_ALGO=Ring NCCL_PROTO=Simple \
         NCCL_MIN_NCHANNELS=4 NCCL_MAX_NCHANNELS=8 \
@@ -446,14 +467,13 @@ case "$1" in
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.90 \
-            --language-model-only \
             --enable-chunked-prefill \
             --disable-custom-all-reduce \
             $QWEN35_PREFIX_FLAGS \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     qwen-122b-fp8)
-        echo "Starting Qwen3.5-122B-A10B FP8 official (TP=2, 65K, 112 tok/s)..."
+        echo "Starting Qwen3.5-122B-A10B FP8 official (TP=2, 65K, 112 tok/s, vision)..."
         NCCL_P2P_DISABLE=1 \
         NCCL_ALGO=Ring NCCL_PROTO=Simple \
         NCCL_MIN_NCHANNELS=4 NCCL_MAX_NCHANNELS=8 \
@@ -466,7 +486,6 @@ case "$1" in
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.90 \
-            --language-model-only \
             --enable-chunked-prefill \
             --disable-custom-all-reduce \
             $QWEN35_PREFIX_FLAGS \

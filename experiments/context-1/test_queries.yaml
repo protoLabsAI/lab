@@ -1,0 +1,35 @@
+# Multi-hop retrieval test queries for A/B testing
+# These test increasingly complex retrieval patterns
+
+# --- Single-hop (baseline) ---
+- query: "What is FP8 quantization and how does it affect model inference speed?"
+  expected_answer: "FP8 quantization reduces model weights from 16-bit to 8-bit floating point, roughly halving memory usage while maintaining quality. On Blackwell GPUs, FP8 can improve throughput by 50-100%."
+  difficulty: 1
+  hops: 1
+
+- query: "What is the maximum context length supported by Qwen3.5-27B?"
+  expected_answer: "Qwen3.5-27B supports up to 131K context length with tensor parallelism across 2 GPUs, or 128K on a single GPU with INT4 quantization."
+  difficulty: 1
+  hops: 1
+
+# --- Two-hop (cross-reference) ---
+- query: "Which quantization method gives the best speed-quality tradeoff for MoE models on Blackwell GPUs?"
+  expected_answer: "Official Qwen FP8 quantization works best for MoE models. INT4 is unstable on MoE architectures. On-the-fly FP8 via --quantization fp8 also works. The 35B MoE FP8 achieves 180 tok/s on a single Blackwell GPU."
+  difficulty: 2
+  hops: 2
+
+- query: "How does TurboQuant KV cache compression compare to SQ8 for vector search at dimension 768?"
+  expected_answer: "TurboQuant is not suitable for vector search at d=768, achieving only 25-50% recall@10 with 4-bit compression. SQ8 is far better with 100% R@1 and 98.5% R@10 at 4x compression."
+  difficulty: 2
+  hops: 2
+
+# --- Three-hop (multi-step reasoning) ---
+- query: "What is the full pipeline for serving a new model on the protoLabs Blackwell node, from download to benchmarking?"
+  expected_answer: "Download via huggingface-cli with HF_HOME=/mnt/models/huggingface, add config to vllm-swap.sh with appropriate flags (FP8/INT4, context length, TP setting), run speed-test.sh for throughput benchmarks, then run eval profiles for quality scoring."
+  difficulty: 3
+  hops: 3
+
+- query: "Why did the compressed-tensors FP8 quantization fail on Qwen3.5 models, and what was the working alternative?"
+  expected_answer: "llm-compressor's FP8_DYNAMIC compressed-tensors format is incompatible with vLLM's Qwen3.5 hybrid Mamba/attention model loader, producing degenerate output. The fix was using official Qwen FP8 models (native fp8 format) or vLLM's --quantization fp8 flag for on-the-fly quantization."
+  difficulty: 3
+  hops: 3

@@ -1,0 +1,55 @@
+# Hard multi-hop queries requiring cross-document retrieval
+# These need information from multiple repos/sections to answer well
+
+# --- Cross-repo queries (lab + homelab-iac + protoResearcher) ---
+- query: "How does the protoLabs monitoring stack work end-to-end, from GPU metrics collection on the Blackwell node to the Grafana dashboards on pve01?"
+  difficulty: 3
+  hops: 3
+
+- query: "What embedding model does protoResearcher use, what dimension are the vectors, and what vector compression experiments were run in the lab to optimize storage?"
+  difficulty: 3
+  hops: 3
+
+- query: "Trace the full path of a model from HuggingFace download to being served and evaluated — which environments, scripts, and eval suites are involved?"
+  difficulty: 3
+  hops: 4
+
+# --- Deep lab queries (evals + models + experiments) ---
+- query: "What are the differences between the claw-eval function calling tasks and the custom function-call eval suite, and how do their scoring methodologies compare?"
+  difficulty: 2
+  hops: 2
+
+- query: "Which vLLM optimization flags actually improved throughput in benchmarks, and which ones were found to have no measurable impact?"
+  difficulty: 2
+  hops: 2
+
+- query: "What is the relationship between the TurboQuant KV cache experiment and the vector search compression experiments? Do they share any techniques or findings?"
+  difficulty: 3
+  hops: 3
+
+# --- Infrastructure queries (homelab-iac + lab infra) ---
+- query: "How are secrets managed across the protoLabs nodes, and how does the LiteLLM gateway on the ava node authenticate with vLLM on the protolabs node?"
+  difficulty: 3
+  hops: 3
+
+- query: "What services run on each node in the protoLabs homelab, and how do they communicate with each other?"
+  difficulty: 2
+  hops: 2
+
+# --- Model/training queries ---
+- query: "What training experiments have been set up for Qwen models in the lab, and what base models and datasets were used?"
+  difficulty: 2
+  hops: 2
+
+- query: "Compare the voice agent experiment and the TTS comparison experiment — what models were tested and what were the findings?"
+  difficulty: 2
+  hops: 2
+
+# --- Single-hop baselines ---
+- query: "What is the claw-eval scoring system and how are tasks graded?"
+  difficulty: 1
+  hops: 1
+
+- query: "How does the vllm-swap.sh script handle graceful model swapping?"
+  difficulty: 1
+  hops: 1
