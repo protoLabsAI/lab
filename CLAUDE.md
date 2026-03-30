@@ -8,7 +8,7 @@ Monorepo for model evaluation, training, inference infrastructure, and ML experi
 - `evals/` — LLM eval suite: claw-eval, custom suites, function-call, RAG (strict, tested)
 - `models/` — Model inventory, vllm-swap.sh, benchmarks
 - `training/` — Fine-tuning workspace (LLaMA-Factory configs, datasets)
-- `experiments/` — ML experiments (ltx-video, flux2, quantize, pixel-gen, stt-whisper, voice-agent)
+- `experiments/` — ML experiments (context-1, ltx-video, flux2, quantize, pixel-gen, stt-whisper, voice-agent)
 - `infra/` — Prometheus exporters, vLLM systemd, gateway configs (gateway runs on ava node)
 
 ## Using uv
