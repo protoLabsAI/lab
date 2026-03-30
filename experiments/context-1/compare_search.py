@@ -92,24 +92,56 @@ def multi_query_search(query, store, qwen_url, k=20, use_rerank=False):
     return fused[:k]
 
 
+def reorder_lost_in_middle(chunks: list) -> list:
+    """Reorder chunks to combat 'lost in the middle' attention bias.
+
+    Places most relevant chunks at positions 1 and N (start/end),
+    less relevant in the middle. LLMs attend more strongly to the
+    beginning and end of context (U-shaped attention curve).
+    """
+    if len(chunks) <= 2:
+        return chunks
+    # Assume chunks are ranked by relevance (index 0 = most relevant)
+    reordered = []
+    left = True
+    front, back = [], []
+    for i, chunk in enumerate(chunks):
+        if left:
+            front.append(chunk)
+        else:
+            back.append(chunk)
+        left = not left
+    # front has odd-indexed (0, 2, 4...), back has even-indexed (1, 3, 5...)
+    # Reverse back so least relevant is in the middle
+    return front + list(reversed(back))
+
+
 def run_query(query, store, qwen_url, search_mode, k=20):
     t0 = time.time()
 
+    # Parse mode flags
+    use_reorder = "+reorder" in search_mode
+    base_mode = search_mode.replace("+reorder", "")
+
     # Retrieve
     t_search = time.time()
-    if search_mode == "multi-query":
+    if base_mode == "multi-query":
         chunks = multi_query_search(query, store, qwen_url, k=k, use_rerank=False)
-    elif search_mode == "multi-query+rerank":
+    elif base_mode == "multi-query+rerank":
         chunks = multi_query_search(query, store, qwen_url, k=k, use_rerank=True)
-    elif search_mode == "hybrid+rerank":
+    elif base_mode == "hybrid+rerank":
         chunks = store.hybrid_rerank_search(query, k=k, candidates=k * 2)
-    elif search_mode == "hybrid":
+    elif base_mode == "hybrid":
         chunks = store.hybrid_search(query, k=k)
-    elif search_mode == "dense":
+    elif base_mode == "dense":
         chunks = store.dense_search(query, k=k)
     else:
         chunks = store.search(query, k=k)
     search_ms = (time.time() - t_search) * 1000
+
+    # Apply lost-in-the-middle reordering
+    if use_reorder:
+        chunks = reorder_lost_in_middle(chunks)
 
     # Reason
     context_text = "\n\n---\n\n".join(
@@ -155,7 +187,7 @@ def main():
     store.load_reranker()
 
     queries = yaml.safe_load(Path(args.queries).read_text())
-    modes = ["keyword", "hybrid", "hybrid+rerank", "multi-query", "multi-query+rerank"]
+    modes = ["hybrid", "hybrid+reorder", "hybrid+rerank", "hybrid+rerank+reorder"]
 
     results = []
     for i, q in enumerate(queries):
