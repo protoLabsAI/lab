@@ -66,6 +66,12 @@ def main(name, model, gateway_url, api_key, trials, claw_only, custom_only, skip
     trial_count = trials or profile.get("trials", 1)
     profile_name = profile.get("name", name)
 
+    # Auto-use OPENROUTER_API_KEY when targeting OpenRouter
+    if "openrouter" in gateway_url:
+        or_key = os.environ.get("OPENROUTER_API_KEY")
+        if or_key:
+            api_key = or_key
+
     click.echo(f"\nProfile: {profile_name}")
     click.echo(f"Model:   {model}")
     click.echo(f"Trials:  {trial_count}")
@@ -93,6 +99,8 @@ def main(name, model, gateway_url, api_key, trials, claw_only, custom_only, skip
             "--tasks", tasks,
             "--trials", str(trial_count),
             "--port-offset", str(port_offset),
+            "--gateway-url", gateway_url,
+            "--api-key", api_key,
         ]
         success, dur = run_command(cmd, f"Claw-Eval ({tasks})")
         results.append(("claw-eval", success, dur))
@@ -106,6 +114,8 @@ def main(name, model, gateway_url, api_key, trials, claw_only, custom_only, skip
                 "--suite", suite_name,
                 "--model", model,
                 "--trials", str(trial_count),
+                "--gateway-url", gateway_url,
+                "--api-key", api_key,
             ]
             success, dur = run_command(cmd, f"Custom: {suite_name}")
             results.append((f"custom/{suite_name}", success, dur))
@@ -119,6 +129,8 @@ def main(name, model, gateway_url, api_key, trials, claw_only, custom_only, skip
                 "bash", run_sh, "function-call",
                 "--model", model,
                 "--all-suites",
+                "--gateway-url", gateway_url,
+                "--api-key", api_key,
             ]
             success, dur = run_command(cmd, "Function Calling (all suites)")
             results.append(("function-call", success, dur))

@@ -1,0 +1,78 @@
+{
+  "latency": [
+    {
+      "model": "nomic-embed-text",
+      "dims": 768,
+      "single_query_ms": 1063.7,
+      "batch_5_ms": 16.5,
+      "medium_doc_ms": 12.3,
+      "long_entity_ms": 12.3,
+      "throughput_docs_per_sec": 302.7
+    },
+    {
+      "model": "qwen3-embedding:0.6b",
+      "dims": 1024,
+      "single_query_ms": 359.8,
+      "batch_5_ms": 61.5,
+      "medium_doc_ms": 49.4,
+      "long_entity_ms": 51.2,
+      "throughput_docs_per_sec": 81.2
+    },
+    {
+      "model": "qwen3-embedding:8b",
+      "dims": 4096,
+      "single_query_ms": 105.0,
+      "batch_5_ms": 308.7,
+      "medium_doc_ms": 183.2,
+      "long_entity_ms": 217.9,
+      "throughput_docs_per_sec": 16.2
+    }
+  ],
+  "quality": [
+    {
+      "model": "nomic-embed-text",
+      "avg_similar_cosine": 0.5807,
+      "avg_dissimilar_cosine": 0.4006,
+      "discrimination": 0.1801,
+      "similar_scores": [
+        0.502,
+        0.597,
+        0.6432
+      ],
+      "dissimilar_scores": [
+        0.4246,
+        0.3767
+      ]
+    },
+    {
+      "model": "qwen3-embedding:0.6b",
+      "avg_similar_cosine": 0.7509,
+      "avg_dissimilar_cosine": 0.3446,
+      "discrimination": 0.4063,
+      "similar_scores": [
+        0.71,
+        0.7794,
+        0.7633
+      ],
+      "dissimilar_scores": [
+        0.3659,
+        0.3232
+      ]
+    },
+    {
+      "model": "qwen3-embedding:8b",
+      "avg_similar_cosine": 0.8027,
+      "avg_dissimilar_cosine": 0.4383,
+      "discrimination": 0.3644,
+      "similar_scores": [
+        0.7998,
+        0.8474,
+        0.7609
+      ],
+      "dissimilar_scores": [
+        0.4434,
+        0.4332
+      ]
+    }
+  ]
+}
