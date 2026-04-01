@@ -17,6 +17,7 @@ Usage:
     cd ~/dev/lab
     .venv/bin/python experiments/agent-lightning/run_apo.py
     .venv/bin/python experiments/agent-lightning/run_apo.py --rounds 3 --dry-run
+    .venv/bin/python experiments/agent-lightning/run_apo.py --use-llm-judge
 """
 
 from __future__ import annotations
@@ -30,6 +31,8 @@ from pathlib import Path
 
 import httpx
 from openai import AsyncOpenAI
+
+import llm_judge
 
 # --- Config ---
 VLLM_URL = "http://localhost:8000/v1"
@@ -119,7 +122,8 @@ async def run_task(prompt: str, session_id: str, timeout: float = 120) -> str:
 
 
 async def evaluate_prompt(
-    soul_content: str, tasks: list[dict], label: str = ""
+    soul_content: str, tasks: list[dict], label: str = "",
+    use_llm_judge: bool = False, judge_client=None,
 ) -> tuple[float, list[dict]]:
     """Write SOUL.md, run tasks, return (avg_score, results)."""
     SOUL_PATH.write_text(soul_content)
@@ -127,7 +131,13 @@ async def evaluate_prompt(
     for task in tasks:
         sid = f"apo-{label}-{task['id']}-{int(time.time())}"
         response = await run_task(task["prompt"], sid)
-        reward = score_response(response, task)
+
+        if use_llm_judge:
+            judge_score = await llm_judge.judge_response(task, response, client=judge_client)
+            reward = judge_score.composite
+        else:
+            reward = score_response(response, task)
+
         results.append({
             "task_id": task["id"],
             "prompt": task["prompt"][:80],
@@ -186,6 +196,7 @@ async def run_apo(args):
     print(f"Tasks: {len(all_tasks)} total, {len(train_tasks)} train, {len(val_tasks)} val")
     print(f"Rounds: {args.rounds}, Beam width: {args.beam_width}, Branch factor: {args.branch_factor}")
     print(f"Critic: {args.critic_model} via gateway, Agent: 27B via protoResearcher")
+    print(f"Scorer: {'LLM judge (Sonnet 4.6)' if args.use_llm_judge else 'pattern matching'}")
     print()
 
     # Critic uses the gateway (stronger model) — key from env or Infisical
@@ -193,6 +204,7 @@ async def run_apo(args):
     gw_key = os.environ.get("GATEWAY_API_KEY", "not-needed")
     client = AsyncOpenAI(base_url=GATEWAY_URL, api_key=gw_key)
     critic_model = args.critic_model
+    judge_client = llm_judge._make_client() if args.use_llm_judge else None
     seed_prompt = SOUL_PATH.read_text()
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -201,7 +213,10 @@ async def run_apo(args):
 
     # --- Evaluate seed ---
     print("=== Evaluating seed prompt ===")
-    seed_score, seed_results = await evaluate_prompt(seed_prompt, val_tasks, "seed")
+    seed_score, seed_results = await evaluate_prompt(
+        seed_prompt, val_tasks, "seed",
+        use_llm_judge=args.use_llm_judge, judge_client=judge_client,
+    )
     print(f"  Seed score: {seed_score:.3f}\n")
 
     beam = [{"prompt": seed_prompt, "score": seed_score, "version": "seed"}]
@@ -216,7 +231,10 @@ async def run_apo(args):
         for parent in beam:
             # Get training rollout results for gradient
             print(f"  Evaluating parent '{parent['version']}' on train tasks for gradient...")
-            _, train_results = await evaluate_prompt(parent["prompt"], train_tasks, f"r{rnd}-train")
+            _, train_results = await evaluate_prompt(
+                parent["prompt"], train_tasks, f"r{rnd}-train",
+                use_llm_judge=args.use_llm_judge, judge_client=judge_client,
+            )
 
             for b in range(args.branch_factor):
                 # Generate critique (textual gradient)
@@ -245,7 +263,10 @@ async def run_apo(args):
         for c in all_candidates:
             if c["score"] is None:
                 print(f"  --- {c['version']} ---")
-                score, _ = await evaluate_prompt(c["prompt"], val_tasks, c["version"])
+                score, _ = await evaluate_prompt(
+                    c["prompt"], val_tasks, c["version"],
+                    use_llm_judge=args.use_llm_judge, judge_client=judge_client,
+                )
                 c["score"] = score
                 print(f"  {c['version']} score: {score:.3f}")
 
@@ -284,13 +305,19 @@ def main():
     parser.add_argument("--beam-width", type=int, default=2, help="Top-k prompts kept per round")
     parser.add_argument("--branch-factor", type=int, default=2, help="Candidates per parent")
     parser.add_argument("--critic-model", default=DEFAULT_CRITIC_MODEL, help="Model for critique/edit (via gateway)")
+    parser.add_argument("--use-llm-judge", action="store_true", help="Use Sonnet 4.6 LLM judge instead of pattern matching")
     parser.add_argument("--dry-run", action="store_true", help="Evaluate seed only")
     args = parser.parse_args()
 
     if args.dry_run:
         tasks = load_tasks()
-        print(f"Dry run — evaluating seed on {len(tasks)} tasks")
-        score, results = asyncio.run(evaluate_prompt(SOUL_PATH.read_text(), tasks, "dryrun"))
+        judge_client = llm_judge._make_client() if args.use_llm_judge else None
+        scorer = "LLM judge" if args.use_llm_judge else "pattern matching"
+        print(f"Dry run — evaluating seed on {len(tasks)} tasks (scorer: {scorer})")
+        score, results = asyncio.run(evaluate_prompt(
+            SOUL_PATH.read_text(), tasks, "dryrun",
+            use_llm_judge=args.use_llm_judge, judge_client=judge_client,
+        ))
         print(f"\nSeed score: {score:.3f}")
         for r in results:
             print(f"  {r['task_id']:25s} {r['score']:.3f}")
