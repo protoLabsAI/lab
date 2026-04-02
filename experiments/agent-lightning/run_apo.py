@@ -33,6 +33,7 @@ import httpx
 from openai import AsyncOpenAI
 
 import llm_judge
+import bootstrap_fewshot
 
 # --- Config ---
 VLLM_URL = "http://localhost:8000/v1"
@@ -208,7 +209,20 @@ async def run_apo(args):
     seed_prompt = SOUL_PATH.read_text()
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Save original
+    # Bootstrap: inject few-shot examples into seed prompt (DSPy-inspired)
+    if args.bootstrap:
+        examples = bootstrap_fewshot.bootstrap_examples(
+            args.bootstrap_rollouts, top_k=args.bootstrap_k,
+        )
+        if examples:
+            seed_prompt = bootstrap_fewshot.inject_fewshot(seed_prompt, examples)
+            print(f"Bootstrapped {len(examples)} few-shot examples into seed prompt "
+                  f"(+{sum(len(bootstrap_fewshot.format_fewshot_block([e])) for e in examples)} chars)")
+        else:
+            print("Warning: --bootstrap enabled but no usable examples found")
+        print()
+
+    # Save original (with bootstrap if applied)
     (RESULTS_DIR / "original_soul.md").write_text(seed_prompt)
 
     # --- Evaluate seed ---
@@ -306,6 +320,11 @@ def main():
     parser.add_argument("--branch-factor", type=int, default=2, help="Candidates per parent")
     parser.add_argument("--critic-model", default=DEFAULT_CRITIC_MODEL, help="Model for critique/edit (via gateway)")
     parser.add_argument("--use-llm-judge", action="store_true", help="Use Sonnet 4.6 LLM judge instead of pattern matching")
+    parser.add_argument("--bootstrap", action="store_true", help="Inject few-shot examples from rollouts into seed prompt (DSPy-inspired)")
+    parser.add_argument("--bootstrap-k", type=int, default=3, help="Number of few-shot examples to inject")
+    parser.add_argument("--bootstrap-rollouts", type=str, nargs="+",
+                        default=["experiments/agent-lightning/results/rollouts/rollouts_*.jsonl"],
+                        help="Rollout JSONL files for bootstrap")
     parser.add_argument("--dry-run", action="store_true", help="Evaluate seed only")
     args = parser.parse_args()
 
@@ -313,9 +332,17 @@ def main():
         tasks = load_tasks()
         judge_client = llm_judge._make_client() if args.use_llm_judge else None
         scorer = "LLM judge" if args.use_llm_judge else "pattern matching"
+        seed = SOUL_PATH.read_text()
+        if args.bootstrap:
+            examples = bootstrap_fewshot.bootstrap_examples(
+                args.bootstrap_rollouts, top_k=args.bootstrap_k,
+            )
+            if examples:
+                seed = bootstrap_fewshot.inject_fewshot(seed, examples)
+                print(f"Bootstrapped {len(examples)} few-shot examples")
         print(f"Dry run — evaluating seed on {len(tasks)} tasks (scorer: {scorer})")
         score, results = asyncio.run(evaluate_prompt(
-            SOUL_PATH.read_text(), tasks, "dryrun",
+            seed, tasks, "dryrun",
             use_llm_judge=args.use_llm_judge, judge_client=judge_client,
         ))
         print(f"\nSeed score: {score:.3f}")

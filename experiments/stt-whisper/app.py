@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Speech-to-Text — Whisper model comparison + speaker diarization
+Speech-to-Text — ASR model comparison + speaker diarization
 
-Compare whisper-large-v3-turbo vs large-v3 vs distil-large-v3 on Blackwell.
+Compare Whisper variants + Cohere Transcribe on Blackwell.
 Upload audio or record from mic, get transcription with speed metrics.
 Optional speaker diarization via pyannote-audio.
 
-Uses HuggingFace Transformers pipeline (SDPA attention, no flash-attn needed).
+Uses HuggingFace Transformers pipeline (Whisper) + custom loader (Cohere).
 
 Run: CUDA_VISIBLE_DEVICES=1 uv run python -u app.py
 """
@@ -36,15 +36,43 @@ DTYPE = torch.float16
 
 HF_TOKEN = os.environ.get("HF_TOKEN", "")
 
-MODELS = {
+WHISPER_MODELS = {
     "large-v3-turbo (809M, fastest)": "openai/whisper-large-v3-turbo",
     "distil-large-v3 (756M, fast)": "distil-whisper/distil-large-v3",
     "large-v3 (1.55B, best quality)": "openai/whisper-large-v3",
 }
 
+CUSTOM_MODELS = {
+    "cohere-transcribe (2B, #1 ASR)": "CohereLabs/cohere-transcribe-03-2026",
+}
+
+MODELS = {**WHISPER_MODELS, **CUSTOM_MODELS}
+
 _pipes: dict[str, object] = {}
 _current_model: str | None = None
 _diarization_pipeline = None
+
+
+def _unload_current():
+    """Unload current model to free VRAM."""
+    global _current_model
+    if _current_model and _current_model in _pipes:
+        del _pipes[_current_model]
+        torch.cuda.empty_cache()
+        gc.collect()
+        logger.info(f"Unloaded {_current_model}")
+        _current_model = None
+
+
+def _load_cohere(model_id: str):
+    """Load Cohere Transcribe (custom Conformer, not Whisper pipeline)."""
+    from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor
+
+    processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
+    model = AutoModelForSpeechSeq2Seq.from_pretrained(
+        model_id, trust_remote_code=True, torch_dtype=DTYPE,
+    ).to(DEVICE)
+    return {"model": model, "processor": processor, "type": "cohere"}
 
 
 def get_pipe(model_key: str):
@@ -54,22 +82,22 @@ def get_pipe(model_key: str):
     if model_key in _pipes:
         return _pipes[model_key]
 
-    if _current_model and _current_model != model_key and _current_model in _pipes:
-        del _pipes[_current_model]
-        torch.cuda.empty_cache()
-        gc.collect()
-        logger.info(f"Unloaded {_current_model}")
+    if _current_model and _current_model != model_key:
+        _unload_current()
 
     logger.info(f"Loading {model_id}...")
     t0 = time.time()
 
-    pipe = pipeline(
-        "automatic-speech-recognition",
-        model=model_id,
-        torch_dtype=DTYPE,
-        device=DEVICE,
-        model_kwargs={"attn_implementation": "sdpa"},
-    )
+    if model_key in CUSTOM_MODELS:
+        pipe = _load_cohere(model_id)
+    else:
+        pipe = pipeline(
+            "automatic-speech-recognition",
+            model=model_id,
+            torch_dtype=DTYPE,
+            device=DEVICE,
+            model_kwargs={"attn_implementation": "sdpa"},
+        )
 
     _pipes[model_key] = pipe
     _current_model = model_key
@@ -132,22 +160,39 @@ def transcribe(
     pipe = get_pipe(model_key)
     model_id = MODELS[model_key]
 
-    generate_kwargs = {}
-    if language and language != "auto":
-        generate_kwargs["language"] = language
-
     t0 = time.time()
 
-    result = pipe(
-        audio,
-        chunk_length_s=30,
-        batch_size=batch_size,
-        return_timestamps="word" if return_timestamps else True,
-        generate_kwargs=generate_kwargs,
-    )
+    if isinstance(pipe, dict) and pipe.get("type") == "cohere":
+        # Cohere Transcribe: custom processor + model.generate()
+        from transformers.audio_utils import load_audio as hf_load_audio
+
+        model = pipe["model"]
+        processor = pipe["processor"]
+        lang = language if language and language != "auto" else "en"
+        audio_array = hf_load_audio(audio, sampling_rate=16000)
+        inputs = processor(audio_array, sampling_rate=16000, return_tensors="pt", language=lang)
+        inputs = inputs.to(model.device, dtype=model.dtype)
+        outputs = model.generate(**inputs, max_new_tokens=512)
+        text = processor.decode(outputs, skip_special_tokens=True)
+        if isinstance(text, list):
+            text = text[0]
+        result = {"text": text}
+    else:
+        # Whisper pipeline path
+        generate_kwargs = {}
+        if language and language != "auto":
+            generate_kwargs["language"] = language
+
+        result = pipe(
+            audio,
+            chunk_length_s=30,
+            batch_size=batch_size,
+            return_timestamps="word" if return_timestamps else True,
+            generate_kwargs=generate_kwargs,
+        )
+        text = result["text"]
 
     transcribe_time = time.time() - t0
-    text = result["text"]
 
     # Audio duration
     audio_data, sr = sf.read(audio)
@@ -200,8 +245,8 @@ def transcribe(
 def build_ui():
     with gr.Blocks(title="Speech-to-Text") as demo:
         gr.Markdown(
-            "# Speech-to-Text — Whisper + Diarization\n"
-            "Compare large-v3-turbo vs distil-large-v3 vs large-v3 on Blackwell"
+            "# Speech-to-Text — ASR Model Comparison\n"
+            "Compare Whisper variants + Cohere Transcribe on Blackwell"
         )
 
         with gr.Row():
@@ -217,7 +262,7 @@ def build_ui():
                     label="Model",
                 )
                 language = gr.Dropdown(
-                    choices=["auto", "en", "es", "fr", "de", "it", "pt", "nl", "ja", "zh", "ko", "ar", "hi"],
+                    choices=["auto", "en", "es", "fr", "de", "it", "pt", "nl", "ja", "zh", "ko", "ar", "hi", "el", "pl", "vi"],
                     value="auto",
                     label="Language",
                 )
@@ -233,7 +278,12 @@ def build_ui():
                 diarization = gr.Checkbox(
                     label="Speaker diarization (pyannote)",
                     value=False,
-                    info="Requires HF_TOKEN env var" if not HF_TOKEN else "Ready",
+                    info="Requires HF_TOKEN env var. Whisper only." if not HF_TOKEN else "Ready. Whisper only.",
+                )
+                gr.Markdown(
+                    "<small>**Cohere Transcribe notes:** No auto language detection "
+                    "(defaults to English), no timestamps, no diarization. "
+                    "#1 on HF ASR Leaderboard (5.42% avg WER).</small>"
                 )
                 transcribe_btn = gr.Button("Transcribe", variant="primary", size="lg")
 

@@ -1,12 +1,13 @@
-# STT Whisper
+# STT — ASR Model Comparison
 
-Speech-to-text comparison of Whisper model variants on Blackwell GPU.
+Speech-to-text comparison of Whisper variants + Cohere Transcribe on Blackwell GPU.
 
 | Model | Params | VRAM | Speed (est.) | Quality |
 |-------|--------|:----:|:------------:|---------|
 | **large-v3-turbo** | 809M | ~6GB | ~100x RT | Best speed/quality ratio |
 | **distil-large-v3** | 756M | ~5GB | ~90x RT | Slightly lower quality |
-| **large-v3** | 1.55B | ~10GB | ~50x RT | Best accuracy |
+| **large-v3** | 1.55B | ~10GB | ~50x RT | Best Whisper accuracy |
+| **cohere-transcribe** | 2B | ~8GB | TBD | #1 HF ASR Leaderboard (5.42% WER) |
 
 ## Run
 
@@ -23,3 +24,13 @@ UI at `http://protolabs:7865`. Upload audio or record from mic. Models lazy-load
 - Language auto-detection or manual selection
 - Word-level timestamps optional
 - Transcripts save to `/mnt/data/comfyui/output/stt-whisper/`
+
+## Cohere Transcribe
+
+Conformer-based (not Whisper). Uses custom `AutoProcessor` + `model.generate()` path, not the standard ASR pipeline. Apache 2.0 license.
+
+- **No auto language detection** — defaults to English, must specify language manually
+- **No timestamps or diarization** — Whisper-only features
+- **14 languages**: en, fr, de, it, es, pt, el, nl, pl, zh, ja, ko, vi, ar
+- **Requires**: `sentencepiece`, `transformers >= 4.52` (uses `trust_remote_code=True`)
+- Tends to transcribe silence/noise — benefits from VAD preprocessing

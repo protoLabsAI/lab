@@ -465,10 +465,190 @@ Convert collected rollouts into preference pairs (chosen = high-reward, rejected
 | Epochs | 3 | Over collected rollouts |
 | Precision | BF16 | Native on Blackwell |
 
+## Few-Shot Bootstrap (DSPy-Inspired)
+
+Inspired by DSPy MIPROv2's bootstrap stage: before running APO's critique-edit loop, inject high-scoring rollout examples directly into the prompt. The hypothesis is that showing the model what a great response looks like is higher-leverage than abstract instruction editing alone.
+
+### How It Works
+
+```
+rollouts.jsonl ──→ bootstrap_fewshot.py ──→ select top-K examples
+                                                  │
+                                          ┌───────┘
+                                          ▼
+                                  inject into SOUL.md
+                                  (before APO starts)
+                                          │
+                                          ▼
+                                  run_apo.py --bootstrap
+```
+
+1. **Selection**: Top-K rollouts by reward, with diversity preference (one per category first, then fill)
+2. **Formatting**: Examples rendered as markdown reference blocks with task, response, and score
+3. **Injection**: Appended to system prompt before any closing section
+
+### Usage
+
+```bash
+# Preview bootstrap examples
+.venv/bin/python experiments/agent-lightning/bootstrap_fewshot.py \
+  --rollouts "experiments/agent-lightning/results/rollouts/rollouts_*.jsonl" \
+  --top-k 3 --min-reward 0.5
+
+# APO with bootstrap
+.venv/bin/python experiments/agent-lightning/run_apo.py \
+  --use-llm-judge --bootstrap --bootstrap-k 3
+
+# Preview augmented prompt
+.venv/bin/python experiments/agent-lightning/bootstrap_fewshot.py \
+  --rollouts "experiments/agent-lightning/results/rollouts/rollouts_*.jsonl" \
+  --show-prompt
+```
+
+### Key Design Decisions
+
+- **Diverse selection**: One example per category (simple/medium/complex) prevents bias toward easy tasks
+- **Truncation**: Responses capped at 800 chars to avoid bloating the system prompt
+- **Minimum reward**: Default 0.5 threshold ensures only genuinely good examples are injected
+- **Composable**: Works independently of APO — can also inject into subagent prompts
+
+## DPO Training Pipeline
+
+Direct Preference Optimization from collected rollouts — the offline alternative to GRPO that doesn't need a live reward function.
+
+### Overview
+
+```
+rollouts.jsonl ──→ train_dpo.py ──→ preference pairs (chosen/rejected)
+                                          │
+                                          ▼
+                                    DPOTrainer (TRL)
+                                    LoRA on Qwen 9B
+                                          │
+                                          ▼
+                                    adapter weights
+```
+
+### Pair Construction
+
+Within-task pairs: same task_id, different rounds → pair high-reward response (chosen) with low-reward response (rejected). Minimum reward spread threshold (default 0.1) ensures meaningful preference signal.
+
+Optional cross-task pairs: within same category, top quartile vs bottom quartile — weaker signal but more training data.
+
+From 200 rollouts (25 rounds × 8 tasks):
+- **901 within-task pairs** (spread range: 0.100–0.807, avg 0.482)
+- **+297 cross-task pairs** (with `--cross-task`)
+- Categories: 391 complex, 807 medium (simple tasks all score 0.94 — no spread)
+
+### Usage
+
+```bash
+source ~/dev/quant-env/bin/activate  # transformers 5.5, TRL 1.0
+
+# Dry run (validate pairs + config)
+python experiments/agent-lightning/train_dpo.py \
+  --rollouts "experiments/agent-lightning/results/rollouts/rollouts_*.jsonl" \
+  --dry-run
+
+# Train on GPU 1 (GPU 0 serving vLLM)
+CUDA_VISIBLE_DEVICES=1 python experiments/agent-lightning/train_dpo.py \
+  --rollouts "experiments/agent-lightning/results/rollouts/rollouts_*.jsonl" \
+  --cross-task
+
+# With custom hyperparams
+CUDA_VISIBLE_DEVICES=1 python experiments/agent-lightning/train_dpo.py \
+  --rollouts "experiments/agent-lightning/results/rollouts/rollouts_*.jsonl" \
+  --cross-task --beta 0.05 --lr 1e-6 --epochs 5
+```
+
+### Training Config
+
+| Parameter | Value | Notes |
+|-----------|-------|-------|
+| Base model | Qwen/Qwen3.5-9B | Dense, fine-tune base |
+| LoRA rank | 16 | Targets q/k/v/o/gate/up/down_proj |
+| Learning rate | 5e-7 | Conservative for preference learning |
+| Beta | 0.1 | KL penalty (lower = more aggressive) |
+| Batch size | 2 x 4 grad_accum = 8 effective | |
+| Max length | 1024 tokens | Prompt + response |
+| Loss | Sigmoid | Standard DPO loss |
+| Precision | BF16 | Native on Blackwell |
+| Epochs | 3 | Over preference pairs |
+
+### GRPO vs DPO
+
+| Aspect | GRPO | DPO |
+|--------|------|-----|
+| Mode | Online (generates fresh completions) | Offline (uses pre-collected pairs) |
+| Reward | Live reward function needed | Pre-scored, no live calls |
+| Data | Can generate infinite data | Limited to collected rollouts |
+| Cost | vLLM + judge API per step | One-time rollout collection cost |
+| Signal | Explores new behaviors | Optimizes between known behaviors |
+| Status | Infrastructure ready, needs live judge | **Working end-to-end** |
+
+### DPO Run 1 (36 pairs)
+
+| Metric | Value |
+|--------|-------|
+| Pairs | 36 (26 within-task, 10 cross-task) |
+| Steps | 15 |
+| Train loss | 0.693 → 0.510 (epoch 1 low) → 0.66 avg |
+| Reward accuracy | Peak 87.5% |
+| Reward margins | Peak 0.539 |
+| Total time | 2m 11s |
+
+**Key finding**: Real gradient signal — loss moved, gradients flowed, margins showed preference learning. Unlike GRPO's zero-gradient failure.
+
+### DPO Run 2 (1198 pairs)
+
+| Metric | Value |
+|--------|-------|
+| Pairs | 1198 (901 within-task, 297 cross-task) |
+| Steps | 450 |
+| Train loss | 0.693 → 0.5959 avg |
+| Reward accuracy | Frequently 0.625–0.875 |
+| Total time | 74 min |
+| Adapter | `/mnt/data/training/researcher/dpo-9b-v2/` (111 MB LoRA) |
+
+Much more stable than Run 1 — less oscillation with 33x more data.
+
+### DPO Serving (Blocked)
+
+vLLM's native LoRA serving fails on Qwen3.5 due to merged QKV projections (`IndexError` in `column_parallel_linear.py`). Merging the adapter into the base model produces a text-only `Qwen3_5ForCausalLM` model, but vLLM only registers the multimodal `Qwen3_5ForConditionalGeneration` wrapper. A merged model with the multimodal config + vision weights was created but produces empty output — the LoRA was trained under transformers 5.5's text-only weight paths which don't align with the multimodal wrapper. Needs proper investigation.
+
+## Bayesian Combination Search (Optuna)
+
+Search over combinations of independently-optimized subagent prompts using Optuna's TPE sampler. Inspired by DSPy MIPROv2.
+
+### Results (4 trials, 2 combinations)
+
+Only the analyst subagent has an optimized variant (explorer and writer only have original).
+
+| Trial | Analyst | Score | Notes |
+|-------|---------|:-----:|-------|
+| 0 | optimized | 0.329 | github_trending=0.000 |
+| 1 | original | 0.352 | multi_step=0.662 |
+| 2 | original | 0.336 | |
+| 3 | **optimized** | **0.439** | github_trending=0.655 |
+
+**Winner**: analyst=optimized (0.439), but variance is high (0.329–0.439 for same config) driven by flaky external tools (github_trending, hf_model_search score 0.000 intermittently).
+
+### Usage
+
+```bash
+# Dry run (list variants)
+.venv/bin/python experiments/agent-lightning/search_combos.py --dry-run
+
+# Run search (4 trials)
+.venv/bin/python experiments/agent-lightning/search_combos.py --trials 4
+```
+
 ## Future Work
 
-- **Re-run APO with LLM judge**: The pattern matcher led to overfitting. Re-optimize SOUL.md using the LLM judge for richer gradient signal.
-- **Expand eval tasks**: Current 10 tasks are narrow. More diverse tasks would prevent overfitting.
-- **Online GRPO**: Once offline training validates, switch to online mode with vLLM generating fresh completions each batch.
+- **Fix DPO adapter serving**: Debug Qwen3.5 multimodal/text weight prefix mismatch. Options: retrain LoRA targeting `Qwen3_5ForConditionalGeneration` weight paths, or use custom model class with `--trust-remote-code`.
+- **Optimize explorer + writer subagents**: Run multi-prompt APO for both. Unlocks meaningful combo search (8 combinations vs current 2).
+- **Re-run combo search with all 3 optimized**: 2^3 = 8 combinations, 8–16 trials needed.
+- **Minibatch evaluation**: Evaluate on random subset of tasks per APO step instead of all tasks — faster iterations, less overfitting. (From DSPy.)
+- **Online GRPO with live judge**: Wire LLM judge as real-time reward function. Requires vLLM 9B on GPU 0, training on GPU 1, Sonnet via gateway (~$1/run).
 - **Cross-validation**: Use k-fold task splits to detect overfitting during APO.
-- **Scale rollout collection**: 40 rollouts is minimal — aim for 200+ for stable GRPO training.
+- **Gradio workbench**: General-purpose prompt optimization → RL training app (deferred until flow is proven and abstractions are stable).
