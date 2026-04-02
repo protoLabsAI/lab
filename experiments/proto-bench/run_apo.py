@@ -101,7 +101,7 @@ def run_task(prompt: str, system_prompt_path: str, timeout: int = 120) -> dict:
     env = os.environ.copy()
     env["QWEN_SYSTEM_MD"] = system_prompt_path
 
-    cmd = [PROTO_CLI, "-p", prompt, "-o", "json", "--max-session-turns", "15"]
+    cmd = [PROTO_CLI, "-p", prompt, "-o", "json", "--max-session-turns", "15", "-y"]
 
     t0 = time.monotonic()
     try:
