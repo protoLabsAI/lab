@@ -1,0 +1,16 @@
+[Unit]
+Description=Qwen3 Embedding Server (OpenAI-compatible)
+After=network.target
+
+[Service]
+Type=simple
+User=ava
+Environment=CUDA_VISIBLE_DEVICES=1
+Environment=HF_HOME=/mnt/models/huggingface
+WorkingDirectory=/home/ava/dev/lab
+ExecStart=/home/ava/dev/lab/.venv/bin/python -u experiments/rag-bench/serve_embed.py --model Qwen/Qwen3-Embedding-0.6B --port 8001
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
