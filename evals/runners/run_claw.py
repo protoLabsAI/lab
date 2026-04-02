@@ -63,6 +63,11 @@ def build_claw_config(model: str, gateway_url: str, api_key: str) -> Path:
     config["model"]["base_url"] = gateway_url
     config["model"]["api_key"] = api_key
 
+    # Ensure judge also uses the same gateway URL
+    if "judge" in config:
+        config["judge"]["base_url"] = gateway_url
+        config["judge"]["api_key"] = api_key
+
     run_dir = RESULTS_DIR / f"{model}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
     run_dir.mkdir(parents=True, exist_ok=True)
     config["defaults"]["trace_dir"] = str(run_dir)
