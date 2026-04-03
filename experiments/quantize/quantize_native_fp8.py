@@ -124,11 +124,23 @@ def quantize_model(model_id: str, output_dir: Path):
         if should_skip(name, skip_patterns) or tensor.ndim < 2:
             new_state_dict[name] = tensor
             skipped_count += 1
-        elif name.endswith(".weight"):
+        elif name.endswith(".weight") and tensor.ndim == 2:
             q_weight, scale = quantize_weight_blockwise(tensor.float())
             new_state_dict[name] = q_weight
             scale_name = name.replace(".weight", ".weight_scale")
             new_state_dict[scale_name] = scale
+            quantized_count += 1
+        elif name.endswith(".weight") and tensor.ndim == 3:
+            # MoE expert weights: [num_experts, in, out] — quantize each expert
+            experts = []
+            scales = []
+            for i in range(tensor.shape[0]):
+                q_w, s = quantize_weight_blockwise(tensor[i].float())
+                experts.append(q_w)
+                scales.append(s)
+            new_state_dict[name] = torch.stack(experts)
+            scale_name = name.replace(".weight", ".weight_scale")
+            new_state_dict[scale_name] = torch.stack(scales)
             quantized_count += 1
         else:
             new_state_dict[name] = tensor
@@ -137,12 +149,73 @@ def quantize_model(model_id: str, output_dir: Path):
     quant_time = time.time() - t1
     logger.info(f"Quantized {quantized_count} layers, skipped {skipped_count} in {quant_time:.1f}s")
 
+    # Free original model + state dict to reclaim RAM before saving
+    del model
+    del state_dict
+    import gc
+    gc.collect()
+
     # Save
     logger.info(f"Saving to {output_dir}...")
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Save weights
-    save_file(new_state_dict, str(output_dir / "model.safetensors"))
+    # Save weights in shards to stay within RAM
+    # Target ~5GB per shard to keep peak memory manageable
+    SHARD_MAX_BYTES = 5 * 1024**3
+    shard_idx = 0
+    current_shard = {}
+    current_bytes = 0
+    shard_files = []
+    weight_map = {}
+
+    seen_data_ptrs = {}
+    for name, tensor in new_state_dict.items():
+        t = tensor.contiguous()
+        ptr = t.data_ptr()
+        if ptr in seen_data_ptrs:
+            t = t.clone()
+        else:
+            seen_data_ptrs[ptr] = name
+
+        tensor_bytes = t.nelement() * t.element_size()
+        if current_bytes + tensor_bytes > SHARD_MAX_BYTES and current_shard:
+            # Save current shard
+            shard_name = f"model-{shard_idx:05d}-of-PLACEHOLDER.safetensors"
+            save_file(current_shard, str(output_dir / shard_name))
+            shard_files.append(shard_name)
+            for k in current_shard:
+                weight_map[k] = shard_name
+            current_shard = {}
+            current_bytes = 0
+            shard_idx += 1
+
+        current_shard[name] = t
+        current_bytes += tensor_bytes
+
+    # Save last shard
+    if current_shard:
+        shard_name = f"model-{shard_idx:05d}-of-PLACEHOLDER.safetensors"
+        save_file(current_shard, str(output_dir / shard_name))
+        shard_files.append(shard_name)
+        for k in current_shard:
+            weight_map[k] = shard_name
+        del current_shard
+
+    # Rename with final count
+    total_shards = len(shard_files)
+    for i, old_name in enumerate(shard_files):
+        new_name = f"model-{i+1:05d}-of-{total_shards:05d}.safetensors"
+        (output_dir / old_name).rename(output_dir / new_name)
+        for k in weight_map:
+            if weight_map[k] == old_name:
+                weight_map[k] = new_name
+
+    # Write index
+    total_size = sum(t.nelement() * t.element_size() for t in new_state_dict.values())
+    index = {"metadata": {"total_size": total_size}, "weight_map": weight_map}
+    with open(output_dir / "model.safetensors.index.json", "w") as f:
+        json.dump(index, f, indent=2)
+    del new_state_dict
 
     # Save tokenizer
     tokenizer.save_pretrained(output_dir)
