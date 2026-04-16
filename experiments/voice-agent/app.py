@@ -39,6 +39,16 @@ logger = logging.getLogger(__name__)
 DEVICE = "cuda"
 LLM_URL = os.environ.get("LLM_URL", "http://localhost:8000/v1")
 
+# TTS backend selection
+# - "kokoro": in-process Kokoro 82M (24kHz, ~95ms/chunk, no cloning)
+# - "fish":   external Fish S2 Pro on FISH_URL (44.1kHz, streaming, voice cloning)
+TTS_BACKEND = os.environ.get("TTS_BACKEND", "kokoro").lower()
+FISH_URL = os.environ.get("FISH_URL", "http://localhost:8092")
+FISH_REFERENCE_ID = os.environ.get("FISH_REFERENCE_ID", "").strip() or None
+FISH_SR = 44100
+KOKORO_SR = 24000
+TTS_SAMPLE_RATE = FISH_SR if TTS_BACKEND == "fish" else KOKORO_SR
+
 SYSTEM_PROMPT = (
     "You are a helpful voice assistant. Keep responses concise — 1-3 sentences max. "
     "Be conversational and natural. Do not use markdown, bullet points, or formatting. "
@@ -146,18 +156,128 @@ def tts_kokoro(text: str) -> tuple[int, np.ndarray]:
     pipe = get_kokoro()
     chunks = list(pipe(text, voice="af_heart", speed=1))
     if not chunks:
-        return 24000, np.zeros(2400, dtype=np.int16)
+        return KOKORO_SR, np.zeros(2400, dtype=np.int16)
     audio = np.concatenate([c[2] for c in chunks])
-    return 24000, (audio * 32767).clip(-32768, 32767).astype(np.int16)
+    return KOKORO_SR, (audio * 32767).clip(-32768, 32767).astype(np.int16)
+
+
+def tts_kokoro_stream(text: str, cancel: threading.Event | None = None):
+    """Wrap Kokoro as a single-yield generator for uniform pipeline."""
+    sr, audio = tts_kokoro(text)
+    yield sr, audio
+
+
+# Currently selected Fish voice (mutable; UI updates this via the dropdown).
+# None = Fish's baked-in default voice.
+_current_fish_voice: str | None = FISH_REFERENCE_ID
+
+
+def set_fish_voice(voice_id: str | None):
+    """Swap the active Fish voice cloning reference."""
+    global _current_fish_voice
+    _current_fish_voice = (voice_id or "").strip() or None
+    logger.info(f"[voice] Switched Fish reference to {_current_fish_voice!r}")
+    return _current_fish_voice
+
+
+def fish_list_voices() -> list[str]:
+    """Query saved reference voice IDs from the Fish server."""
+    try:
+        r = httpx.get(
+            f"{FISH_URL}/v1/references/list",
+            headers={"Accept": "application/json"},
+            timeout=5.0,
+        )
+        r.raise_for_status()
+        return r.json().get("reference_ids", [])
+    except Exception as e:
+        logger.warning(f"Failed to list Fish voices: {e}")
+        return []
+
+
+def tts_fish_stream(text: str, cancel: threading.Event | None = None):
+    """Stream Fish Audio S2 Pro chunks as int16 PCM @ 44.1kHz.
+
+    Wire format: ~44 byte WAV header, then raw int16 LE PCM samples (mono).
+    See fish-speech/tools/server/inference.py:30-33.
+    """
+    payload = {
+        "text": text,
+        "format": "wav",
+        "streaming": True,
+        "use_memory_cache": "on",  # reuse encoded ref between sentences
+    }
+    if _current_fish_voice:
+        payload["reference_id"] = _current_fish_voice
+
+    buf = bytearray()
+    header_skipped = False
+    HEADER_BYTES = 44
+
+    try:
+        with httpx.Client(timeout=300.0) as client:
+            with client.stream(
+                "POST",
+                f"{FISH_URL}/v1/tts",
+                json=payload,
+                headers={"authorization": "Bearer none"},
+            ) as r:
+                r.raise_for_status()
+                for chunk in r.iter_bytes(chunk_size=4096):
+                    if cancel is not None and cancel.is_set():
+                        return
+                    if not chunk:
+                        continue
+                    buf.extend(chunk)
+
+                    # Skip 44-byte WAV header on first valid prefix
+                    if not header_skipped:
+                        if len(buf) < HEADER_BYTES:
+                            continue
+                        del buf[:HEADER_BYTES]
+                        header_skipped = True
+
+                    # Yield aligned int16 samples; carry remainder for next round
+                    n_samples = len(buf) // 2
+                    if n_samples == 0:
+                        continue
+                    usable = n_samples * 2
+                    arr = np.frombuffer(bytes(buf[:usable]), dtype=np.int16)
+                    del buf[:usable]
+                    yield FISH_SR, arr
+    except Exception as e:
+        logger.error(f"Fish TTS stream error: {e}")
+        # Yield a brief silence so the pipeline doesn't stall silently
+        yield FISH_SR, np.zeros(int(FISH_SR * 0.2), dtype=np.int16)
+
+
+def tts_stream(text: str, cancel: threading.Event | None = None):
+    """Dispatch to the configured TTS backend as a (sr, int16_array) generator."""
+    if TTS_BACKEND == "fish":
+        yield from tts_fish_stream(text, cancel=cancel)
+    else:
+        yield from tts_kokoro_stream(text, cancel=cancel)
 
 
 # ---------------------------------------------------------------------------
 # LLM: Streaming with cancellation support
 # ---------------------------------------------------------------------------
 def stream_llm_tokens(text: str, history: list[dict], cancel: threading.Event):
-    """Generator yielding tokens. Stops early if cancel is set."""
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    messages.extend(history)
+    """Generator yielding tokens. Stops early if cancel is set.
+
+    Qwen3.5 chat template rejects multiple system messages — merge the base
+    SYSTEM_PROMPT with any history-injected summary into a single system
+    message at position 0, then append non-system history + current user turn.
+    """
+    system_parts = [SYSTEM_PROMPT]
+    non_system_history = []
+    for m in history:
+        if m.get("role") == "system":
+            system_parts.append(m["content"])
+        else:
+            non_system_history.append(m)
+    messages = [{"role": "system", "content": "\n\n".join(system_parts)}]
+    messages.extend(non_system_history)
     messages.append({"role": "user", "content": text})
 
     try:
@@ -335,15 +455,16 @@ class VoiceAgent:
                     break
 
                 t1 = time.time()
-                sr_out, audio_chunk = tts_kokoro(sentence)
+                for sr_out, audio_chunk in tts_stream(sentence, cancel=self.cancel):
+                    if self.cancel.is_set():
+                        interrupted = True
+                        break
+                    if ttfa is None:
+                        ttfa = time.time() - total_start
+                        logger.info(f"[TTFA {ttfa:.2f}s] First chunk: {sentence!r}")
+                    chunk_count += 1
+                    yield sr_out, audio_chunk
                 tts_total += time.time() - t1
-
-                if ttfa is None:
-                    ttfa = time.time() - total_start
-                    logger.info(f"[TTFA {ttfa:.2f}s] First chunk: {sentence!r}")
-
-                chunk_count += 1
-                yield sr_out, audio_chunk
 
             if interrupted:
                 break
@@ -354,10 +475,12 @@ class VoiceAgent:
                 if self.cancel.is_set():
                     break
                 t1 = time.time()
-                sr_out, audio_chunk = tts_kokoro(sentence)
+                for sr_out, audio_chunk in tts_stream(sentence, cancel=self.cancel):
+                    if self.cancel.is_set():
+                        break
+                    chunk_count += 1
+                    yield sr_out, audio_chunk
                 tts_total += time.time() - t1
-                chunk_count += 1
-                yield sr_out, audio_chunk
 
         llm_time = time.time() - llm_start
         total_time = time.time() - total_start
@@ -388,10 +511,38 @@ agent = VoiceAgent()
 
 
 def prewarm():
-    logger.info("Pre-warming all models...")
+    logger.info(
+        f"Pre-warming all models... (TTS_BACKEND={TTS_BACKEND}, sr={TTS_SAMPLE_RATE})"
+    )
     t0 = time.time()
     get_stt()
+
+    # Always preload Kokoro (cheap fallback) — even if Fish is selected, it's
+    # available if Fish goes down mid-session.
     get_kokoro()
+
+    # Fish health check + first-call warmup (torch.compile is ~2 min cold).
+    if TTS_BACKEND == "fish":
+        try:
+            r = httpx.get(f"{FISH_URL}/v1/health", timeout=5.0)
+            r.raise_for_status()
+            logger.info(f"Fish reachable at {FISH_URL}")
+            if FISH_REFERENCE_ID:
+                logger.info(f"Fish voice clone reference: {FISH_REFERENCE_ID!r}")
+        except Exception as e:
+            logger.error(f"Fish unreachable at {FISH_URL}: {e}")
+            logger.error("Start it with: cd ~/dev/fish-speech && CUDA_VISIBLE_DEVICES=1 .venv/bin/python -m tools.api_server --listen 0.0.0.0:8092 --llama-checkpoint-path checkpoints/s2-pro --decoder-checkpoint-path checkpoints/s2-pro/codec.pth --decoder-config-name modded_dac_vq --half --compile")
+
+        try:
+            t_fish = time.time()
+            # Drain a tiny stream to amortize compile + cache the model
+            chunks = 0
+            for _ in tts_fish_stream("Ready."):
+                chunks += 1
+            logger.info(f"Fish warmed in {time.time() - t_fish:.1f}s ({chunks} chunks)")
+        except Exception as e:
+            logger.warning(f"Fish warmup failed: {e}")
+
     try:
         httpx.post(
             f"{LLM_URL}/chat/completions",
@@ -413,43 +564,78 @@ def prewarm():
     logger.info(f"All models pre-warmed in {time.time() - t0:.1f}s")
 
 
-def voice_handler(audio: tuple[int, np.ndarray]):
+def voice_handler(audio: tuple[int, np.ndarray], *extra_inputs):
+    """Main handler. If TTS_BACKEND=fish, the last extra input is the voice-dropdown
+    value from FastRTC additional_inputs. (FastRTC prepends a WebRTC session id
+    as the first extra, so we always take the LAST non-empty string.)"""
+    if TTS_BACKEND == "fish":
+        # Pick the last string extra (the voice dropdown value) and ignore the
+        # WebRTC session id that FastRTC prepends.
+        v = None
+        for item in reversed(extra_inputs):
+            if isinstance(item, str) and item:
+                v = item
+                break
+        set_fish_voice(None if (not v or v == "(default)") else v)
+
     # Signal interruption to any in-progress generation
     agent.interrupt()
     yield from agent.process_turn_streaming(audio)
 
 
-def build_ui():
-    with gr.Blocks(title="Voice Agent") as demo:
-        gr.Markdown("# Voice Agent\nSpeak — I'll respond.")
-        from fastrtc.reply_on_pause import AlgoOptions
-        Stream(
-            ReplyOnPause(
-                voice_handler,
-                algo_options=AlgoOptions(
-                    audio_chunk_duration=0.6,
-                    started_talking_threshold=0.5,
-                    speech_threshold=0.1,
-                ),
-                output_sample_rate=24000,
-                can_interrupt=True,
-            ),
-            modality="audio",
-            mode="send-receive",
+def build_stream():
+    """Build the FastRTC Stream with the Fish voice selector as an extra input."""
+    from fastrtc.reply_on_pause import AlgoOptions
+
+    additional_inputs = []
+    if TTS_BACKEND == "fish":
+        voices = fish_list_voices()
+        default_choice = (
+            _current_fish_voice if _current_fish_voice in voices else "(default)"
         )
-    return demo
+        voice_dd = gr.Dropdown(
+            choices=["(default)"] + voices,
+            value=default_choice,
+            label="Fish voice (select a saved reference)",
+            allow_custom_value=True,
+        )
+        additional_inputs.append(voice_dd)
+
+    stream = Stream(
+        ReplyOnPause(
+            voice_handler,
+            algo_options=AlgoOptions(
+                audio_chunk_duration=0.6,
+                started_talking_threshold=0.5,
+                speech_threshold=0.1,
+            ),
+            output_sample_rate=TTS_SAMPLE_RATE,
+            can_interrupt=True,
+        ),
+        additional_inputs=additional_inputs,
+        modality="audio",
+        mode="send-receive",
+        ui_args={
+            "title": "Voice Agent",
+            "subtitle": f"TTS: {TTS_BACKEND}" + (
+                f" — select a Fish voice below, or '(default)' for the baked-in voice"
+                if TTS_BACKEND == "fish" else ""
+            ),
+        },
+    )
+    return stream
 
 
 if __name__ == "__main__":
     prewarm()
-    demo = build_ui()
+    stream = build_stream()
     auth = os.environ.get("GRADIO_AUTH")
     auth_pairs = None
     if auth:
         auth_pairs = [tuple(pair.split(":")) for pair in auth.split(",")]
         logger.info(f"Auth enabled for {len(auth_pairs)} user(s)")
 
-    demo.launch(
+    stream.ui.launch(
         server_name="0.0.0.0",
         server_port=7866,
         share=False,
