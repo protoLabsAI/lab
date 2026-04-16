@@ -195,6 +195,53 @@ def fish_list_voices() -> list[str]:
         return []
 
 
+def fish_save_voice(audio_path: str, transcript: str, voice_id: str) -> tuple[bool, str]:
+    """Save an audio clip + transcript to the Fish server as a named reference."""
+    if not audio_path:
+        return False, "Upload or record audio first."
+    voice_id = (voice_id or "").strip()
+    if not voice_id:
+        return False, "Voice ID is required."
+    import re as _re
+    if not _re.match(r"^[a-zA-Z0-9\-_ ]+$", voice_id) or len(voice_id) > 255:
+        return False, "Voice ID: alphanumeric, '-', '_', space only (max 255)."
+    transcript = (transcript or "").strip()
+    if not transcript:
+        return False, "Transcript is required (or click 'Auto-transcribe' first)."
+
+    try:
+        with open(audio_path, "rb") as f:
+            name = Path(audio_path).name
+            files = {"audio": (name, f.read(), "application/octet-stream")}
+        r = httpx.post(
+            f"{FISH_URL}/v1/references/add",
+            data={"id": voice_id, "text": transcript},
+            files=files,
+            headers={"Accept": "application/json"},
+            timeout=30.0,
+        )
+        if r.status_code == 200:
+            return True, f"Saved '{voice_id}'."
+        body = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
+        return False, f"[{r.status_code}] {body.get('message', r.text[:160])}"
+    except Exception as e:
+        return False, f"Save failed: {e}"
+
+
+def whisper_transcribe_file(audio_path: str) -> str:
+    """Use the already-loaded Whisper model to transcribe a local audio file.
+    Passes return_timestamps=True so clips >30s use long-form chunking."""
+    if not audio_path:
+        return ""
+    try:
+        stt = get_stt()
+        result = stt(audio_path, return_timestamps=True)
+        return (result.get("text") or "").strip()
+    except Exception as e:
+        logger.warning(f"Whisper transcribe failed: {e}")
+        return ""
+
+
 def tts_fish_stream(text: str, cancel: threading.Event | None = None):
     """Stream Fish Audio S2 Pro chunks as int16 PCM @ 44.1kHz.
 
@@ -584,10 +631,15 @@ def voice_handler(audio: tuple[int, np.ndarray], *extra_inputs):
 
 
 def build_stream():
-    """Build the FastRTC Stream with the Fish voice selector as an extra input."""
+    """Build the FastRTC Stream with the Fish voice selector as an extra input.
+    When Fish backend is active, also mounts an "Add voice clone" accordion into
+    the generated Blocks so new references can be recorded without leaving the
+    voice-agent UI.
+    """
     from fastrtc.reply_on_pause import AlgoOptions
 
     additional_inputs = []
+    voice_dd = None
     if TTS_BACKEND == "fish":
         voices = fish_list_voices()
         default_choice = (
@@ -623,6 +675,71 @@ def build_stream():
             ),
         },
     )
+
+    # Add the "Add voice clone" accordion into the generated Blocks.
+    # Re-entering the Blocks context lets us append more components after
+    # FastRTC has finished building its default layout.
+    if TTS_BACKEND == "fish" and voice_dd is not None:
+        with stream.ui:
+            with gr.Accordion("🎙️ Add a voice clone (10–30s of speech)", open=False):
+                gr.Markdown(
+                    "Record or upload a clip, fill in the transcript (or click "
+                    "**Auto-transcribe**), give it a short ID, then **Save**. "
+                    "The voice will appear in the dropdown above."
+                )
+                new_audio = gr.Audio(
+                    sources=["microphone", "upload"],
+                    type="filepath",
+                    label="Reference audio",
+                )
+                with gr.Row():
+                    new_id = gr.Textbox(
+                        label="Voice ID",
+                        placeholder="e.g. sarah_sample1 (alphanumeric, -, _, space)",
+                        scale=2,
+                    )
+                    transcribe_btn = gr.Button("Auto-transcribe", scale=1)
+                new_transcript = gr.Textbox(
+                    label="Transcript (exact words spoken)",
+                    lines=3,
+                    placeholder="What is said in the reference clip",
+                )
+                save_btn = gr.Button("Save voice clone", variant="primary")
+                save_status = gr.Textbox(
+                    label="Status", interactive=False, lines=1,
+                )
+
+                def _do_transcribe(audio_path):
+                    if not audio_path:
+                        return gr.update(), "Record or upload audio first."
+                    t = whisper_transcribe_file(audio_path)
+                    if not t:
+                        return gr.update(), "Transcribe failed — check logs."
+                    return t, f"Transcribed ({len(t)} chars)."
+
+                def _do_save(audio_path, transcript, voice_id):
+                    ok, msg = fish_save_voice(audio_path, transcript, voice_id)
+                    if ok:
+                        ids = fish_list_voices()
+                        # Also activate the new voice right away
+                        set_fish_voice(voice_id.strip())
+                        return msg, gr.update(
+                            choices=["(default)"] + ids,
+                            value=voice_id.strip(),
+                        )
+                    return msg, gr.update()
+
+                transcribe_btn.click(
+                    _do_transcribe,
+                    inputs=[new_audio],
+                    outputs=[new_transcript, save_status],
+                )
+                save_btn.click(
+                    _do_save,
+                    inputs=[new_audio, new_transcript, new_id],
+                    outputs=[save_status, voice_dd],
+                )
+
     return stream
 
 
