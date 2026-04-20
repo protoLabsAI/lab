@@ -48,9 +48,14 @@ def run_agent(client: OpenAI, model: str, task: dict, max_turns: int = 20) -> di
     start = time.time()
 
     while turns < max_turns:
-        kwargs = {"model": model, "messages": messages, "temperature": 0.0, "max_tokens": 4000}
+        kwargs = {"model": model, "messages": messages, "temperature": 0.0, "max_tokens": 8000}
         if tools:
             kwargs["tools"] = tools
+        extra_body = dict(task.get("extra_body") or {})
+        ctk = dict(extra_body.get("chat_template_kwargs") or {})
+        ctk.setdefault("enable_thinking", False)
+        extra_body["chat_template_kwargs"] = ctk
+        kwargs["extra_body"] = extra_body
 
         response = client.chat.completions.create(**kwargs)
         choice = response.choices[0]
@@ -92,7 +97,7 @@ def run_agent(client: OpenAI, model: str, task: dict, max_turns: int = 20) -> di
     }
 
 
-def grade_task(task: dict, output: dict, gateway_url: str = "http://localhost:4000/v1", api_key: str = "not-needed") -> list[GradeResult]:
+def grade_task(task: dict, output: dict, gateway_url: str = "http://localhost:4000/v1", api_key: str = "not-needed", judge_url: str | None = None) -> list[GradeResult]:
     """Apply graders defined in the task config."""
     grades = []
     grader_configs = task.get("graders", [])
@@ -103,7 +108,7 @@ def grade_task(task: dict, output: dict, gateway_url: str = "http://localhost:40
                 dimension=gc["dimension"],
                 rubric=gc.get("rubric"),
                 model=gc.get("model", "claude-sonnet-4-6"),
-                base_url=gateway_url,
+                base_url=judge_url or gateway_url,
                 api_key=api_key,
             )
             # Pass clean output to judge — just the text, not the full trace
@@ -125,7 +130,8 @@ def grade_task(task: dict, output: dict, gateway_url: str = "http://localhost:40
 @click.option("--gateway-url", default="http://localhost:4000/v1")
 @click.option("--api-key", envvar="GATEWAY_API_KEY", default="not-needed")
 @click.option("--submit-langfuse", is_flag=True, help="Submit scores to Langfuse")
-def main(task_path, suite, model, trials, gateway_url, api_key, submit_langfuse):
+@click.option("--thinking", is_flag=True, help="Enable thinking/reasoning mode (Gemma 4, etc.)")
+def main(task_path, suite, model, trials, gateway_url, api_key, submit_langfuse, thinking):
     """Run custom eval tasks and grade results."""
     client = OpenAI(base_url=gateway_url, api_key=api_key)
     scorer = LangfuseScorer() if submit_langfuse else None
@@ -169,13 +175,20 @@ def main(task_path, suite, model, trials, gateway_url, api_key, submit_langfuse)
         click.echo(f"\n{suite_name} ({len(tasks)} tests)")
 
         for task in tasks:
+            if thinking:
+                eb = dict(task.get("extra_body") or {})
+                ctk = dict(eb.get("chat_template_kwargs") or {})
+                ctk["enable_thinking"] = True
+                eb["chat_template_kwargs"] = ctk
+                task["extra_body"] = eb
             task_id = task.get("id", file_data.get("id", tf.stem))
             click.echo(f"\n  {task_id}:")
 
             trial_results = []
             for trial in range(1, trials + 1):
                 output = run_agent(client, model, task)
-                grades = grade_task(task, output, gateway_url=gateway_url, api_key=api_key)
+                judge_gateway = os.environ.get("JUDGE_GATEWAY_URL", "http://100.101.189.45:4000/v1")
+                grades = grade_task(task, output, gateway_url=gateway_url, api_key=api_key, judge_url=judge_gateway)
 
                 result = TaskResult(
                     task_id=task_id,

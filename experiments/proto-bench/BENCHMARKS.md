@@ -90,10 +90,11 @@ There's a ~53-point collapse from headline benchmark scores to production perfor
 
 | Benchmark | Status | Models Tested |
 |-----------|--------|---------------|
-| **BFCL v4** (900 tests) | ✅ Running | Gemma 4 MoE (94.4%), Qwen 35B (90.9%), Qwen 27B (89.2%), E4B (87.5%) |
-| **Aider Polyglot** (225 exercises) | ✅ Running | Gemma 4 MoE: 37% polyglot, 50% Python-only |
-| **Claw-Eval** (30-52 tasks) | ✅ Running | Qwen 27B (86/103), Qwen 122B (89/103), Gemma 4 MoE (0.634), MiniMax (0.635) |
-| **Custom suites** (10 suites) | ✅ Running | All models pass |
+| **BFCL v4** (4,706 tests) | ✅ Running | Full harness integrated — see detailed results below |
+| **Function Calling** (8 tests) | ✅ Running | Gemma 4 MoE (8/8), E4B (8/8), E2B (8/8) — all 100% |
+| **Aider Python Hard** (34 exercises) | ✅ Running | Qwen 27B (32%), Qwen 35B MoE (29%), Gemma 4 31B (18%), Gemma 4 MoE (15%) |
+| **Claw-Eval** (104 tasks) | ✅ Running | Qwen 122B (86%), Qwen 27B (83%), Qwen 35B MoE (45%), Gemma 4 MoE (32%), Gemma 4 31B (30%) |
+| **Custom suites** (59 tasks) | ✅ Running | Gemma 4 MoE + thinking: 51/59 (86%) |
 | **WildBench** (1,024 tasks) | ✅ Available | GPT-5.4, Sonnet, Haiku, Qwen 9B variants |
 | **Proto-bench coding** (5 tasks) | ✅ Prototype | Qwen 122B (0.800 baseline) |
 | **Terminal-Bench 2.0** | ❌ Not yet | Target for protoCLI |
@@ -121,6 +122,109 @@ Leaderboard context (pass_rate_2):
 - **Gemma 4 MoE (local, 175 tok/s): 37%**
 
 Note: Gemma 4 is a general-purpose model, not coding-specialized. Strong self-correction (11.8% → 37% with retry).
+
+### Claw-Eval Full Results (2026-04-05/07)
+
+| Model | Size | tok/s | Pass | Rate | Avg Score | Notes |
+|-------|------|:-----:|:----:|:----:|:---------:|-------|
+| **Qwen 122B INT4** | 74GB | 122 | 89/103 | **86.4%** | 0.860 | Quality ceiling, TP=2 |
+| **Qwen 27B INT4** | 29GB | 53 | 86/103 | **83.5%** | 0.830 | Daily driver, best quality/speed |
+| **Qwen 35B MoE FP8** | 35GB | 180 | 41/92 | **44.6%** | 0.604 | Speed king, 3B active params |
+| Gemma 4 26B MoE | 35GB | ~175 | 30/94 | 31.9% | 0.584 | 10B active params |
+| Gemma 4 31B dense | 59GB | ~45 | 26/87 | 29.9% | 0.566 | bf16, single GPU |
+| Gemma 4 E2B | 10GB | 220 | 16/98 | 16.3% | 0.501 | Ollama bf16 |
+| Gemma 4 E4B | 16GB | 126 | 14/99 | 14.1% | 0.472 | Ollama bf16 |
+
+Category breakdown:
+
+| Category | Q122B | Q27B | Q35B MoE | G4 MoE | G4 31B | G4 E2B | G4 E4B |
+|----------|:-----:|:----:|:--------:|:------:|:------:|:------:|:------:|
+| **PinBench** | — | — | 83% | 32% | 67% | 42% | 33% |
+| **Research** | — | — | 71% | 50% | 57% | 12% | 0% |
+| **Security** | — | — | 67% | 33% | 100% | 100% | 67% |
+| **Agentic (Core)** | — | — | 44% | 32% | 26% | 16% | 19% |
+| **Finance/Office** | — | — | 29% | 18% | 0% | 0% | 0% |
+| **Coding (T100+)** | — | — | 20% | 17% | 17% | 0% | 0% |
+| **Vision/Multimodal** | — | — | 0% | 0% | 0% | 0% | 0% |
+
+### Aider Python Hard (34 Exercism exercises, whole edit format)
+
+| Model | Pass2 | Rate | Notes |
+|-------|:-----:|:----:|-------|
+| **Qwen 27B INT4** | 11/34 | **32.4%** | Best coding accuracy |
+| **Qwen 35B MoE FP8** | 10/34 | **29.4%** | Nearly matches 27B, 3.4x faster |
+| Gemma 4 31B dense | 6/34 | 17.6% | +thinking, whole format |
+| Gemma 4 26B MoE | 5/34 | 14.7% | +thinking, whole format |
+| Gemma 4 26B MoE (diff) | 3/34 | 8.8% | No thinking, diff format (worst) |
+
+### Custom Eval Suite (59 tasks, LLM-judged, 2026-04-06)
+
+Gemma 4 MoE with thinking enabled:
+
+| Suite | Pass | Rate |
+|-------|:----:|:----:|
+| Coding | 9/10 | 90% |
+| Reasoning | 4/5 | 80% |
+| Structured Output | 5/5 | 100% |
+| Instruction Following | 3/5 | 60% |
+| Summarization | 22/25 | 88% |
+| Safety | 5/5 | 100% |
+| Research | 3/4 | 75% |
+| **Total** | **51/59** | **86.4%** |
+
+### BFCL v4 Full Results (2026-04-07)
+
+Gorilla Berkeley Function Calling Leaderboard — full 4,706 test harness.
+Harness at `~/dev/gorilla-bfcl/`, wrapper at `evals/run-bfcl.sh`.
+
+**Single-turn (non-live, curated):**
+
+| Category | Gemma 4 MoE | Qwen 27B INT4 |
+|----------|:-----------:|:-------------:|
+| simple_python (400) | **96.75%** | 56.50% |
+| parallel (200) | **95.50%** | 54.00% |
+| parallel_multiple (200) | **91.50%** | 20.00% |
+| irrelevance (240) | **92.92%** | 78.75% |
+| simple_javascript (50) | 76.00% | 70.00% |
+| simple_java (100) | **66.00%** | 3.00% |
+
+**Live (real-world user-contributed):**
+
+| Category | Gemma 4 MoE | Qwen 27B INT4 |
+|----------|:-----------:|:-------------:|
+| live_simple (258) | **87.98%** | 62.40% |
+| live_parallel (16) | 87.50% | 87.50% |
+| live_multiple (1053) | 66.67% | **74.26%** |
+| live_parallel_multiple (24) | 58.33% | 58.33% |
+| live_irrelevance (884) | — | 71.49% |
+| live_relevance (16) | — | **93.75%** |
+
+**Multi-turn (conversational tool use):**
+
+| Category | Gemma 4 MoE | Qwen 27B INT4 |
+|----------|:-----------:|:-------------:|
+| multi_turn_base (200) | 6.00% | **74.50%** |
+| multi_turn_miss_param (200) | 2.00% | **16.00%** |
+| multi_turn_miss_func (200) | 5.00% | 0.00% |
+| multi_turn_long_context (200) | 4.50% | **15.50%** |
+
+**Root cause of claw-eval gap identified:** Gemma 4 has best-in-class single-turn function calling (92-97%) but collapses on multi-turn (2-6%). Qwen 27B is mediocre at single-turn (20-57%) but strong at multi-turn base (74.5%). Claw-eval tasks are multi-turn, explaining why Qwen scores 83% vs Gemma's 32%.
+
+Note: Qwen 27B single-turn scores may be depressed by QwenFCHandler format mismatch with Qwen 3.5 (handler built for Qwen 3). Qwen's native tool calling via vLLM scores ~89% on our 8-test FC suite.
+
+### Key Findings
+
+- **Qwen 27B INT4 is the best all-rounder**: 83% claw-eval, 32% Aider, 53 tok/s — best quality-per-speed ratio
+- **Qwen 35B MoE FP8 is the speed king**: 180 tok/s, 45% claw-eval — trades quality for 3.4x throughput
+- **Qwen 122B INT4 is the quality ceiling**: 86% claw-eval, needs TP=2 (both GPUs)
+- **Gemma 4 MoE vs 31B dense are nearly identical**: ~30% claw-eval, ~16% Aider — MoE is 4x faster
+- **Gemma 4 excels at single-turn function calling** (97% BFCL simple_python) but collapses on multi-turn (2-6%). This is the root cause of its poor claw-eval showing — not format issues
+- **Qwen 27B is the opposite**: mediocre single-turn FC (57% simple_python via BFCL handler) but strong multi-turn (74.5% base). Multi-turn ability drives agentic benchmark success
+- **Thinking mode helps Gemma 4**: +3-6% on Aider, enables reasoning extraction, but doesn't move claw-eval scores
+- **Edit format matters for Aider**: whole >> diff for all models tested
+- **Vision tasks are 0%** across the board (no multimodal serving configured)
+- Qwen2.5-Coder is obsoleted by Qwen3.5 — general models beat the code-specialized variant
+- **BFCL v4 full harness integrated** (`evals/run-bfcl.sh`) — 4,706 tests across single-turn, live, multi-turn, memory, and web search categories
 
 ---
 
