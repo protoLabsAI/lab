@@ -50,3 +50,6 @@ evals/inspect/logs/
 
 # Build / compile caches
 unsloth_compiled_cache/
+
+# Claude Code harness transient state
+.claude/scheduled_tasks.lock
