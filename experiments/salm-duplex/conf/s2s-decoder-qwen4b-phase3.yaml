@@ -1,0 +1,172 @@
+model:
+  pretrained_llm: Qwen/Qwen3.5-4B
+  pretrained_audio_codec: /mnt/data/salm-duplex/checkpoints/nanocodec/nemo-nano-codec-22khz-0.6kbps-12.5fps.nemo
+  pretrained_asr: nvidia/canary-1b-flash
+  scoring_asr: stt_en_fastconformer_transducer_large
+
+  pretrained_weights: True
+
+  freeze_params:
+    - "^audio_codec\\..+$"
+    - "^llm\\..+$"
+    - "^embed_tokens\\..+$"
+    - "^perception\\.preprocessor\\..+$"
+    - "^perception\\.encoder\\..+$"
+  prevent_freeze_params: []
+
+  audio_loss_weight: 4
+  text_loss_weight: 3
+
+  perception:
+    target: nemo.collections.speechlm2.modules.perception.AudioPerceptionModule
+    modality_adapter:
+      _target_: nemo.collections.asr.modules.ConformerEncoder
+      feat_in: 1024
+      feat_out: -1
+      n_layers: 2
+      d_model: 512
+      subsampling: dw_striding
+      subsampling_factor: 1
+      subsampling_conv_channels: 256
+      causal_downsampling: true
+      ff_expansion_factor: 4
+      self_attention_model: rel_pos
+      n_heads: 8
+      att_context_size: [70, 1]
+      att_context_style: chunked_limited
+      xscaling: true
+      untie_biases: true
+      pos_emb_max_len: 5000
+      conv_kernel_size: 9
+      conv_norm_type: layer_norm
+      conv_context_size: causal
+      dropout: 0
+      dropout_pre_encoder: 0
+      dropout_emb: 0.0
+      dropout_att: 0
+
+  speech_decoder:
+    n_layers: 12
+    d_model: 768
+    d_ffn: 3072
+    sa_n_heads: 12
+    kernel_size: 3
+    p_dropout: 0.1
+    p_dropout_out: 0.0
+    has_xattn: false
+    xa_d_memory: 768
+    xa_n_heads: 12
+    is_causal: true
+    apply_norm_to_cond: true
+    apply_norm_out: true
+    max_length_causal_mask: 5000
+    cond_on_prev_audio_tokens: True
+    detach_input: False
+    use_learnable_pos_emb: True
+
+  optimizer:
+    _target_: torch.optim.AdamW
+    lr: 3e-4
+    betas: [0.9, 0.98]
+    weight_decay: 0
+    foreach: true
+
+  lr_scheduler:
+    _target_: nemo.core.optim.lr_scheduler.CosineAnnealing
+    warmup_steps: 1000
+    min_lr: 1e-6
+    max_steps: ${trainer.max_steps}
+
+trainer:
+  devices: -1
+  accelerator: gpu
+  num_nodes: 1
+  precision: bf16-true
+  logger: False
+  enable_checkpointing: False
+  use_distributed_sampler: False
+  max_steps: 100000
+  limit_train_batches: 500
+  val_check_interval: ${trainer.limit_train_batches}
+  limit_val_batches: 20
+  log_every_n_steps: 10
+  num_sanity_val_steps: 0   # skip sanity val to avoid crash-before-train if filters admit a bad batch
+  gradient_clip_val: 1.0
+  accumulate_grad_batches: 4
+  strategy:
+    _target_: lightning.pytorch.strategies.DDPStrategy
+    gradient_as_bucket_view: true
+    find_unused_parameters: true
+
+data:
+  frame_length: 0.08
+  source_sample_rate: 16000
+  target_sample_rate: 22050
+  input_roles: ["user"]
+  output_roles: ["agent"]
+
+  train_ds:
+    sample_rate: ${data.target_sample_rate}
+    # Duration filter: model's max_length_causal_mask=5000 at 12.5 fps → ~400s raw audio.
+    # Cap at 60s to stay safely under the limit (750 audio tokens + text tokens).
+    min_duration: 2.0
+    max_duration: 60.0
+    input_cfg:
+      # Multi-source mixing with weights (sum to 1.0).
+      # Emilia dominates but is diluted 2x to give conversational data
+      # (DailyTalk / Switchboard / AMI) more relative weight.
+      - type: lhotse_shar
+        shar_path: /mnt/data/salm-duplex/manifests/dailytalk/shar-train
+        weight: 0.15
+      - type: lhotse_shar
+        shar_path: /mnt/data/salm-duplex/manifests/phase3/switchboard/shar-train
+        weight: 0.20
+      - type: lhotse_shar
+        shar_path: /mnt/data/salm-duplex/manifests/phase3/ami/shar-train
+        weight: 0.15
+      - type: lhotse_shar
+        shar_path: /mnt/pool/salm-duplex/manifests/phase3/emilia/shar-train
+        weight: 0.50
+    seed: 42
+    shard_seed: "randomized"
+    num_workers: 2
+    batch_size: 1
+
+  validation_ds:
+    datasets:
+      dailytalk_val:
+        shar_path: /mnt/data/salm-duplex/manifests/dailytalk/shar-val
+      switchboard_val:
+        shar_path: /mnt/data/salm-duplex/manifests/phase3/switchboard/shar-val
+      ami_val:
+        shar_path: /mnt/data/salm-duplex/manifests/phase3/ami/shar-val
+      emilia_val:
+        shar_path: /mnt/pool/salm-duplex/manifests/phase3/emilia/shar-val
+    sample_rate: ${data.target_sample_rate}
+    min_duration: 2.0
+    max_duration: 60.0
+    batch_size: 1
+    seed: 42
+    shard_seed: "randomized"
+
+exp_manager:
+  exp_dir: null
+  explicit_log_dir: /mnt/data/training/s2s-decoder-qwen4b-phase3/
+  name: s2s-decoder-qwen4b-phase3
+  create_tensorboard_logger: true
+  create_checkpoint_callback: true
+  use_datetime_version: true
+  max_time_per_run: 02:00:00:00
+
+  resume_if_exists: true   # fresh exp_dir so there's nothing to resume on first run
+  resume_ignore_no_checkpoint: true
+
+  checkpoint_callback_params:
+    filename: "{step}"
+    monitor: val_asr_bleu
+    mode: max
+    every_n_train_steps: 2500   # more frequent saves; Phase 3 has much more diverse val signal
+    every_n_epochs: 0
+    save_top_k: 5
+    always_save_nemo: false
+    save_nemo_on_train_end: false
