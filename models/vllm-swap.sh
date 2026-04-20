@@ -2,6 +2,11 @@
 # Usage: ./vllm-swap.sh <model-name>
 # Gracefully stops vLLM, waits for port release, starts new model.
 #
+# === Qwen 3.6 (new, bf16 only on disk — FP8 via on-the-fly quant) ===
+#   qwen-36b-fp8       — Qwen3.6-35B-A3B MoE + on-the-fly FP8 (single GPU, 262K)
+#   qwen-36b-bf16      — Qwen3.6-35B-A3B MoE bf16 (single GPU, 64K)
+#   qwen-36b-tp2       — Qwen3.6-35B-A3B MoE bf16 (TP=2, 250K)
+#
 # === Production (Single GPU) ===
 #   qwen-35b           — speed king MoE FP8 (Qwen official), 262K ctx (180 tok/s)
 #   qwen-27b-int4      — daily driver, agentic work (53 tok/s)
@@ -16,6 +21,14 @@
 #   qwen-4b            — LoRA base bf16 (155 tok/s)
 #   qwen-2b / qwen-0.8b — training experiments
 #
+# === Gemma 4 (text-only via --language-model-only) ===
+#   gemma4-moe         — 26B-A4B MoE bf16, 128K (single GPU)
+#   gemma4-moe-fp8     — 26B-A4B MoE on-the-fly FP8 (175 tok/s, 128K)
+#   gemma4-31b         — 31B dense bf16, 65K FP8 KV (single GPU)
+#   gemma4-31b-fp8     — 31B dense on-the-fly FP8 (42 tok/s, 131K)
+#   gemma4-e4b         — E4B edge bf16, 128K (single GPU)
+#   gemma4-e4b-fp8     — E4B edge on-the-fly FP8 (128K)
+#
 # === Creative / Experimental ===
 #   cydonia-24b        — Mistral 24B creative/roleplay (no tool calling)
 #   llama-70b          — Llama 70B AWQ creative (38 tok/s)
@@ -26,6 +39,7 @@
 #   qwen-27b-fp8-tp2   — on-the-fly FP8 TP=2 (70 tok/s, 131K ctx)
 #   qwen-35b-tp2-opt   — 250K context, prefix caching (220 tok/s)
 #   qwen-27b-int4-tp2  — 256K context
+#   gemma4-31b-tp2     — Gemma 4 31B dense bf16 TP=2 (128K, FP8 KV)
 #
 # === Legacy / Eval-only (suffix -opt adds P1+P2 flags) ===
 #   qwen-27b-int4-opt, qwen-4b-int4-opt, qwen-35b-opt, qwen-122b-opt
@@ -42,6 +56,9 @@ QWEN35_PREFIX_FLAGS="--enable-prefix-caching --mamba-cache-mode align --mamba-bl
 # -O3: graph optimizations + kernel fusions (5-15% throughput gain)
 O3="-O3"
 usage() {
+    echo "Qwen 3.6 (new):"
+    echo "  $0 {qwen-36b-fp8|qwen-36b-bf16|qwen-36b-tp2}"
+    echo ""
     echo "Production:"
     echo "  $0 {qwen-35b|qwen-9b-fp8|qwen-4b-fp8|qwen-27b-int4|qwen-27b-int4-mtp|qwen-9b-mtp|qwen-4b-int4|context-1}"
     echo ""
@@ -51,8 +68,11 @@ usage() {
     echo "Creative:"
     echo "  $0 {cydonia-24b|llama-70b}"
     echo ""
+    echo "Gemma 4:"
+    echo "  $0 {gemma4-moe|gemma4-moe-fp8|gemma4-31b|gemma4-31b-fp8|gemma4-e4b|gemma4-e4b-fp8}"
+    echo ""
     echo "TP=2 (both GPUs):"
-    echo "  $0 {qwen-122b-fp8|qwen-122b-int4|qwen-27b-fp8-tp2|qwen-35b-tp2-opt|qwen-27b-int4-tp2}"
+    echo "  $0 {qwen-122b-fp8|qwen-122b-int4|qwen-27b-fp8-tp2|qwen-35b-tp2-opt|qwen-27b-int4-tp2|gemma4-31b-tp2}"
     exit 1
 }
 stop_vllm() {
@@ -198,6 +218,56 @@ case "$1" in
             --async-scheduling \
             --performance-mode interactivity \
             --kv-cache-dtype fp8 \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+    qwen-36b-fp8)
+        echo "Starting Qwen3.6-35B-A3B MoE + on-the-fly FP8 (GPU 0, 262K)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.6-35B-A3B \
+            $O3 \
+            --host 0.0.0.0 --port $PORT \
+            --served-model-name local \
+            --max-model-len 262144 \
+            --reasoning-parser qwen3 \
+            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
+            --gpu-memory-utilization 0.90 \
+            --language-model-only \
+            --enable-chunked-prefill \
+            --quantization fp8 \
+            $QWEN35_PREFIX_FLAGS \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+    qwen-36b-bf16)
+        echo "Starting Qwen3.6-35B-A3B MoE bf16 (GPU 0, 64K)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.6-35B-A3B \
+            $O3 \
+            --host 0.0.0.0 --port $PORT \
+            --served-model-name local \
+            --max-model-len 65536 \
+            --reasoning-parser qwen3 \
+            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
+            --gpu-memory-utilization 0.85 \
+            --language-model-only \
+            --enable-chunked-prefill \
+            $QWEN35_PREFIX_FLAGS \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+    qwen-36b-tp2)
+        echo "Starting Qwen3.6-35B-A3B MoE (TP=2, 250K)..."
+        NCCL_P2P_DISABLE=1 \
+        NCCL_CUMEM_ENABLE=0 \
+        $VLLM_BIN serve Qwen/Qwen3.6-35B-A3B \
+            $O3 \
+            --host 0.0.0.0 --port $PORT \
+            --tensor-parallel-size 2 \
+            --served-model-name local \
+            --max-model-len 253952 \
+            --reasoning-parser qwen3 \
+            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
+            --gpu-memory-utilization 0.90 \
+            --disable-custom-all-reduce \
+            --async-scheduling \
+            --enable-chunked-prefill \
+            $QWEN35_PREFIX_FLAGS \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     llama-70b)
@@ -371,6 +441,126 @@ case "$1" in
             --gpu-memory-utilization 0.90 \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
+    # ─── Gemma 4 configs ─────────────────────────────────────────────
+    # On-the-fly FP8 works on our build despite #39049 reports — verified coherent
+    # Heterogeneous head dims force Triton attention fallback (#38887) — expect slower than Qwen
+    # Tool calling parsers are experimental — test before relying on them
+    gemma4-moe)
+        echo "Starting Gemma 4 26B-A4B MoE bf16 (GPU 0, 128K, 4B active)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve google/gemma-4-26B-A4B-it \
+            $O3 \
+            --host 0.0.0.0 --port $PORT \
+            --served-model-name local \
+            --max-model-len 131072 \
+            --dtype bfloat16 \
+            --kv-cache-dtype fp8 \
+            --gpu-memory-utilization 0.90 \
+            --language-model-only \
+            --enable-chunked-prefill \
+            --enable-prefix-caching \
+            --async-scheduling \
+            --generation-config auto \
+            --enable-auto-tool-choice --tool-call-parser gemma4 \
+            --reasoning-parser gemma4 \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+    gemma4-moe-fp8)
+        echo "Starting Gemma 4 26B-A4B MoE + on-the-fly FP8 (GPU 0, 128K, 175 tok/s)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve google/gemma-4-26B-A4B-it \
+            $O3 \
+            --host 0.0.0.0 --port $PORT \
+            --served-model-name local \
+            --max-model-len 131072 \
+            --dtype bfloat16 \
+            --quantization fp8 \
+            --kv-cache-dtype fp8 \
+            --gpu-memory-utilization 0.90 \
+            --language-model-only \
+            --enable-chunked-prefill \
+            --enable-prefix-caching \
+            --async-scheduling \
+            --generation-config auto \
+            --enable-auto-tool-choice --tool-call-parser gemma4 \
+            --reasoning-parser gemma4 \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+    gemma4-31b)
+        echo "Starting Gemma 4 31B dense bf16 (GPU 0, 65K, FP8 KV)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve google/gemma-4-31B-it \
+            $O3 \
+            --host 0.0.0.0 --port $PORT \
+            --served-model-name local \
+            --max-model-len 65536 \
+            --dtype bfloat16 \
+            --kv-cache-dtype fp8 \
+            --gpu-memory-utilization 0.92 \
+            --language-model-only \
+            --enable-chunked-prefill \
+            --enable-prefix-caching \
+            --async-scheduling \
+            --generation-config auto \
+            --enable-auto-tool-choice --tool-call-parser gemma4 \
+            --reasoning-parser gemma4 \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+    gemma4-31b-fp8)
+        echo "Starting Gemma 4 31B + on-the-fly FP8 (GPU 0, 131K, 42 tok/s)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve google/gemma-4-31B-it \
+            $O3 \
+            --host 0.0.0.0 --port $PORT \
+            --served-model-name local \
+            --max-model-len 131072 \
+            --dtype bfloat16 \
+            --quantization fp8 \
+            --kv-cache-dtype fp8 \
+            --gpu-memory-utilization 0.92 \
+            --language-model-only \
+            --enable-chunked-prefill \
+            --enable-prefix-caching \
+            --async-scheduling \
+            --generation-config auto \
+            --enable-auto-tool-choice --tool-call-parser gemma4 \
+            --reasoning-parser gemma4 \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+    gemma4-e4b)
+        echo "Starting Gemma 4 E4B dense bf16 (GPU 0, 128K)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve google/gemma-4-E4B-it \
+            $O3 \
+            --host 0.0.0.0 --port $PORT \
+            --served-model-name local \
+            --max-model-len 131072 \
+            --dtype bfloat16 \
+            --gpu-memory-utilization 0.90 \
+            --language-model-only \
+            --enable-chunked-prefill \
+            --enable-prefix-caching \
+            --async-scheduling \
+            --generation-config auto \
+            --enable-auto-tool-choice --tool-call-parser gemma4 \
+            --reasoning-parser gemma4 \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+    gemma4-e4b-fp8)
+        echo "Starting Gemma 4 E4B + on-the-fly FP8 (GPU 0, 128K)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve google/gemma-4-E4B-it \
+            $O3 \
+            --host 0.0.0.0 --port $PORT \
+            --served-model-name local \
+            --max-model-len 131072 \
+            --dtype bfloat16 \
+            --quantization fp8 \
+            --kv-cache-dtype fp8 \
+            --gpu-memory-utilization 0.90 \
+            --language-model-only \
+            --enable-chunked-prefill \
+            --enable-prefix-caching \
+            --async-scheduling \
+            --generation-config auto \
+            --enable-auto-tool-choice --tool-call-parser gemma4 \
+            --reasoning-parser gemma4 \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
     # ─── Context-1 (Chroma retrieval agent) ────────────────────────────
     context-1)
         echo "Starting Context-1 20B MoE retrieval agent (GPU 0, 32K)..."
@@ -483,6 +673,7 @@ case "$1" in
             --served-model-name local \
             --tensor-parallel-size 2 \
             --max-model-len 65536 \
+            --max-num-seqs 512 \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.90 \
@@ -527,6 +718,29 @@ case "$1" in
             --async-scheduling \
             --enable-chunked-prefill \
             $QWEN35_PREFIX_FLAGS \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+    gemma4-31b-tp2)
+        echo "Starting Gemma 4 31B dense bf16 (TP=2, 128K, FP8 KV)..."
+        NCCL_P2P_DISABLE=1 \
+        NCCL_CUMEM_ENABLE=0 \
+        $VLLM_BIN serve google/gemma-4-31B-it \
+            $O3 \
+            --host 0.0.0.0 --port $PORT \
+            --served-model-name local \
+            --tensor-parallel-size 2 \
+            --max-model-len 131072 \
+            --dtype bfloat16 \
+            --kv-cache-dtype fp8 \
+            --gpu-memory-utilization 0.90 \
+            --language-model-only \
+            --enable-chunked-prefill \
+            --enable-prefix-caching \
+            --async-scheduling \
+            --generation-config auto \
+            --disable-custom-all-reduce \
+            --enable-auto-tool-choice --tool-call-parser gemma4 \
+            --reasoning-parser gemma4 \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     qwen-27b-int4-tp2)

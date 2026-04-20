@@ -47,3 +47,6 @@ Thumbs.db
 
 # Inspect AI
 evals/inspect/logs/
+
+# Build / compile caches
+unsloth_compiled_cache/
