@@ -253,19 +253,18 @@ case "$1" in
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     qwen-36b-voice)
-        echo "Starting Qwen3.6-35B-A3B MoE FP8 NO-THINKING voice/agentic (GPU 1, port ${VOICE_PORT}, 256K)..."
+        echo "Starting Qwen3.6-35B-A3B-FP8 NO-THINKING voice/agentic (GPU 1, port ${VOICE_PORT}, 256K)..."
         stop_vllm_voice
-        CUDA_VISIBLE_DEVICES=1 $VLLM_BIN serve Qwen/Qwen3.6-35B-A3B \
+        CUDA_VISIBLE_DEVICES=1 $VLLM_BIN serve Qwen/Qwen3.6-35B-A3B-FP8 \
             $O3 \
             --host 0.0.0.0 --port $VOICE_PORT \
             --served-model-name local-voice \
             --max-model-len 262144 \
             --chat-template "$NONTHINKING_TEMPLATE" \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
-            --gpu-memory-utilization 0.90 \
+            --gpu-memory-utilization 0.85 \
             --language-model-only \
             --enable-chunked-prefill \
-            --quantization fp8 \
             --kv-cache-dtype fp8 \
             --async-scheduling \
             --performance-mode interactivity \
