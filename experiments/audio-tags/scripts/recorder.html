@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>audio-tags held-out recorder</title>
+<style>
+  body { font: 16px/1.4 -apple-system, sans-serif; max-width: 640px; margin: 2em auto; padding: 0 1em; color: #222; }
+  h1 { font-size: 1.2em; }
+  .prompt { background: #f5f5f5; border-left: 4px solid #69c; padding: 1em; margin: 1em 0; border-radius: 4px; }
+  .prompt.done { border-color: #4a4; background: #f0f8f0; }
+  .prompt .label { font-weight: 600; color: #468; }
+  button { font: inherit; padding: 0.5em 1em; margin: 0.25em; border: 1px solid #888; border-radius: 4px; cursor: pointer; background: #fff; }
+  button.record { background: #c44; color: #fff; border-color: #a22; }
+  button.record.recording { background: #a22; animation: pulse 1s infinite; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  @keyframes pulse { 50% { opacity: 0.6; } }
+  .status { font-size: 0.9em; color: #666; }
+  .takes { display: flex; gap: 1em; margin-top: 0.5em; flex-wrap: wrap; }
+  .take { background: #fff; border: 1px solid #ddd; padding: 0.5em; border-radius: 4px; min-width: 200px; }
+  .take.captured { border-color: #4a4; }
+  audio { width: 100%; margin-top: 0.5em; }
+  details summary { cursor: pointer; font-size: 0.9em; color: #666; }
+  pre { background: #f5f5f5; padding: 0.5em; border-radius: 4px; font-size: 0.85em; overflow: auto; }
+</style>
+</head>
+<body>
+<h1>audio-tags — held-out recorder</h1>
+<p class="status">For each prompt, record one VOICED take (normal speaking) and one WHISPERED take. Click each "Save All" button at the end to download a zip of all recordings + manifest.</p>
+
+<div id="prompts"></div>
+
+<p>
+  <button id="save-all">Save all (download)</button>
+  <button id="clear-all">Clear all</button>
+</p>
+
+<details><summary>Setup notes</summary>
+<pre>
+- Recordings are 16 kHz mono WAV (browser-permitting).
+- Files saved as: prompt_{NN}_{voiced|whispered}.wav
+- Manifest jsonl included in the zip.
+- Drop the unzipped contents in /mnt/data/audio-tags/held_out/ on the GPU box.
+</pre>
+</details>
+
+<script>
+const PROMPTS = [
+  "The weather has been strange this week.",
+  "Tell me what you remember about yesterday.",
+  "I'd like to set a reminder for tomorrow morning.",
+  "Could you help me find my keys?",
+  "What's the latest from the team?",
+  "Did you hear what happened at the office?",
+  "I'm thinking about taking a walk later.",
+  "Show me the calendar for next week.",
+  "My favorite book is sitting on the desk.",
+  "Read me the headlines from this morning.",
+  "Send a message to Alex about the project.",
+  "Set a timer for fifteen minutes please.",
+  "Remind me to call my mother on Sunday.",
+  "What's on the agenda for the meeting?",
+  "Play some quiet music for the evening.",
+];
+
+const recordings = {};  // key = "prompt_NN_label" → { blob, duration }
+
+function el(html) {
+  const t = document.createElement("template");
+  t.innerHTML = html.trim();
+  return t.content.firstElementChild;
+}
+
+function renderPrompts() {
+  const root = document.getElementById("prompts");
+  root.innerHTML = "";
+  PROMPTS.forEach((text, i) => {
+    const idx = String(i).padStart(2, "0");
+    const div = el(`
+      <div class="prompt" id="prompt-${idx}">
+        <div><span class="label">Prompt ${i+1}:</span> ${text}</div>
+        <div class="takes">
+          <div class="take" data-label="voiced">
+            <div>VOICED take</div>
+            <button class="record" data-prompt="${idx}" data-label="voiced">● Record</button>
+            <div class="status"></div>
+          </div>
+          <div class="take" data-label="whispered">
+            <div>WHISPERED take</div>
+            <button class="record" data-prompt="${idx}" data-label="whispered">● Record</button>
+            <div class="status"></div>
+          </div>
+        </div>
+      </div>`);
+    root.appendChild(div);
+  });
+  document.querySelectorAll("button.record").forEach(b => b.onclick = onRecord);
+}
+
+let active = null;  // { mediaRecorder, chunks, button, key, takeEl }
+
+async function onRecord(ev) {
+  const btn = ev.currentTarget;
+  if (active) {
+    active.mediaRecorder.stop();
+    return;
+  }
+  const promptIdx = btn.dataset.prompt;
+  const label = btn.dataset.label;
+  const key = `prompt_${promptIdx}_${label}`;
+  const takeEl = btn.closest(".take");
+
+  btn.classList.add("recording");
+  btn.textContent = "■ Stop";
+  takeEl.querySelector(".status").textContent = "recording...";
+
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1 } });
+  const mr = new MediaRecorder(stream, { mimeType: "audio/webm" });
+  const chunks = [];
+  mr.ondataavailable = e => chunks.push(e.data);
+  mr.onstop = async () => {
+    stream.getTracks().forEach(t => t.stop());
+    const blob = new Blob(chunks, { type: "audio/webm" });
+    const wav = await webmToWav(blob);
+    recordings[key] = { blob: wav, duration: 0 };
+    btn.classList.remove("recording");
+    btn.textContent = "● Re-record";
+    takeEl.classList.add("captured");
+    takeEl.querySelector(".status").textContent = `${(wav.size / 1024).toFixed(0)} KB`;
+    let audio = takeEl.querySelector("audio");
+    if (!audio) { audio = document.createElement("audio"); audio.controls = true; takeEl.appendChild(audio); }
+    audio.src = URL.createObjectURL(wav);
+    document.getElementById(`prompt-${promptIdx}`).classList.toggle("done",
+      recordings[`prompt_${promptIdx}_voiced`] && recordings[`prompt_${promptIdx}_whispered`]);
+    active = null;
+  };
+  mr.start();
+  active = { mediaRecorder: mr, chunks, button: btn, key, takeEl };
+}
+
+async function webmToWav(blob) {
+  const buf = await blob.arrayBuffer();
+  const ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+  const decoded = await ctx.decodeAudioData(buf);
+  const ch = decoded.getChannelData(0);
+  const wav = encodeWav(ch, decoded.sampleRate);
+  return new Blob([wav], { type: "audio/wav" });
+}
+
+function encodeWav(samples, sampleRate) {
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+  function writeStr(off, s) { for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)); }
+  writeStr(0, "RIFF"); view.setUint32(4, 36 + samples.length * 2, true);
+  writeStr(8, "WAVE"); writeStr(12, "fmt ");
+  view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+  writeStr(36, "data"); view.setUint32(40, samples.length * 2, true);
+  let off = 44;
+  for (let i = 0; i < samples.length; i++, off += 2) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  }
+  return buffer;
+}
+
+document.getElementById("save-all").onclick = async () => {
+  const keys = Object.keys(recordings);
+  if (!keys.length) { alert("Nothing recorded yet."); return; }
+  // Manifest jsonl
+  const manifest = keys.map(k => {
+    const [, idx, label] = k.match(/prompt_(\d+)_(\w+)/);
+    return JSON.stringify({
+      audio_path: `${k}.wav`,
+      voice_quality: label,
+      prompt_id: parseInt(idx),
+      prompt_text: PROMPTS[parseInt(idx)],
+    });
+  }).join("\n") + "\n";
+  // Use JSZip via CDN
+  if (!window.JSZip) {
+    await new Promise((res, rej) => {
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
+      s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
+  }
+  const zip = new JSZip();
+  for (const k of keys) zip.file(`${k}.wav`, recordings[k].blob);
+  zip.file("manifest.jsonl", manifest);
+  const out = await zip.generateAsync({ type: "blob" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(out);
+  a.download = "audio-tags-held-out.zip";
+  a.click();
+};
+
+document.getElementById("clear-all").onclick = () => {
+  if (confirm("Clear all recordings?")) {
+    Object.keys(recordings).forEach(k => delete recordings[k]);
+    renderPrompts();
+  }
+};
+
+renderPrompts();
+</script>
+</body>
+</html>
