@@ -47,16 +47,22 @@ and use available tools to complete it. When done, provide a concise final answe
 def run_single(task_id: str, goal: str, model: str, base_url: str) -> LoopResult:
     """Run a task with a single model — no planner/executor split."""
     client = OpenAI(base_url=base_url, api_key="none")
+    # For the 27B planner baseline, allow thinking so it has a fair shot.
+    # For the 35B executor baseline, thinking is disabled at vLLM level anyway.
+    is_planner = "8000" in base_url
     t0 = time.perf_counter()
-    resp = client.chat.completions.create(
+    kwargs: dict = dict(
         model=model,
         messages=[
             {"role": "system", "content": SINGLE_SYSTEM},
             {"role": "user", "content": f"Goal: {goal}"},
         ],
         temperature=0.2,
-        max_tokens=1024,
+        max_tokens=4096,
     )
+    if is_planner:
+        kwargs["extra_body"] = {"chat_template_kwargs": {"enable_thinking": True}}
+    resp = client.chat.completions.create(**kwargs)
     latency = time.perf_counter() - t0
     content = resp.choices[0].message.content or ""
     success = len(content.strip()) > 20  # non-empty response = completed

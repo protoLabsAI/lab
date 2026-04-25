@@ -117,17 +117,19 @@ def _parse_json_response(content: str, model_cls: type) -> Any:
 
 def _planner_call(messages: list[dict], label: str = "plan") -> tuple[str, float]:
     t0 = time.perf_counter()
-    # Review passes don't need deep reasoning — cap thinking budget there
-    max_tok = 4096 if label == "review" else 8192
+    # Review passes don't need CoT — disable thinking for fast JSON verdict.
+    # Plan/replan passes keep thinking enabled for quality decomposition.
+    thinking_on = label != "review"
     resp = planner.chat.completions.create(
         model=PLANNER_MODEL,
         messages=messages,
         temperature=0.2,
-        max_tokens=max_tok,
+        max_tokens=8192,
+        extra_body={"chat_template_kwargs": {"enable_thinking": thinking_on}},
     )
     latency = time.perf_counter() - t0
     content = resp.choices[0].message.content or ""
-    print(f"  [planner/{label}] {latency:.2f}s — {len(content)} chars")
+    print(f"  [planner/{label}] {'🧠' if thinking_on else '⚡'} {latency:.2f}s — {len(content)} chars")
     return content, latency
 
 
