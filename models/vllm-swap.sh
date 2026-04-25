@@ -2,8 +2,13 @@
 # Usage: ./vllm-swap.sh <model-name>
 # Gracefully stops vLLM, waits for port release, starts new model.
 #
+# === Qwen 3.6 Dual-GPU Production Setup ===
+#   GPU 0 (:8000) — qwen36-27b-fp8   — 27B FP8, thinking+planning, 256K
+#   GPU 1 (:8002) — qwen-36b-voice   — 35B FP8, NO thinking, voice/agentic, 256K
+#
 # === Qwen 3.6 (new, bf16 only on disk — FP8 via on-the-fly quant) ===
 #   qwen-36b-fp8       — Qwen3.6-35B-A3B MoE + on-the-fly FP8 (single GPU, 262K)
+#   qwen-36b-voice     — Qwen3.6-35B-A3B MoE FP8, NO thinking, voice/agentic (GPU 1, :8002, 256K)
 #   qwen-36b-bf16      — Qwen3.6-35B-A3B MoE bf16 (single GPU, 64K)
 #   qwen-36b-tp2       — Qwen3.6-35B-A3B MoE bf16 (TP=2, 250K)
 #
@@ -45,8 +50,10 @@
 #   qwen-27b-int4-opt, qwen-4b-int4-opt, qwen-35b-opt, qwen-122b-opt
 set -euo pipefail
 PORT=8000
+VOICE_PORT=8002
 VLLM_BIN="$HOME/dev/vllm-env/bin/vllm"
 LOG_DIR="/mnt/scratch/logs"
+NONTHINKING_TEMPLATE="$HOME/dev/lab/models/templates/qwen3_nonthinking.jinja"
 export HF_HOME="/mnt/models/huggingface"
 export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
 export VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=1
@@ -100,6 +107,31 @@ wait_ready() {
     done
     echo "ERROR: Model failed to start within 5 minutes."
     tail -20 "${LOG_DIR}/vllm-swap.log"
+    return 1
+}
+stop_vllm_voice() {
+    echo "Stopping voice vLLM (port ${VOICE_PORT})..."
+    fuser -k "${VOICE_PORT}/tcp" 2>/dev/null || true
+    for i in $(seq 1 30); do
+        if ! ss -tlnp | grep -q ":${VOICE_PORT} "; then
+            echo "Port ${VOICE_PORT} released."
+            return
+        fi
+        sleep 1
+    done
+    echo "Port ${VOICE_PORT} still held after 30s."
+}
+wait_ready_voice() {
+    echo "Waiting for voice model on port ${VOICE_PORT}..."
+    for i in $(seq 1 60); do
+        if curl -s --max-time 3 "http://localhost:${VOICE_PORT}/v1/models" | grep -q "model"; then
+            echo "Voice model ready!"
+            return 0
+        fi
+        sleep 5
+    done
+    echo "ERROR: Voice model failed to start within 5 minutes."
+    tail -20 "${LOG_DIR}/vllm-voice.log"
     return 1
 }
 [[ $# -lt 1 ]] && usage
@@ -219,6 +251,28 @@ case "$1" in
             --performance-mode interactivity \
             --kv-cache-dtype fp8 \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+    qwen-36b-voice)
+        echo "Starting Qwen3.6-35B-A3B MoE FP8 NO-THINKING voice/agentic (GPU 1, port ${VOICE_PORT}, 256K)..."
+        stop_vllm_voice
+        CUDA_VISIBLE_DEVICES=1 $VLLM_BIN serve Qwen/Qwen3.6-35B-A3B \
+            $O3 \
+            --host 0.0.0.0 --port $VOICE_PORT \
+            --served-model-name local-voice \
+            --max-model-len 262144 \
+            --chat-template "$NONTHINKING_TEMPLATE" \
+            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
+            --gpu-memory-utilization 0.90 \
+            --language-model-only \
+            --enable-chunked-prefill \
+            --quantization fp8 \
+            --kv-cache-dtype fp8 \
+            --async-scheduling \
+            --performance-mode interactivity \
+            $QWEN35_PREFIX_FLAGS \
+            >> "${LOG_DIR}/vllm-voice.log" 2>&1 &
+        wait_ready_voice
+        exit 0
         ;;
     qwen-36b-fp8)
         echo "Starting Qwen3.6-35B-A3B MoE + on-the-fly FP8 (GPU 0, 262K)..."
@@ -640,6 +694,21 @@ case "$1" in
             --speculative-config '{"method": "mtp", "num_speculative_tokens": 1}' \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
+    qwen36-27b-fp8)
+        echo "Starting Qwen3.6-27B FP8 official (GPU 0, 256K, thinking/planning)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.6-27B-FP8 \
+            $O3 \
+            --host 0.0.0.0 --port $PORT \
+            --served-model-name local \
+            --max-model-len 262144 \
+            --max-num-seqs 512 \
+            --reasoning-parser qwen3 \
+            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
+            --gpu-memory-utilization 0.90 \
+            --enable-chunked-prefill \
+            $QWEN35_PREFIX_FLAGS \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
     # ─── Dual GPU configs (TP=2) ───────────────────────────────────
     # NCCL_P2P_DISABLE=1 required for stable CUDA graphs on Blackwell PCIe
     # (ACS on PCIe bridges corrupts P2P during graph replay)
@@ -654,6 +723,26 @@ case "$1" in
             --served-model-name local \
             --tensor-parallel-size 2 \
             --max-model-len 131072 \
+            --reasoning-parser qwen3 \
+            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
+            --gpu-memory-utilization 0.90 \
+            --enable-chunked-prefill \
+            --disable-custom-all-reduce \
+            $QWEN35_PREFIX_FLAGS \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+    qwen36-27b-fp8-tp2)
+        echo "Starting Qwen3.6-27B FP8 official (TP=2, 131K)..."
+        NCCL_P2P_DISABLE=1 \
+        NCCL_ALGO=Ring NCCL_PROTO=Simple \
+        NCCL_MIN_NCHANNELS=4 NCCL_MAX_NCHANNELS=8 \
+        $VLLM_BIN serve Qwen/Qwen3.6-27B-FP8 \
+            $O3 \
+            --host 0.0.0.0 --port $PORT \
+            --served-model-name local \
+            --tensor-parallel-size 2 \
+            --max-model-len 131072 \
+            --max-num-seqs 512 \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.90 \

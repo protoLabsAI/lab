@@ -11,6 +11,14 @@ model_list:
       api_base: http://vllm:8000/v1
       api_key: os.environ/VLLM_API_KEY
 
+  # No-thinking voice/agentic model — Qwen3.6-35B on GPU 1, port 8002.
+  # Thinking is disabled at the vLLM level via qwen3_nonthinking.jinja.
+  - model_name: local-voice
+    litellm_params:
+      model: openai/local-voice
+      api_base: http://vllm:8002/v1
+      api_key: os.environ/VLLM_API_KEY
+
   # ─── Local: Ollama ─────────────────────────────────────────────────
   # Add specific Ollama models here as needed, e.g.:
   # - model_name: ollama/llama3
