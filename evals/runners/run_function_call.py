@@ -36,6 +36,7 @@ def run_function_call_test(client: OpenAI, model: str, test: dict) -> dict:
             tools=tools,
             temperature=0.0,
             max_tokens=1000,
+            extra_body={"chat_template_kwargs": {"enable_thinking": False}},
         )
         choice = response.choices[0]
 

@@ -5,6 +5,12 @@ model:
   api_key: ${GATEWAY_API_KEY}
   base_url: http://localhost:4000/v1
   model_id: local  # vLLM model behind gateway
+  extra_body:
+    # Disable CoT thinking for Qwen3-family models. Agent tasks with reasoning
+    # on can spiral into multi-minute thinking loops that hang the run. Also
+    # keeps benchmarks fair across thinking / non-thinking model families.
+    chat_template_kwargs:
+      enable_thinking: false
 
 judge:
   api_key: ${GATEWAY_API_KEY}
