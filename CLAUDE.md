@@ -11,6 +11,53 @@ Monorepo for model evaluation, training, inference infrastructure, and ML experi
 - `experiments/` — ML experiments (context-1, ltx-video, flux2, quantize, pixel-gen, stt-whisper, voice-agent)
 - `infra/` — Prometheus exporters, vLLM systemd, gateway configs (gateway runs on ava node)
 
+## How we operate
+
+The default work pattern in this lab is a **closed cycle**:
+
+```
+experiment  →  report  →  engineering  →  test  →  content  →  repeat
+```
+
+Every phase has an exit criterion. Don't move to the next phase until
+the current one is done.
+
+| Phase | What it is | Exit when |
+|---|---|---|
+| **experiment** | research, training, iteration in `experiments/<name>/` | model artifact + Tier-0 baselines (majority + linear probe + one off-the-shelf comparable) + cross-domain held-out eval |
+| **report** | internal `RESULTS.md` with honest numbers, confusion matrices, what didn't work | written without softening the failures — the report is for next-session-us |
+| **engineering** | wire the artifact into the consuming product (ORBIS, gateway, CI) | a PR landed on the consuming repo's main branch |
+| **test** | validate under real conditions, not just held-out splits | one round of real-world signal observed (real users, real traffic, real audio — not benchmark replay) |
+| **content** | public artifact: HF model card + dataset card + blog post on protolabs.studio | merged blog + public HF release (private during draft, public after review) |
+| **repeat** | next experiment, informed by what `test` and `content` revealed | always |
+
+**Bias toward shipping.** The trap is doing experiment → report → experiment ad infinitum. The cycle is only valuable when it closes. If a piece of work has been in `report` for a week without engineering, that's the signal to either ship or kill it.
+
+**What this means for new experiments:**
+- Don't start a new experiment unless the previous one is past `engineering` (or has been explicitly parked with a memo)
+- Each experiment plans for its `content` deliverable on day one — what's the blog headline? — and reverses-out the work needed to get there
+- Default to publishing publicly via `protoLabsAI/...` on HuggingFace and protolabs.studio for the writeup. Privacy is a temporary state during drafting, not the default.
+
+## Companion-stack research workspace
+
+`experiments/companion-stack/` is the umbrella for [ORBIS](https://github.com/protoLabsAI/ORBIS)-supporting research. New experiments around the conversational AI loop go there, organized by pipe (`audio-pre/`, `text-pre/`, `llm-context/`, `text-post/`, `memory/`, `visual/`).
+
+Read `experiments/companion-stack/README.md`, `ROADMAP.md`, and `LEARNING.md` before starting a new ORBIS-related experiment. The audio-tags experiment (`pipes/audio-pre/audio-tags/`) is the worked exemplar — copy its shape.
+
+**Heuristic for new pipes:** if the LLM would have to guess something a small classifier could measure, you're paying LLM cost for a job a 1.7 ms head could do better. That's the whole game.
+
+## Brand & monetization — protolabs.studio
+
+protolabs.studio is the public face. The work in this lab is only valuable to the brand if it surfaces there.
+
+Discipline:
+- **Every shipped experiment produces a blog draft** before the next experiment starts. Drafts live in `experiments/<name>/BLOG.md`. The audio-tags experiment is the template.
+- **HuggingFace org `protoLabsAI/`** is the canonical model + dataset publishing target. Models go up private during drafting, flipped public on blog publish.
+- **Cross-link aggressively.** Blog → HF model + dataset → ORBIS PR → back to blog. The whole stack should be one click apart.
+- **Cite our own prior work.** v5 cites v4 cites v3 cites v2 cites v0. The lineage is the credibility.
+
+When in doubt about whether something should be public, default to publishing. The lab's expertise is only monetizable to the extent it's visible.
+
 ## Using uv
 
 ```bash
