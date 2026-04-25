@@ -121,6 +121,27 @@ FLUX.2-klein 9B+base (100GB), Z-Image+Turbo (51GB), Voxtral-Mini-4B (17GB), OCR 
 
 ---
 
+## Dual-GPU Production Setup (Current — April 2026)
+
+Two services run simultaneously on boot:
+
+| Service | GPU | Port | Model | Role |
+|---------|-----|------|-------|------|
+| `vllm.service` | 0 | :8000 | Qwen3.6-27B-FP8 | Thinking / planning / reasoning (256K) |
+| `vllm-voice.service` | 1 | :8002 | Qwen3.6-35B-A3B-FP8 | Executor / voice / agentic (256K, no thinking) |
+
+Gateway names: `local` → :8000, `local-voice` → :8002.
+
+No-thinking enforced via `models/templates/qwen3_nonthinking.jinja` (vLLM-level, not per-request).
+TRITON_ATTN backend required on `vllm-voice` — FlashInfer JIT crashes on Blackwell SM 12.0.
+
+MoE kernel tuned for Blackwell (2026-04-25) — see `docs/moe-tuning.md`.
+
+```bash
+sudo systemctl start vllm vllm-voice   # start dual-GPU setup
+sudo systemctl stop vllm vllm-voice    # stop both
+```
+
 ## Recommended Production Configs
 
 ```bash
