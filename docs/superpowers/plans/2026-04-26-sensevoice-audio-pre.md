@@ -8,6 +8,8 @@
 
 **Tech Stack:** FunASR (`funasr`), SenseVoiceSmall, pipecat FrameProcessor, Python 3.11+, pytest, uv
 
+**ORBIS issue:** [#66](https://github.com/protoLabsAI/ORBIS/issues/66) — prerequisite: #35 merged
+
 ---
 
 ## Files to create

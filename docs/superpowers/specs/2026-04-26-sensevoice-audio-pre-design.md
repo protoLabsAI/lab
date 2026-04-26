@@ -3,7 +3,7 @@
 **Date:** 2026-04-26
 **Status:** Draft
 **Phase:** 1 (perception layer)
-**ORBIS issue:** #35 (PR 3 — adds to existing speaker-gate PRs #45/#48)
+**ORBIS issue:** [#66](https://github.com/protoLabsAI/ORBIS/issues/66) — follows #35 (prerequisite: #35 PRs #45/#48 merged)
 **Lab experiment:** `experiments/companion-stack/pipes/audio-pre/`
 
 ---
