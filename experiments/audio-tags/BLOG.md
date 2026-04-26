@@ -473,6 +473,74 @@ neutral/indoor/narrational.
 
 ---
 
+## Shipping it — and the model that ate ours
+
+The plan was to take v5-soft and graduate it into ORBIS as a Pipecat
+side-channel running alongside Whisper STT. Speaker-verification
+gate first (single-owner ORBIS shouldn't update mood from a guest
+voice), then the audio-tags tap, then a context line into the LLM.
+
+That's what we wrote up in the
+[ORBIS issue](https://github.com/protoLabsAI/ORBIS/issues/66). It's
+not what shipped.
+
+What shipped is **better than the plan**: ORBIS dropped Whisper STT
+entirely in favor of [SenseVoice-Small](https://github.com/FunAudioLLM/SenseVoice)
+— a 234 M-param multi-task speech model from FunASR that emits ASR
++ language ID + speech emotion + audio events in **one forward
+pass**. AudioTagsTap, the Pipecat processor that was supposed to run
+v5-soft, became a thin consumer of SenseVoice's `EmotionFrame`
+instead.
+
+This is an honest research outcome and worth being clear about:
+
+- We trained v5-soft over a weekend. It works. It's on Hugging Face.
+- Mid-engineering, the team found a model that subsumes our entire
+  hot path more cheaply (one forward pass instead of two) and adds
+  signal we didn't have (audio events: BGM, laughter, applause,
+  cry, sneeze, breath, cough).
+- We picked the better architecture and our model became an
+  alternative emotion source in the pipeline rather than the only
+  one.
+
+What survives:
+
+- The **methodology** is the deliverable. Tier-0 baselines
+  (majority + linear probe + off-the-shelf), multi-corpus mixing,
+  sqrt-tempered class weighting, the "data not architecture moves
+  the needle" lesson — those carry forward to the next head we
+  build, regardless of what model holds the slot today.
+- The **dataset contribution** is unchanged. `protoLabsAI/orbis-audio-tags-v0`
+  on Hugging Face ships the DSP whisperization technique + sample
+  whispered audio + Qwen-extracted prose tags. The script is the
+  contribution; reproducible from LibriSpeech alone.
+- The **lineage** (v0 → v1 → v2 → v3-balanced → v4-multi → v5-soft)
+  is the credibility. Future ORBIS-supporting research will cite
+  this experiment as the methodology shakedown.
+- The **non-emotion heads** in v5-soft (`snr_db`, `environment`,
+  `speaking_speed`, `voice_quality`, `speaker_gender`) — SenseVoice
+  doesn't emit these. They're queued as a small follow-up PR to
+  enrich the `[audio]` annotation that ORBIS's LLM sees.
+
+The deployed pipeline as of ORBIS v0.1.36:
+
+1. `SpeakerGate` verifies owner-vs-stranger from echo-guarded audio
+2. `SenseVoiceSTT` produces `EmotionFrame` → `AudioEventFrame` →
+   `TranscriptionFrame` per utterance
+3. `AudioTagsTap` drift-writes mood (owner only, for privacy) per
+   a curated emotion-to-mood-delta map
+4. `AudioTagsTap` injects `[audio] emotion=warm lang=en speaker=owner
+   events=[Laughter]` as a system message before each user
+   transcription
+5. The persona prompt includes an `audio_context_block` that tells
+   the LLM what to do with the line and forbids parroting it back
+
+The orb now has ears. Whether they're our ears or someone else's
+ears is, in the end, less important than what the model decided to
+do with what it heard.
+
+---
+
 ## Acknowledgments
 
 The DSP whisperization is essentially an old privacy-preservation
@@ -481,7 +549,9 @@ randomization for voicing destruction has been around since the
 80s in linear-prediction speech research. Nothing in this writeup
 is novel — what's hopefully useful is the integrated demonstration
 that *for a small voice-agent context-injection use case, you can
-ship in 8 M params with mostly off-the-shelf tools in a weekend*.
+ship in 8 M params with mostly off-the-shelf tools in a weekend* —
+and that knowing when **not** to ship your own model is part of
+the same craft.
 
 The training and eval code, model checkpoints, and a reproducible
 50 k-clip whispered dataset are all on Hugging Face. Take them and

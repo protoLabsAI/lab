@@ -498,3 +498,97 @@ is justified.
 Pushed to HF: `protoLabsAI/orbis-audio-tags-v5-soft` (private).
 v4-multi marked as superseded; v2 / v3-balanced / v4 retained as
 ablation references for the data + loss progression.
+
+---
+
+## Shipped to ORBIS — and architecturally substituted along the way
+
+The v5-soft model was meant to graduate via a Pipecat tap alongside
+Whisper STT, writing to ORBIS's `mood` table and injecting a context
+line into the LLM call. That's what
+[`INTEGRATION.md`](./INTEGRATION.md) describes and what
+[ORBIS issue #66](https://github.com/protoLabsAI/ORBIS/issues/66)
+was opened to do.
+
+What actually shipped was *better than the plan*: ORBIS replaced
+Whisper STT entirely with **SenseVoice-Small** (FunASR, 234 M params,
+Apache 2.0), a multi-task speech model that emits ASR + language ID
++ speech emotion + audio events together in one forward pass. Our
+`AudioTagsTap` became a thin consumer of SenseVoice's `EmotionFrame`
+instead of running v5 inference on the audio.
+
+### What landed in production (ORBIS v0.1.36)
+
+| PR | What | Released |
+|---|---|---|
+| [#70](https://github.com/protoLabsAI/ORBIS/pull/70) | `EmotionFrame` + `AudioEventFrame` + `drift_mood` per-turn delta API + `audio_context_block` system prompt | v0.1.29 |
+| [#73](https://github.com/protoLabsAI/ORBIS/pull/73) | `drift_mood` true no-op + tuple-compare `EMOTION_LABELS` | v0.1.30 |
+| [#75](https://github.com/protoLabsAI/ORBIS/pull/75) | `SenseVoiceSTT` backend (`STT_BACKEND=sensevoice`) | v0.1.31 |
+| [#77](https://github.com/protoLabsAI/ORBIS/pull/77) | `trust_remote_code` allow-list + opt-in smoke test (RCE fix) | v0.1.32 |
+| [#81](https://github.com/protoLabsAI/ORBIS/pull/81) | `AudioTagsTap` (mood writes + `[audio]` injection) | v0.1.34 |
+| [#83](https://github.com/protoLabsAI/ORBIS/pull/83) | Defer mood write to `TranscriptionFrame` (race fix) | v0.1.35 |
+| [#85](https://github.com/protoLabsAI/ORBIS/pull/85) | Pipeline wiring | v0.1.36 (queued) |
+
+End-to-end behavior with `STT_BACKEND=sensevoice` + `[sensevoice]`
+extra installed:
+
+1. `SpeakerGate` verifies owner-vs-stranger from echo-guarded audio
+   (from the earlier Phase 1 / #35 stack)
+2. `SenseVoiceSTT` produces `EmotionFrame` → `AudioEventFrame` →
+   `TranscriptionFrame` per utterance
+3. `AudioTagsTap` drift-writes mood (owner only) per a curated
+   `_EMOTION_DELTAS` map
+4. `AudioTagsTap` injects `[audio] emotion=… lang=… speaker=…
+   events=…` as a system message before each user transcription
+5. `audio_context_block` in the persona prompt tells the LLM what to
+   do with the line + forbids parroting
+
+### Why the substitution is a strict improvement
+
+- **One model on the hot path instead of two.** SenseVoice does
+  STT + emotion + events in a single forward pass. Our v5 + Whisper
+  would have been two passes.
+- **Apache 2.0, no novel weights to maintain.** Lower operational
+  burden than maintaining v5 in production.
+- **AudioEventFrame** is signal v5 doesn't emit at all (BGM,
+  Laughter, Applause, Cry, Sneeze, Breath, Cough). Wired through to
+  the `[audio]` annotation. Sound-event detection partially shipped
+  for free as part of the substitution.
+
+### What v5-soft *retains* despite the substitution
+
+- **Methodology lineage** — v0 → v5 progression demonstrates a
+  reproducible recipe for tiny audio-attribute models: frozen
+  Whisper-tiny encoder, multi-task head stack, multi-corpus mixing,
+  sqrt class weighting, Tier-0 baselines. Future heads (Phase 2+)
+  reuse all of it.
+- **Dataset contribution** —
+  [`protoLabsAI/orbis-audio-tags-v0`](https://huggingface.co/datasets/protoLabsAI/orbis-audio-tags-v0)
+  ships the DSP whisperization technique + sample whispered audio +
+  Qwen-extracted prose tags. Reproducible from LibriSpeech alone.
+- **Backup emotion source** if SenseVoice quality regresses or a
+  deployment swaps backends — v5-soft drops in via `AudioTagsTap`'s
+  existing `EmotionFrame` shape.
+- **The non-emotion heads** (`snr_db`, `environment`,
+  `speaking_speed`, `voice_quality`, `speaker_gender`) — SenseVoice
+  doesn't emit these; v5 does. Wiring them as additional `[audio]`
+  annotation fields is a small follow-up PR, deferred from v0
+  scope.
+
+### What did NOT ship (deferred, not killed)
+
+- **v5's non-emotion heads in production.** The `[audio]` line
+  currently has `emotion=… lang=… speaker=… events=…`; it's
+  missing `snr=…`, `env=…`, `rate=…`, `voice_quality=…`. Small PR
+  to add when prioritized.
+- **Personalization fine-tune flow** — Gradio app at
+  [`app.py`](./app.py) lets the owner record clips and fine-tune
+  the heads on their voice. Not wired into ORBIS yet.
+- **Phase 1 blog post** — "Adding ears to a voice agent." Owed.
+  Should foreground the SenseVoice substitution as the punchline.
+
+### Test count
+
+ORBIS test suite: **453 passed, 2 skipped** at v0.1.35
+(was 173 at the start of the #66 stack). Net **+280 tests** to
+cover the perception layer.

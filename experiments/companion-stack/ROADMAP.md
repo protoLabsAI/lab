@@ -30,34 +30,44 @@ what's the publishing cadence.
 
 ---
 
-## Phase 1 — perception layer (next, ~1-2 weeks)
+## Phase 1 — perception layer (✅ engineering done, content owed)
 
 The pipe most LLM-only voice agents skip entirely: **understanding
 what just hit the microphone before STT does its thing.**
 
-### Experiments
+### Outcomes
 
-1. **`audio-pre/audio-tags`** — graduate v5 from research to ORBIS
-   integration. Pipecat frame processor that runs in parallel with
-   Whisper, writes to ORBIS's `mood` table + injects context line
-   into the LLM call. Already-trained, just needs wiring.
+| Roadmap deliverable | Plan | What shipped |
+|---|---|---|
+| `audio-pre/speaker-verification` | ECAPA-TDNN + cosine gate | ✅ Shipped via [ORBIS #35 stack](https://github.com/protoLabsAI/ORBIS/issues/35) — PRs #45 / #56 / #58 / #62 / #64 / #67. Includes wizard enrollment, voiceprint endpoint, corrupt-voiceprint failure-mode contract. |
+| `audio-pre/audio-tags` (v5 graduation) | Pipecat tap alongside Whisper, writes mood + injects context line | 🔀 Shipped via [ORBIS #66 stack](https://github.com/protoLabsAI/ORBIS/issues/66) — but **architecturally substituted**: SenseVoice-Small (234 M, single forward pass) replaced Whisper-STT + v5 emotion head. AudioTagsTap consumes `EmotionFrame` from SenseVoice instead of running v5 inference. PRs #70 / #73 / #75 / #77 / #81 / #83 / #85. Released as v0.1.29 → v0.1.36. |
+| `audio-pre/sound-event-detection` (backlog) | YAMNet/PANNs | 🟡 Half-shipped: SenseVoice's `AudioEventFrame` covers BGM, Laughter, Applause, Cry, Sneeze, Breath, Cough — wired through to the `[audio]` annotation. Doorbell / baby specifically NOT covered (SenseVoice's event taxonomy is voice-adjacent). |
 
-2. **`audio-pre/speaker-verification`** — owner-vs-stranger
-   classifier. ORBIS is single-owner; the orb should know when
-   someone *else* is talking. Candidate models:
-   `speechbrain/spkrec-ecapa-voxceleb`, `pyannote/embedding`.
-   ~10 sec of owner-enrollment audio, then cosine-similarity gating
-   against incoming utterances.
+### The SenseVoice substitution (the actual story of Phase 1)
 
-3. **`audio-pre/sound-event-detection`** *(backlog)* — YAMNet or
-   PANNs. Tags background events (doorbell, music, baby, dog) so
-   the orb can react to the room, not just the words.
+The plan was to graduate v5-soft alongside Whisper. The implementation found a strictly better architecture: **SenseVoice-Small subsumes both transcription and emotion in one forward pass.** A 234 M-param multi-task model from FunASR that emits ASR + language ID + speech emotion + audio events together. ORBIS dropped Whisper STT entirely in favor of SenseVoice-as-STT, and AudioTagsTap became a thin consumer of the `EmotionFrame` it produces.
 
-### Phase exit criteria
+What this means for v5-soft and the audio-tags research:
+- **The methodology survives.** Tier-0 baselines, multi-corpus mixing, sqrt class weighting, the DSP whisperization technique — all carry forward to future heads we add.
+- **v5-soft remains valuable as an alternative emotion source** if SenseVoice quality regresses, plus the ablation lineage (v2 → v3-balanced → v4-multi → v5-soft) is the credibility chain for everything we publish next.
+- **v5's non-emotion heads (`snr_db`, `environment`, `speaking_speed`)** are NOT in production yet. SenseVoice doesn't cover them; v5 does. Wiring them into the `[audio]` annotation is a small follow-up PR — explicitly deferred from Phase 1.
+- **The Hugging Face artifacts stay published.** v5-soft + ablations + dataset are the public reference for the methodology; ORBIS using a different model for production doesn't invalidate them.
 
-- PR into ORBIS that wires audio-tags + speaker-verification into
-  the Pipecat pipeline.
-- Blog post: "Adding ears to a voice agent."
+### Other things that shipped under the Phase 1 banner
+
+- **R-series engineering debt** — 9 production risks closed across ~10 PRs (R1, R2, R5, R6, R7+R8, R9, R10+R11, R14, R15). Several were Major (R5 silent data corruption, R7+R8 atomic stash/drain, R15 mood-collision). Not on the research roadmap; ate real cycles; was the cost of shipping cleanly.
+- **Three-writer mood pattern** (`set_mood` / `drift_mood_toward` / `drift_mood`) — closed R15 and is also Phase-3-ready scaffolding for the eventual `memory/mood-summarizer`.
+- **`audio_context_block` in the persona prompt** — a small text-post foothold (tells the LLM what to do with the `[audio] …` annotation, forbids parroting). Not a full text-post experiment but demonstrates the shape.
+- **Lifecycle audit docs** in ORBIS (`voice-lifecycle.md` / `voice-lifecycle-risks.md` / `voice-lifecycle-research.md`) — research integration plan that maps the roadmap onto the actual ORBIS pipe slots.
+
+### Phase 1 exit status
+
+- ✅ **Engineering**: PR(s) into ORBIS that wire audio-tags + speaker-verification into the Pipecat pipeline. Live on `STT_BACKEND=sensevoice` + `[sensevoice]` extra. v0.1.36 release queued.
+- 🟡 **Test**: starting now — owner-driven ORBIS use to surface confidence calibration drift, mood-injection quality, edge cases the v4-holdout didn't catch.
+- ⬜ **Content**: blog post "Adding ears to a voice agent" still owed. Should foreground the SenseVoice substitution as the punchline (we built the model, learned the methodology, found a better fit, applied the methodology to picking it).
+- ⬜ **HF flip**: model + dataset repos still private. Flip to public on blog publish.
+
+Phase 2 should not start in earnest until `Content` and the HF flip close.
 
 ---
 
