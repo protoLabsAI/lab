@@ -1,0 +1,6 @@
+# Training data (generated, can be regenerated)
+data/*.jsonl
+
+# Trained models
+models/*.pt
+models/*.onnx

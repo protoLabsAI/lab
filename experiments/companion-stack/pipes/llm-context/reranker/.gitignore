@@ -1,0 +1,5 @@
+# Generated benchmark data
+data/*.jsonl
+
+# Eval results (regenerable)
+eval/*.json
