@@ -53,7 +53,7 @@ def run_command(cmd: list[str], label: str) -> tuple[bool, float]:
 @click.command()
 @click.option("--name", required=True, help="Profile name (quick, full)")
 @click.option("--model", default="local", help="Gateway model name")
-@click.option("--gateway-url", default="http://localhost:4000/v1")
+@click.option("--gateway-url", default="http://ava:4000/v1")
 @click.option("--api-key", envvar="GATEWAY_API_KEY", default="not-needed")
 @click.option("--trials", default=None, type=int, help="Override profile trial count")
 @click.option("--claw-only", is_flag=True, help="Run only claw-eval tasks")

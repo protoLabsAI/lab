@@ -65,7 +65,7 @@ def run_function_call_test(client: OpenAI, model: str, test: dict) -> dict:
 @click.option("--model", default="local", help="Gateway model name")
 @click.option("--suite", default=None, help="Test suite name (e.g., basic)")
 @click.option("--all-suites", is_flag=True, help="Run all test suites")
-@click.option("--gateway-url", default="http://localhost:4000/v1")
+@click.option("--gateway-url", default="http://ava:4000/v1")
 @click.option("--api-key", envvar="GATEWAY_API_KEY", default="not-needed")
 @click.option("--submit-langfuse", is_flag=True, help="Submit scores to Langfuse")
 def main(model, suite, all_suites, gateway_url, api_key, submit_langfuse):
