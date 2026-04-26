@@ -8,7 +8,8 @@
 
 **Tech Stack:** FunASR (`funasr`), SenseVoiceSmall, pipecat FrameProcessor, Python 3.11+, pytest, uv
 
-**ORBIS issue:** [#66](https://github.com/protoLabsAI/ORBIS/issues/66) — prerequisite: #35 merged
+**Tracking:** ORBIS [issue #68](https://github.com/protoLabsAI/ORBIS/issues/68) — lands after #35 (speaker-gate + audio-tags v5-soft) closes.
+**Prerequisite:** #35 PR 1 (speaker-gate) and PR 2 (audio-tags v5-soft) must be merged first.
 
 ---
 
