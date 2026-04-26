@@ -97,7 +97,7 @@ def run_agent(client: OpenAI, model: str, task: dict, max_turns: int = 20) -> di
     }
 
 
-def grade_task(task: dict, output: dict, gateway_url: str = "http://localhost:4000/v1", api_key: str = "not-needed", judge_url: str | None = None) -> list[GradeResult]:
+def grade_task(task: dict, output: dict, gateway_url: str = "http://ava:4000/v1", api_key: str = "not-needed", judge_url: str | None = None) -> list[GradeResult]:
     """Apply graders defined in the task config."""
     grades = []
     grader_configs = task.get("graders", [])
@@ -127,7 +127,7 @@ def grade_task(task: dict, output: dict, gateway_url: str = "http://localhost:40
 @click.option("--suite", help="Task suite directory name (e.g., tool_use, browser)")
 @click.option("--model", default="local", help="Gateway model name")
 @click.option("--trials", default=3, help="Trials per task")
-@click.option("--gateway-url", default="http://localhost:4000/v1")
+@click.option("--gateway-url", default="http://ava:4000/v1")
 @click.option("--api-key", envvar="GATEWAY_API_KEY", default="not-needed")
 @click.option("--submit-langfuse", is_flag=True, help="Submit scores to Langfuse")
 @click.option("--thinking", is_flag=True, help="Enable thinking/reasoning mode (Gemma 4, etc.)")
@@ -187,7 +187,7 @@ def main(task_path, suite, model, trials, gateway_url, api_key, submit_langfuse,
             trial_results = []
             for trial in range(1, trials + 1):
                 output = run_agent(client, model, task)
-                judge_gateway = os.environ.get("JUDGE_GATEWAY_URL", "http://100.101.189.45:4000/v1")
+                judge_gateway = os.environ.get("JUDGE_GATEWAY_URL", "http://ava:4000/v1")
                 grades = grade_task(task, output, gateway_url=gateway_url, api_key=api_key, judge_url=judge_gateway)
 
                 result = TaskResult(

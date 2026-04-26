@@ -12,7 +12,7 @@ set -euo pipefail
 MODEL="${1:?Usage: speed-test-gateway.sh <model> [runs] [short|long]}"
 RUNS="${2:-5}"
 MODE="${3:-long}"
-GATEWAY_URL="${GATEWAY_URL:-http://100.101.189.45:4000/v1}"
+GATEWAY_URL="${GATEWAY_URL:-http://ava:4000/v1}"
 API_KEY="${GATEWAY_API_KEY:-not-needed}"
 
 if [ "$MODE" = "short" ]; then

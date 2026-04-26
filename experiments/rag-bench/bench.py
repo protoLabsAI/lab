@@ -36,7 +36,7 @@ os.environ.setdefault("HF_HOME", "/mnt/models/huggingface")
 RESULTS_DIR = Path(__file__).parent / "results"
 
 # --- Embedding endpoints ---
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://100.101.189.45:11434")
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://ava:11434")
 LOCAL_EMBED_URL = "http://localhost:8001"
 
 # --- Test data ---

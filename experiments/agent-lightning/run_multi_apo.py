@@ -33,7 +33,7 @@ from openai import AsyncOpenAI
 import llm_judge
 
 # --- Config ---
-GATEWAY_URL = os.environ.get("GATEWAY_URL", "http://100.101.189.45:4000/v1")
+GATEWAY_URL = os.environ.get("GATEWAY_URL", "http://ava:4000/v1")
 DEFAULT_CRITIC_MODEL = "claude-sonnet-4-6"
 RESEARCHER_URL = "http://localhost:7872/api/chat"
 TASKS_PATH = Path("/home/ava/dev/protoResearcher/evals/tasks.json")

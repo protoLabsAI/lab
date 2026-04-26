@@ -18,7 +18,7 @@ import os
 os.environ["UNSLOTH_COMPILE_DISABLE"] = "1"
 os.environ["HF_HOME"] = "/mnt/models/huggingface"
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-os.environ["MLFLOW_TRACKING_URI"] = "http://100.101.189.45:5050"
+os.environ["MLFLOW_TRACKING_URI"] = "http://ava:5050"
 os.environ["MLFLOW_EXPERIMENT_NAME"] = "gemma4-moe-agentic"
 
 from unsloth import FastModel

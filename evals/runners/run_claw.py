@@ -63,10 +63,9 @@ def build_claw_config(model: str, gateway_url: str, api_key: str) -> Path:
     config["model"]["base_url"] = gateway_url
     config["model"]["api_key"] = api_key
 
-    # Ensure judge can reach the gateway (Sonnet for judging)
-    # If model is local, judge still needs the remote gateway
+    # Judge always routes through the ava gateway (cloud models live there)
     if "judge" in config:
-        judge_url = os.environ.get("JUDGE_GATEWAY_URL", "http://100.101.189.45:4000/v1")
+        judge_url = os.environ.get("JUDGE_GATEWAY_URL", "http://ava:4000/v1")
         judge_key = os.environ.get("GATEWAY_API_KEY", api_key)
         config["judge"]["base_url"] = judge_url
         config["judge"]["api_key"] = judge_key
@@ -87,7 +86,7 @@ def build_claw_config(model: str, gateway_url: str, api_key: str) -> Path:
 @click.option("--tasks", default=None, help="Comma-separated task IDs (e.g., T01,T02)")
 @click.option("--all-tasks", is_flag=True, help="Run all available tasks")
 @click.option("--trials", default=3, help="Number of trials per task (default: 3 for pass^3)")
-@click.option("--gateway-url", default="http://localhost:4000/v1", help="Gateway base URL")
+@click.option("--gateway-url", default="http://ava:4000/v1", help="Gateway base URL")
 @click.option("--api-key", envvar="GATEWAY_API_KEY", default="not-needed")
 @click.option("--workers", default=4, help="Parallel workers for batch mode")
 @click.option("--port-offset", default=0, help="Port offset for mock services (use different values for parallel runs)")

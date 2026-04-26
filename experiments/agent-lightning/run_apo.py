@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import time
 from datetime import datetime
 from pathlib import Path
@@ -37,7 +38,7 @@ import bootstrap_fewshot
 
 # --- Config ---
 VLLM_URL = "http://localhost:8000/v1"
-GATEWAY_URL = "http://100.101.189.45:4000/v1"
+GATEWAY_URL = os.environ.get("GATEWAY_URL", "http://ava:4000/v1")
 DEFAULT_CRITIC_MODEL = "cli/claude-sonnet-4-6"
 RESEARCHER_URL = "http://localhost:7872/api/chat"
 SOUL_PATH = Path("/home/ava/dev/protoResearcher/config/SOUL.md")

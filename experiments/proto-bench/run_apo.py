@@ -36,7 +36,7 @@ from pathlib import Path
 from openai import AsyncOpenAI
 
 PROTO_CLI = os.environ.get("PROTO_CLI", "proto")
-GATEWAY_URL = os.environ.get("GATEWAY_URL", "http://100.101.189.45:4000/v1")
+GATEWAY_URL = os.environ.get("GATEWAY_URL", "http://ava:4000/v1")
 CRITIC_MODEL = "cli/claude-sonnet-4-6"
 SEED_PROMPT_PATH = Path(__file__).parent / "templates" / "seed_prompt.md"
 RESULTS_DIR = Path(__file__).parent / "results"
