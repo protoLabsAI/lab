@@ -3,6 +3,7 @@
 # Gracefully stops vLLM, waits for port release, starts new model.
 #
 # === Qwen 3.6 Dual-GPU Production Setup ===
+#   dual                              — start both models at once (recommended)
 #   GPU 0 (:8000) — qwen36-27b-fp8   — 27B FP8, thinking+planning, 256K
 #   GPU 1 (:8002) — qwen-36b-voice   — 35B FP8, NO thinking, voice/agentic, 256K
 #
@@ -78,13 +79,16 @@ usage() {
     echo "Gemma 4:"
     echo "  $0 {gemma4-moe|gemma4-moe-fp8|gemma4-31b|gemma4-31b-fp8|gemma4-e4b|gemma4-e4b-fp8}"
     echo ""
+    echo "Dual GPU (one model per GPU):"
+    echo "  $0 dual                — 27B thinking (GPU 0) + 35B no-thinking (GPU 1)"
+    echo ""
     echo "TP=2 (both GPUs):"
     echo "  $0 {qwen-122b-fp8|qwen-122b-int4|qwen-27b-fp8-tp2|qwen-35b-tp2-opt|qwen-27b-int4-tp2|gemma4-31b-tp2}"
     exit 1
 }
 stop_vllm() {
-    echo "Stopping vLLM..."
-    pkill -f "vllm serve" 2>/dev/null || true
+    echo "Stopping vLLM (port ${PORT})..."
+    fuser -k "${PORT}/tcp" 2>/dev/null || true
     for i in $(seq 1 30); do
         if ! ss -tlnp | grep -q ":${PORT} "; then
             echo "Port ${PORT} released."
@@ -92,9 +96,17 @@ stop_vllm() {
         fi
         sleep 1
     done
-    echo "Port still held, force killing..."
-    pkill -9 -f "vllm serve" 2>/dev/null || true
+    echo "Port ${PORT} still held after 30s, force killing..."
+    fuser -k -9 "${PORT}/tcp" 2>/dev/null || true
     sleep 3
+}
+stop_all() {
+    echo "Stopping all vLLM services..."
+    sudo systemctl stop vllm 2>/dev/null || true
+    sudo systemctl stop vllm-voice 2>/dev/null || true
+    # Also kill any ad-hoc processes not managed by systemd
+    stop_vllm
+    stop_vllm_voice
 }
 wait_ready() {
     echo "Waiting for model to load..."
@@ -135,7 +147,12 @@ wait_ready_voice() {
     return 1
 }
 [[ $# -lt 1 ]] && usage
-stop_vllm
+# Voice/dual configs manage their own stop — don't kill blindly
+case "$1" in
+    qwen-36b-voice) ;; # voice only touches GPU 1 / :8002
+    dual)            ;; # dual does stop_all itself
+    *) stop_vllm ;;
+esac
 case "$1" in
     # ─── Single GPU configs ────────────────────────────────────────
     qwen-27b-int4)
@@ -252,24 +269,48 @@ case "$1" in
             --kv-cache-dtype fp8 \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
+    # ─── Dual GPU split (one model per GPU) via systemd ──────────────
+    dual)
+        echo "=== Dual-GPU setup: 27B thinking (GPU 0) + 35B no-thinking (GPU 1) ==="
+        stop_all
+
+        echo ""
+        echo "Starting vllm.service (27B FP8, GPU 0, port ${PORT})..."
+        sudo systemctl start vllm
+        wait_ready
+
+        echo ""
+        echo "Starting vllm-voice.service (35B MoE FP8, GPU 1, port ${VOICE_PORT})..."
+        sudo systemctl start vllm-voice
+        wait_ready_voice
+
+        echo ""
+        echo "=== Both models ready ==="
+        echo "  GPU 0 :${PORT}        — local       (27B FP8, thinking)"
+        echo "  GPU 1 :${VOICE_PORT}  — local-voice  (35B MoE FP8, no thinking)"
+        exit 0
+        ;;
     qwen-36b-voice)
         echo "Starting Qwen3.6-35B-A3B-FP8 NO-THINKING voice/agentic (GPU 1, port ${VOICE_PORT}, 256K)..."
         stop_vllm_voice
-        CUDA_VISIBLE_DEVICES=1 $VLLM_BIN serve Qwen/Qwen3.6-35B-A3B-FP8 \
-            $O3 \
-            --host 0.0.0.0 --port $VOICE_PORT \
-            --served-model-name local-voice \
-            --max-model-len 262144 \
-            --chat-template "$NONTHINKING_TEMPLATE" \
-            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
-            --gpu-memory-utilization 0.85 \
-            --language-model-only \
-            --enable-chunked-prefill \
-            --kv-cache-dtype fp8 \
-            --async-scheduling \
-            --performance-mode interactivity \
-            $QWEN35_PREFIX_FLAGS \
-            >> "${LOG_DIR}/vllm-voice.log" 2>&1 &
+        (
+            export CUDA_VISIBLE_DEVICES=1
+            exec $VLLM_BIN serve Qwen/Qwen3.6-35B-A3B-FP8 \
+                $O3 \
+                --host 0.0.0.0 --port $VOICE_PORT \
+                --served-model-name local-voice \
+                --max-model-len 262144 \
+                --chat-template "$NONTHINKING_TEMPLATE" \
+                --enable-auto-tool-choice --tool-call-parser qwen3_xml \
+                --gpu-memory-utilization 0.85 \
+                --language-model-only \
+                --enable-chunked-prefill \
+                --kv-cache-dtype fp8 \
+                --async-scheduling \
+                --performance-mode interactivity \
+                $QWEN35_PREFIX_FLAGS \
+                >> "${LOG_DIR}/vllm-voice.log" 2>&1
+        ) &
         wait_ready_voice
         exit 0
         ;;
