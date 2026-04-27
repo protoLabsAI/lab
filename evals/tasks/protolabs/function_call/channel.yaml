@@ -1,0 +1,187 @@
+# protolabs fleet eval — function call channel reliability
+# Tests whether tool calls land in the tool_calls field (structured)
+# vs being emitted as text in content (the gina issue #1 failure mode).
+
+id: fc_channel
+name: "Function Call Channel Reliability"
+category: protolabs
+difficulty: medium
+
+system_prompt: |
+  You are a helpful assistant. When a user's request can be fulfilled by a tool,
+  you MUST use the tool via a function call. Never write tool calls as text in your
+  response — always use the structured tool calling mechanism.
+
+tests:
+  - id: fc_001_simple_tool
+    prompt: "What time is it?"
+    tools:
+      - type: function
+        function:
+          name: current_time
+          description: "Get the current date and time"
+          parameters:
+            type: object
+            properties: {}
+    mock_tool_responses:
+      current_time: '{"datetime": "2026-04-27T10:30:00-05:00", "timezone": "America/Chicago"}'
+    graders:
+      - type: llm_judge
+        dimension: channel_correctness
+        rubric: |
+          The model should call current_time via the structured tool_calls field.
+          Check the response format — did it use a proper function call or write XML/JSON in content?
+          1.0 = Used structured tool call (tool_calls field), got the time, reported it clearly
+          0.5 = Got the right answer but emitted the tool call as text (XML tags, JSON in content, or <tool_code>)
+          0.0 = Didn't call the tool at all, or hallucinated the time
+
+  - id: fc_002_tool_with_args
+    prompt: "Search the web for 'vLLM Blackwell GPU support'"
+    tools:
+      - type: function
+        function:
+          name: web_search
+          description: "Search the web for information"
+          parameters:
+            type: object
+            properties:
+              query:
+                type: string
+                description: "Search query"
+            required: ["query"]
+    mock_tool_responses:
+      web_search: '{"results": [{"title": "vLLM 0.8.0 adds Blackwell support", "url": "https://blog.vllm.ai", "snippet": "Full CUDA 12.8 support for RTX PRO 6000 Blackwell GPUs"}]}'
+    graders:
+      - type: llm_judge
+        dimension: channel_correctness
+        rubric: |
+          The model should call web_search with the query via structured tool_calls.
+          1.0 = Structured tool call with appropriate query argument, summarized results
+          0.5 = Emitted tool call as text/XML in content instead of tool_calls field
+          0.0 = Didn't search, or hallucinated results
+
+  - id: fc_003_multi_tool_selection
+    prompt: "What's 234 * 567 and what time is it?"
+    tools:
+      - type: function
+        function:
+          name: calculator
+          description: "Perform arithmetic calculations"
+          parameters:
+            type: object
+            properties:
+              expression:
+                type: string
+            required: ["expression"]
+      - type: function
+        function:
+          name: current_time
+          description: "Get current date/time"
+          parameters:
+            type: object
+            properties: {}
+      - type: function
+        function:
+          name: web_search
+          description: "Search the web"
+          parameters:
+            type: object
+            properties:
+              query:
+                type: string
+            required: ["query"]
+    mock_tool_responses:
+      calculator: '{"result": 132678}'
+      current_time: '{"datetime": "2026-04-27T10:30:00-05:00"}'
+    graders:
+      - type: llm_judge
+        dimension: channel_correctness
+        rubric: |
+          Two tools needed (calculator + current_time), both via structured tool_calls.
+          1.0 = Both called via structured tool_calls, correct results reported
+          0.5 = One structured + one as text, or only one tool called
+          0.0 = Both as text in content, or neither called
+
+  - id: fc_004_tool_with_complex_args
+    prompt: "Send an email to sarah@company.com about the GPU benchmark results. Subject: 'Benchmark Complete'. Body should mention 27B won quality and 35B won speed."
+    tools:
+      - type: function
+        function:
+          name: gmail_send_message
+          description: "Send an email message"
+          parameters:
+            type: object
+            properties:
+              to:
+                type: string
+                description: "Recipient email address"
+              subject:
+                type: string
+                description: "Email subject line"
+              body:
+                type: string
+                description: "Email body text"
+            required: ["to", "subject", "body"]
+      - type: function
+        function:
+          name: gmail_draft
+          description: "Save an email draft"
+          parameters:
+            type: object
+            properties:
+              to:
+                type: string
+              subject:
+                type: string
+              body:
+                type: string
+            required: ["to", "subject", "body"]
+    mock_tool_responses:
+      gmail_send_message: '{"status": "sent", "message_id": "msg_abc123"}'
+    graders:
+      - type: llm_judge
+        dimension: channel_correctness
+        rubric: |
+          Model should call gmail_send_message with all three args populated correctly.
+          1.0 = Structured tool call with to=sarah@company.com, subject about benchmark, body mentioning 27B/35B results
+          0.5 = Structured call but missing/wrong args, or emitted as text
+          0.0 = Didn't call the tool, or used gmail_draft instead of gmail_send_message
+
+  - id: fc_005_no_tool_needed
+    prompt: "Thanks, that's all I needed!"
+    tools:
+      - type: function
+        function:
+          name: current_time
+          description: "Get current date/time"
+          parameters:
+            type: object
+            properties: {}
+      - type: function
+        function:
+          name: calculator
+          description: "Math calculations"
+          parameters:
+            type: object
+            properties:
+              expression:
+                type: string
+            required: ["expression"]
+      - type: function
+        function:
+          name: web_search
+          description: "Search the web"
+          parameters:
+            type: object
+            properties:
+              query:
+                type: string
+            required: ["query"]
+    graders:
+      - type: llm_judge
+        dimension: channel_correctness
+        rubric: |
+          The user is saying goodbye — no tool should be called.
+          1.0 = Friendly sign-off with NO tool calls
+          0.5 = Friendly sign-off but unnecessarily called a tool
+          0.0 = Ignored the farewell and called multiple tools

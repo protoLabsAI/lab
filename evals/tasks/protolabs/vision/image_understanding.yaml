@@ -1,0 +1,87 @@
+# protolabs fleet eval — vision capabilities
+# Tests image understanding across the fleet.
+# 27B (local) should pass all; 35B uncensored (local-voice) should gracefully fail.
+
+id: vision_understanding
+name: "Vision / Image Understanding"
+category: protolabs
+difficulty: medium
+
+tests:
+  - id: vis_001_describe_photo
+    prompt:
+      - type: text
+        text: "Describe what you see in this image in one sentence."
+      - type: image_url
+        image_url:
+          url: "https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png"
+    graders:
+      - type: llm_judge
+        dimension: vision_accuracy
+        rubric: |
+          The image is the Google logo (multicolored text "Google" on white background).
+          1.0 = Correctly identifies it as the Google logo or describes the colored letters
+          0.5 = Describes colored text but doesn't identify it as Google
+          0.0 = Cannot see the image, produces degenerate output, or describes something unrelated
+
+  - id: vis_002_chart_reading
+    prompt:
+      - type: text
+        text: "What type of chart is this and what are the approximate values shown?"
+      - type: image_url
+        image_url:
+          url: "https://quickchart.io/chart?c={type:'bar',data:{labels:['Q1','Q2','Q3','Q4'],datasets:[{label:'Revenue',data:[65,80,45,95]}]}}"
+    graders:
+      - type: llm_judge
+        dimension: vision_accuracy
+        rubric: |
+          The image is a bar chart with 4 bars labeled Q1-Q4 with approximate values 65, 80, 45, 95.
+          1.0 = Identifies it as a bar chart AND gets the approximate values right (within ±10)
+          0.5 = Identifies chart type but values are significantly off, or gets values but wrong chart type
+          0.0 = Cannot read the chart, degenerate output, or completely wrong description
+
+  - id: vis_003_text_extraction
+    prompt:
+      - type: text
+        text: "Read and transcribe the text in this image."
+      - type: image_url
+        image_url:
+          url: "https://dummyimage.com/400x100/000/fff&text=protoLabs+AI+Fleet+v2.0"
+    graders:
+      - type: llm_judge
+        dimension: vision_accuracy
+        rubric: |
+          The image contains the text "protoLabs AI Fleet v2.0" as white text on black background.
+          1.0 = Correctly transcribes the text (minor formatting differences ok)
+          0.5 = Gets most of the text but misses or garbles part of it
+          0.0 = Cannot read text, degenerate output, or completely wrong transcription
+
+  - id: vis_004_spatial_reasoning
+    prompt:
+      - type: text
+        text: "How many distinct colored sections are in this image? What colors are they?"
+      - type: image_url
+        image_url:
+          url: "https://dummyimage.com/200x200/ff0000/ff0000"
+    graders:
+      - type: llm_judge
+        dimension: vision_accuracy
+        rubric: |
+          The image is a solid red square (one color section).
+          1.0 = Correctly identifies one section/color (red)
+          0.5 = Identifies the color but claims multiple sections
+          0.0 = Cannot see image, degenerate output, or wrong color
+
+  - id: vis_005_graceful_refusal
+    prompt: "Describe this image in detail."
+    extra_body:
+      chat_template_kwargs:
+        enable_thinking: false
+    graders:
+      - type: llm_judge
+        dimension: vision_accuracy
+        rubric: |
+          No image was actually provided in this prompt — just text asking to describe "this image."
+          1.0 = Recognizes no image was provided and asks for one, or states it cannot see an image
+          0.5 = Makes up a description but hedges that it may not have received an image
+          0.0 = Confidently hallucinates a detailed image description

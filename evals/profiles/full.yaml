@@ -29,6 +29,12 @@ custom:
   - suite: roleplay
   - suite: svg_generation
   - suite: research
+  - suite: protolabs/tool_reliability
+  - suite: protolabs/vision
+  - suite: protolabs/voice
+  - suite: protolabs/uncensored
+  - suite: protolabs/function_call
+  - suite: protolabs/routing
 
 # Function calling — all suites
 function_call:

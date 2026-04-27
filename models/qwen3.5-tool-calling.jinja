@@ -1,0 +1,256 @@
+{#- Qwen 3.5 patched chat template for vLLM tool calling
+     Based on official Qwen/Qwen3.5-27B tokenizer_config.json template
+     with community fixes from QwenLM/Qwen3#1831 (barubary) applied:
+       Fix 1:  Safe defaults for add_vision_id / enable_thinking
+       Fix 2:  Precomputed _last_idx
+       Fix 3:  Developer role handled (Claude Code / Codex / OpenCode)
+       Fix 5:  item.type checked before 'in item' key test
+       Fix 6:  arguments.items() replaces bare key iteration + mapping check
+       Fix 7:  | safe filter removed (llama.cpp compat, harmless for vLLM)
+       Fix 8:  tojson/string explicit if/else (no chained filters)
+       Fix 9:  String arguments pass-through for OAI-compat proxies
+       Fix 10: tc alias avoids shadowing tool_call loop var
+       Fix 11: ns2 namespace replaces loop.previtem / loop.nextitem
+       Fix 12: enable_thinking applied to in-context assistant turns
+       Fix 13: reasoning_content is defined + not none guard
+       Fix 14: loop.index0 > (not >=) for assistant thinking scope
+       Fix 15: \n\n delimiter between parallel tool call blocks
+       Fix 18: Clean newline boundaries on XML tags (streaming compat)
+       Fix 19: Auto-disable thinking when tools active
+       Fix 20: Unknown roles: graceful fallback
+       Fix 21: Flattened nesting where possible
+     Fixes 4, 16, 17 are structural/optional and not applied to keep
+     the template close to upstream.
+     License: Apache 2.0 (same as upstream Qwen3.5)
+-#}
+{%- set image_count = namespace(value=0) %}
+{%- set video_count = namespace(value=0) %}
+{#- Fix 1: safe defaults for add_vision_id and enable_thinking -#}
+{%- if add_vision_id is not defined %}
+  {%- set add_vision_id = false %}
+{%- endif %}
+{%- if enable_thinking is not defined %}
+  {%- set enable_thinking = true %}
+{%- endif %}
+{#- Fix 19: auto-disable thinking when tools are active -#}
+{%- if tools and tools is iterable and tools is not mapping and tools | length > 0 %}
+  {%- if enable_thinking is true %}
+    {%- set enable_thinking = false %}
+  {%- endif %}
+{%- endif %}
+{%- macro render_content(content, do_vision_count, is_system_content=false) %}
+  {%- if content is string %}
+    {{- content }}
+  {%- elif content is iterable and content is not mapping %}
+    {%- for item in content %}
+      {#- Fix 5: check item.type before 'in item' key test -#}
+      {%- if item.type is defined and item.type == 'image' %}
+        {%- if is_system_content %}
+          {{- raise_exception('System message cannot contain images.') }}
+        {%- endif %}
+        {%- if do_vision_count %}
+          {%- set image_count.value = image_count.value + 1 %}
+        {%- endif %}
+        {%- if add_vision_id %}
+          {{- 'Picture ' ~ image_count.value ~ ': ' }}
+        {%- endif %}
+        {{- '<|vision_start|><|image_pad|><|vision_end|>' }}
+      {%- elif 'image' in item or 'image_url' in item %}
+        {%- if is_system_content %}
+          {{- raise_exception('System message cannot contain images.') }}
+        {%- endif %}
+        {%- if do_vision_count %}
+          {%- set image_count.value = image_count.value + 1 %}
+        {%- endif %}
+        {%- if add_vision_id %}
+          {{- 'Picture ' ~ image_count.value ~ ': ' }}
+        {%- endif %}
+        {{- '<|vision_start|><|image_pad|><|vision_end|>' }}
+      {%- elif item.type is defined and item.type == 'video' %}
+        {%- if is_system_content %}
+          {{- raise_exception('System message cannot contain videos.') }}
+        {%- endif %}
+        {%- if do_vision_count %}
+          {%- set video_count.value = video_count.value + 1 %}
+        {%- endif %}
+        {%- if add_vision_id %}
+          {{- 'Video ' ~ video_count.value ~ ': ' }}
+        {%- endif %}
+        {{- '<|vision_start|><|video_pad|><|vision_end|>' }}
+      {%- elif 'video' in item %}
+        {%- if is_system_content %}
+          {{- raise_exception('System message cannot contain videos.') }}
+        {%- endif %}
+        {%- if do_vision_count %}
+          {%- set video_count.value = video_count.value + 1 %}
+        {%- endif %}
+        {%- if add_vision_id %}
+          {{- 'Video ' ~ video_count.value ~ ': ' }}
+        {%- endif %}
+        {{- '<|vision_start|><|video_pad|><|vision_end|>' }}
+      {%- elif 'text' in item %}
+        {{- item.text }}
+      {%- else %}
+        {{- raise_exception('Unexpected item type in content.') }}
+      {%- endif %}
+    {%- endfor %}
+  {%- elif content is none or content is undefined %}
+    {{- '' }}
+  {%- else %}
+    {{- raise_exception('Unexpected content type.') }}
+  {%- endif %}
+{%- endmacro %}
+{%- if not messages %}
+  {{- raise_exception('No messages provided.') }}
+{%- endif %}
+{#- Render system message with tools -#}
+{%- if tools and tools is iterable and tools is not mapping %}
+  {{- '<|im_start|>system\n' }}
+  {{- "# Tools\n\nYou have access to the following functions:\n\n" }}
+  {%- for tool in tools %}
+    {{- "\n" }}
+    {{- tool | tojson }}
+  {%- endfor %}
+  {{- "\n" }}
+  {{- '\n\nIf you choose to call a function ONLY reply in the following format with NO suffix:\n\n<tool_call>\n<function=example_function_name>\n<parameter=example_parameter_1>\nvalue_1\n</parameter>\n<parameter=This is the value for the second parameter\nthat can span\nmultiple lines>\n</parameter>\n</function>\n</tool_call>\n\nReminder:\n- Function calls MUST follow the specified format: an inner <parameter> block must be nested within <function> XML tags\n- Required parameters MUST be specified\n- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after\n- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls\n' }}
+  {%- if messages[0].role == 'system' %}
+    {%- set content = render_content(messages[0].content, false, true) | trim %}
+    {%- if content %}
+      {{- '\n\n' + content }}
+    {%- endif %}
+  {#- Fix 3: developer role handled -#}
+  {%- elif messages[0].role == 'developer' %}
+    {%- set content = render_content(messages[0].content, false, true) | trim %}
+    {%- if content %}
+      {{- '\n\n' + content }}
+    {%- endif %}
+  {%- endif %}
+  {{- '<|im_end|>\n' }}
+{%- else %}
+  {%- if messages[0].role == 'system' %}
+    {%- set content = render_content(messages[0].content, false, true) | trim %}
+    {{- '<|im_start|>system\n' + content + '<|im_end|>\n' }}
+  {%- elif messages[0].role == 'developer' %}
+    {%- set content = render_content(messages[0].content, false, true) | trim %}
+    {{- '<|im_start|>system\n' + content + '<|im_end|>\n' }}
+  {%- endif %}
+{%- endif %}
+{#- Fix 2: precompute _last_idx; find last real user query index -#}
+{%- set ns = namespace(multi_step_tool=true, last_query_index=messages | length - 1) %}
+{%- for message in messages[::-1] %}
+  {%- set index = (messages | length - 1) - loop.index0 %}
+  {%- if ns.multi_step_tool and message.role == "user" %}
+    {%- set content = render_content(message.content, false) | trim %}
+    {%- if not (content.startswith('<tool_response>') and content.endswith('</tool_response>')) %}
+      {%- set ns.multi_step_tool = false %}
+      {%- set ns.last_query_index = index %}
+    {%- endif %}
+  {%- endif %}
+{%- endfor %}
+{#- Fix 17: graceful fallback instead of crash for deep agent loops -#}
+{%- if ns.multi_step_tool %}
+  {%- set ns.last_query_index = 0 %}
+{%- endif %}
+{#- Fix 11: ns2 namespace replaces loop.previtem / loop.nextitem -#}
+{%- set ns2 = namespace(prev_role='', next_role='') %}
+{%- for message in messages %}
+  {%- set content = render_content(message.content, true) | trim %}
+  {#- Compute next_role for tool message grouping -#}
+  {%- if not loop.last %}
+    {%- set ns2.next_role = messages[loop.index0 + 1].role %}
+  {%- else %}
+    {%- set ns2.next_role = '' %}
+  {%- endif %}
+  {%- if message.role == "system" or message.role == "developer" %}
+    {#- System/developer already rendered above; skip -#}
+    {%- if not loop.first %}
+      {#- Fix 3/20: treat extra system/developer as user -#}
+      {{- '<|im_start|>user\n' + content + '<|im_end|>\n' }}
+    {%- endif %}
+  {%- elif message.role == "user" %}
+    {{- '<|im_start|>user\n' + content + '<|im_end|>\n' }}
+  {%- elif message.role == "assistant" %}
+    {#- Fix 13: reasoning_content guard — check defined AND not none -#}
+    {%- set reasoning_content = '' %}
+    {%- if message.reasoning_content is defined and message.reasoning_content is not none and message.reasoning_content is string %}
+      {%- set reasoning_content = message.reasoning_content %}
+    {%- else %}
+      {%- if content is string and '<think>' in content %}
+        {%- set reasoning_content = content.split('<think>')[-1].split('</think>')[0] | trim %}
+        {%- set content = content.split('</think>')[-1] | trim %}
+      {%- endif %}
+    {%- endif %}
+    {%- set reasoning_content = reasoning_content | trim %}
+    {#- Fix 12: apply enable_thinking to in-context assistant turns too -#}
+    {#- Fix 14: use > not >= for thinking scope -#}
+    {%- if loop.index0 > ns.last_query_index and enable_thinking %}
+      {{- '<|im_start|>assistant\n<think>\n' + reasoning_content + '\n</think>\n\n' + content }}
+    {%- elif enable_thinking and reasoning_content %}
+      {{- '<|im_start|>assistant\n<think>\n' + reasoning_content + '\n</think>\n\n' + content }}
+    {%- else %}
+      {{- '<|im_start|>assistant\n' + content }}
+    {%- endif %}
+    {#- Render tool calls if present -#}
+    {%- if message.tool_calls is defined and message.tool_calls is iterable and message.tool_calls is not mapping %}
+      {%- for tc in message.tool_calls %}
+        {#- Fix 10: tc alias avoids shadowing tool_call -#}
+        {%- if tc.function is defined %}
+          {%- set tc = tc.function %}
+        {%- endif %}
+        {#- Fix 15: \n\n delimiter between parallel tool call blocks -#}
+        {#- Fix 18: clean newline boundaries on XML tags -#}
+        {%- if loop.first %}
+          {%- if content | trim %}
+            {{- '\n\n<tool_call>\n<function=' + tc.name + '>\n' }}
+          {%- else %}
+            {{- '<tool_call>\n<function=' + tc.name + '>\n' }}
+          {%- endif %}
+        {%- else %}
+          {{- '\n\n<tool_call>\n<function=' + tc.name + '>\n' }}
+        {%- endif %}
+        {#- Fix 6, 8, 9: arguments handling with mapping check, items(), string pass-through -#}
+        {%- if tc.arguments is defined %}
+          {%- if tc.arguments is string %}
+            {#- Fix 9: string arguments pass-through (OAI-compat proxies) -#}
+            {{- tc.arguments }}
+          {%- elif tc.arguments is mapping %}
+            {#- Fix 6: use .items() not bare iteration; Fix 8: explicit if/else -#}
+            {%- for args_name, args_value in tc.arguments.items() %}
+              {{- '<parameter=' + args_name + '>\n' }}
+              {%- if args_value is mapping or (args_value is iterable and args_value is not string) %}
+                {{- args_value | tojson }}
+              {%- else %}
+                {{- args_value | string }}
+              {%- endif %}
+              {{- '\n</parameter>\n' }}
+            {%- endfor %}
+          {%- endif %}
+        {%- endif %}
+        {{- '</function>\n</tool_call>' }}
+      {%- endfor %}
+    {%- endif %}
+    {{- '<|im_end|>\n' }}
+  {%- elif message.role == "tool" %}
+    {#- Fix 11: use ns2 namespace instead of loop.previtem -#}
+    {%- if ns2.prev_role != "tool" %}
+      {{- '<|im_start|>user' }}
+    {%- endif %}
+    {{- '\n<tool_response>\n' }}
+    {{- content }}
+    {{- '\n</tool_response>' }}
+    {#- Fix 11: use ns2.next_role instead of loop.nextitem -#}
+    {%- if ns2.next_role != "tool" %}
+      {{- '<|im_end|>\n' }}
+    {%- endif %}
+  {%- else %}
+    {#- Fix 20: unknown roles fall back gracefully -#}
+    {{- '<|im_start|>user\n' + content + '<|im_end|>\n' }}
+  {%- endif %}
+  {%- set ns2.prev_role = message.role %}
+{%- endfor %}
+{%- if add_generation_prompt %}
+  {{- '<|im_start|>assistant\n' }}
+  {%- if enable_thinking %}
+    {{- '<think>\n' }}
+  {%- endif %}
+{%- endif %}

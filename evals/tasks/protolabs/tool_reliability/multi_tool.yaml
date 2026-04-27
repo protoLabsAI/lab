@@ -1,0 +1,219 @@
+# protolabs fleet eval — tool reliability under multi-tool binding
+# Tests whether the model reliably selects and calls the right tool
+# when bound with many tools + a long system prompt (gina/ORBIS scenario).
+
+id: tool_reliability
+name: "Tool Reliability Under Load"
+category: protolabs
+difficulty: medium
+
+system_prompt: |
+  You are a helpful AI assistant for a protoLabs user. You have access to many tools
+  across different surfaces: memory, tasks, calendar, email, discord, web, and utilities.
+  Always use the appropriate tool when available — never guess or hallucinate an answer
+  when a tool can provide it. Respond concisely after receiving tool results.
+
+  <output_protocol>
+  Always wrap your final answer in <output></output> tags.
+  Use <scratch_pad></scratch_pad> for intermediate reasoning if needed.
+  </output_protocol>
+
+tests:
+  # --- Core tool selection under noise ---
+  - id: tr_001_calculator_with_noise
+    prompt: "What is 1847 * 293 + 14562?"
+    tools:
+      - { type: function, function: { name: memory_search, description: "Search long-term memory for relevant information", parameters: { type: object, properties: { query: { type: string } }, required: [query] } } }
+      - { type: function, function: { name: memory_ingest, description: "Store information in long-term memory", parameters: { type: object, properties: { content: { type: string }, domain: { type: string } }, required: [content] } } }
+      - { type: function, function: { name: task_add, description: "Create a new task/todo item", parameters: { type: object, properties: { title: { type: string }, description: { type: string } }, required: [title] } } }
+      - { type: function, function: { name: task_list, description: "List current tasks with optional status filter", parameters: { type: object, properties: { status: { type: string, enum: [all, pending, done] } } } } }
+      - { type: function, function: { name: calendar_list_events, description: "List calendar events for a date range", parameters: { type: object, properties: { start_date: { type: string }, end_date: { type: string } }, required: [start_date] } } }
+      - { type: function, function: { name: calendar_create_event, description: "Create a new calendar event", parameters: { type: object, properties: { title: { type: string }, start: { type: string }, end: { type: string } }, required: [title, start] } } }
+      - { type: function, function: { name: gmail_list_messages, description: "List email messages from inbox", parameters: { type: object, properties: { max_results: { type: integer } } } } }
+      - { type: function, function: { name: gmail_send_message, description: "Send an email message", parameters: { type: object, properties: { to: { type: string }, subject: { type: string }, body: { type: string } }, required: [to, subject, body] } } }
+      - { type: function, function: { name: discord_send, description: "Send a message to a Discord channel", parameters: { type: object, properties: { channel: { type: string }, message: { type: string } }, required: [channel, message] } } }
+      - { type: function, function: { name: discord_read, description: "Read recent messages from a Discord channel", parameters: { type: object, properties: { channel: { type: string }, limit: { type: integer } }, required: [channel] } } }
+      - { type: function, function: { name: web_search, description: "Search the web for information", parameters: { type: object, properties: { query: { type: string } }, required: [query] } } }
+      - { type: function, function: { name: fetch_url, description: "Fetch content from a URL", parameters: { type: object, properties: { url: { type: string } }, required: [url] } } }
+      - { type: function, function: { name: calculator, description: "Perform arithmetic calculations", parameters: { type: object, properties: { expression: { type: string, description: "Math expression to evaluate" } }, required: [expression] } } }
+      - { type: function, function: { name: current_time, description: "Get the current date and time", parameters: { type: object, properties: {} } } }
+      - { type: function, function: { name: daily_log, description: "Write an entry to the daily log", parameters: { type: object, properties: { entry: { type: string } }, required: [entry] } } }
+      - { type: function, function: { name: peer_consult, description: "Consult another AI agent via A2A protocol", parameters: { type: object, properties: { peer: { type: string }, question: { type: string } }, required: [peer, question] } } }
+    mock_tool_responses:
+      calculator: '{"result": 555933}'
+    graders:
+      - type: llm_judge
+        dimension: tool_selection
+        rubric: |
+          The model was given 16 tools and asked a math question.
+          1.0 = Used the calculator tool with the correct expression
+          0.5 = Used calculator but with wrong expression, or computed mentally then used calculator to verify
+          0.0 = Did not use calculator, or used wrong tool (web_search, memory_search, etc.)
+
+  - id: tr_002_memory_search_with_noise
+    prompt: "What did I tell you last week about the quarterly budget review?"
+    tools:
+      - { type: function, function: { name: memory_search, description: "Search long-term memory for relevant information", parameters: { type: object, properties: { query: { type: string } }, required: [query] } } }
+      - { type: function, function: { name: memory_ingest, description: "Store information in long-term memory", parameters: { type: object, properties: { content: { type: string }, domain: { type: string } }, required: [content] } } }
+      - { type: function, function: { name: task_list, description: "List current tasks with optional status filter", parameters: { type: object, properties: { status: { type: string } } } } }
+      - { type: function, function: { name: calendar_list_events, description: "List calendar events", parameters: { type: object, properties: { start_date: { type: string }, end_date: { type: string } }, required: [start_date] } } }
+      - { type: function, function: { name: gmail_list_messages, description: "List email messages", parameters: { type: object, properties: { max_results: { type: integer } } } } }
+      - { type: function, function: { name: web_search, description: "Search the web", parameters: { type: object, properties: { query: { type: string } }, required: [query] } } }
+      - { type: function, function: { name: calculator, description: "Perform arithmetic", parameters: { type: object, properties: { expression: { type: string } }, required: [expression] } } }
+      - { type: function, function: { name: current_time, description: "Get current date/time", parameters: { type: object, properties: {} } } }
+      - { type: function, function: { name: daily_log, description: "Write to daily log", parameters: { type: object, properties: { entry: { type: string } }, required: [entry] } } }
+      - { type: function, function: { name: fetch_url, description: "Fetch URL content", parameters: { type: object, properties: { url: { type: string } }, required: [url] } } }
+    mock_tool_responses:
+      memory_search: '{"results": [{"content": "User mentioned quarterly budget review is scheduled for May 15th. Key concerns: cloud compute costs up 30%, need to consolidate GPU instances.", "domain": "work", "timestamp": "2026-04-20T14:30:00Z"}]}'
+    graders:
+      - type: llm_judge
+        dimension: tool_selection
+        rubric: |
+          The user asked about something they mentioned previously. The correct tool is memory_search.
+          1.0 = Used memory_search with a relevant query about budget/quarterly review
+          0.5 = Used memory_search but with a poor query, or used it alongside unnecessary tools
+          0.0 = Did not use memory_search, or used web_search/gmail instead
+
+  - id: tr_003_task_creation
+    prompt: "Add a task to review the GPU inventory doc before Friday."
+    tools:
+      - { type: function, function: { name: task_add, description: "Create a new task/todo item", parameters: { type: object, properties: { title: { type: string }, description: { type: string }, due_date: { type: string } }, required: [title] } } }
+      - { type: function, function: { name: task_list, description: "List current tasks", parameters: { type: object, properties: { status: { type: string } } } } }
+      - { type: function, function: { name: memory_ingest, description: "Store information in memory", parameters: { type: object, properties: { content: { type: string } }, required: [content] } } }
+      - { type: function, function: { name: daily_log, description: "Write to daily log", parameters: { type: object, properties: { entry: { type: string } }, required: [entry] } } }
+      - { type: function, function: { name: calendar_create_event, description: "Create calendar event", parameters: { type: object, properties: { title: { type: string }, start: { type: string } }, required: [title, start] } } }
+      - { type: function, function: { name: gmail_send_message, description: "Send email", parameters: { type: object, properties: { to: { type: string }, subject: { type: string }, body: { type: string } }, required: [to, subject, body] } } }
+      - { type: function, function: { name: calculator, description: "Math calculations", parameters: { type: object, properties: { expression: { type: string } }, required: [expression] } } }
+      - { type: function, function: { name: web_search, description: "Search the web", parameters: { type: object, properties: { query: { type: string } }, required: [query] } } }
+    mock_tool_responses:
+      task_add: '{"id": "task_42", "title": "Review GPU inventory doc", "status": "pending"}'
+    graders:
+      - type: llm_judge
+        dimension: tool_selection
+        rubric: |
+          The user asked to add a task. The correct tool is task_add (not calendar_create_event, not memory_ingest, not daily_log).
+          1.0 = Used task_add with a title mentioning GPU inventory and a due date reference
+          0.5 = Used task_add but missing due date, or also created a calendar event unnecessarily
+          0.0 = Used wrong tool (calendar, memory, daily_log) or no tool at all
+
+  - id: tr_004_email_with_32_tools
+    prompt: "Check my email for anything from the DevOps team."
+    tools:
+      - { type: function, function: { name: memory_search, description: "Search long-term memory", parameters: { type: object, properties: { query: { type: string } }, required: [query] } } }
+      - { type: function, function: { name: memory_ingest, description: "Store in memory", parameters: { type: object, properties: { content: { type: string } }, required: [content] } } }
+      - { type: function, function: { name: memory_list, description: "List memory entries", parameters: { type: object, properties: { domain: { type: string } } } } }
+      - { type: function, function: { name: memory_forget, description: "Delete a memory entry", parameters: { type: object, properties: { id: { type: string } }, required: [id] } } }
+      - { type: function, function: { name: memory_stats, description: "Get memory usage statistics", parameters: { type: object, properties: {} } } }
+      - { type: function, function: { name: task_add, description: "Create a task", parameters: { type: object, properties: { title: { type: string } }, required: [title] } } }
+      - { type: function, function: { name: task_list, description: "List tasks", parameters: { type: object, properties: { status: { type: string } } } } }
+      - { type: function, function: { name: task_get, description: "Get task details", parameters: { type: object, properties: { id: { type: string } }, required: [id] } } }
+      - { type: function, function: { name: task_update, description: "Update a task", parameters: { type: object, properties: { id: { type: string }, status: { type: string } }, required: [id] } } }
+      - { type: function, function: { name: task_complete, description: "Mark task done", parameters: { type: object, properties: { id: { type: string } }, required: [id] } } }
+      - { type: function, function: { name: task_delete, description: "Delete a task", parameters: { type: object, properties: { id: { type: string } }, required: [id] } } }
+      - { type: function, function: { name: agent_task_create, description: "Create an agent task (bead)", parameters: { type: object, properties: { title: { type: string } }, required: [title] } } }
+      - { type: function, function: { name: agent_task_list, description: "List agent tasks", parameters: { type: object, properties: {} } } }
+      - { type: function, function: { name: calendar_list_events, description: "List events", parameters: { type: object, properties: { start_date: { type: string } }, required: [start_date] } } }
+      - { type: function, function: { name: calendar_create_event, description: "Create event", parameters: { type: object, properties: { title: { type: string }, start: { type: string } }, required: [title, start] } } }
+      - { type: function, function: { name: gmail_list_messages, description: "List email messages from inbox", parameters: { type: object, properties: { max_results: { type: integer } } } } }
+      - { type: function, function: { name: gmail_get_message, description: "Get full email by ID", parameters: { type: object, properties: { message_id: { type: string } }, required: [message_id] } } }
+      - { type: function, function: { name: gmail_draft, description: "Draft an email", parameters: { type: object, properties: { to: { type: string }, subject: { type: string }, body: { type: string } }, required: [to, subject, body] } } }
+      - { type: function, function: { name: gmail_send_message, description: "Send an email", parameters: { type: object, properties: { to: { type: string }, subject: { type: string }, body: { type: string } }, required: [to, subject, body] } } }
+      - { type: function, function: { name: discord_send, description: "Send Discord message", parameters: { type: object, properties: { channel: { type: string }, message: { type: string } }, required: [channel, message] } } }
+      - { type: function, function: { name: discord_read, description: "Read Discord messages", parameters: { type: object, properties: { channel: { type: string } }, required: [channel] } } }
+      - { type: function, function: { name: discord_react, description: "React to a Discord message", parameters: { type: object, properties: { message_id: { type: string }, emoji: { type: string } }, required: [message_id, emoji] } } }
+      - { type: function, function: { name: peer_list, description: "List available peer agents", parameters: { type: object, properties: {} } } }
+      - { type: function, function: { name: peer_consult, description: "Ask a peer agent", parameters: { type: object, properties: { peer: { type: string }, question: { type: string } }, required: [peer, question] } } }
+      - { type: function, function: { name: web_search, description: "Web search", parameters: { type: object, properties: { query: { type: string } }, required: [query] } } }
+      - { type: function, function: { name: fetch_url, description: "Fetch URL", parameters: { type: object, properties: { url: { type: string } }, required: [url] } } }
+      - { type: function, function: { name: calculator, description: "Math", parameters: { type: object, properties: { expression: { type: string } }, required: [expression] } } }
+      - { type: function, function: { name: current_time, description: "Get time", parameters: { type: object, properties: {} } } }
+      - { type: function, function: { name: daily_log, description: "Daily log entry", parameters: { type: object, properties: { entry: { type: string } }, required: [entry] } } }
+    mock_tool_responses:
+      gmail_list_messages: '{"messages": [{"id": "msg_1", "from": "devops@company.com", "subject": "Prod deploy rollback — action needed", "snippet": "The 3am deploy failed health checks..."}, {"id": "msg_2", "from": "newsletter@techcrunch.com", "subject": "Weekly digest", "snippet": "Top stories this week..."}]}'
+    graders:
+      - type: llm_judge
+        dimension: tool_selection
+        rubric: |
+          29 tools were bound. The user asked to check email from DevOps. The correct tool is gmail_list_messages.
+          1.0 = Used gmail_list_messages and correctly identified the DevOps email in the results
+          0.5 = Used gmail_list_messages but didn't filter/highlight the DevOps message
+          0.0 = Used wrong tool, hallucinated email content, or didn't use any tool
+
+  - id: tr_005_chained_tools
+    prompt: "What meetings do I have today? Add any action items from them to my task list."
+    tools:
+      - { type: function, function: { name: calendar_list_events, description: "List calendar events for a date range", parameters: { type: object, properties: { start_date: { type: string }, end_date: { type: string } }, required: [start_date] } } }
+      - { type: function, function: { name: task_add, description: "Create a new task", parameters: { type: object, properties: { title: { type: string }, description: { type: string } }, required: [title] } } }
+      - { type: function, function: { name: current_time, description: "Get current date/time", parameters: { type: object, properties: {} } } }
+      - { type: function, function: { name: memory_search, description: "Search memory", parameters: { type: object, properties: { query: { type: string } }, required: [query] } } }
+      - { type: function, function: { name: gmail_list_messages, description: "List emails", parameters: { type: object, properties: { max_results: { type: integer } } } } }
+      - { type: function, function: { name: web_search, description: "Web search", parameters: { type: object, properties: { query: { type: string } }, required: [query] } } }
+      - { type: function, function: { name: calculator, description: "Math", parameters: { type: object, properties: { expression: { type: string } }, required: [expression] } } }
+    mock_tool_responses:
+      current_time: '{"datetime": "2026-04-27T10:00:00-05:00", "timezone": "America/Chicago"}'
+      calendar_list_events: '{"events": [{"title": "Sprint Planning", "start": "2026-04-27T09:00:00", "end": "2026-04-27T10:00:00", "description": "Review backlog, assign Q3 priorities"}, {"title": "1:1 with Sarah", "start": "2026-04-27T14:00:00", "end": "2026-04-27T14:30:00", "description": "Discuss GPU cost optimization proposal"}]}'
+      task_add: '{"id": "task_99", "status": "pending"}'
+    graders:
+      - type: llm_judge
+        dimension: tool_chaining
+        rubric: |
+          The user asked for today's meetings + action items added as tasks. This requires chaining:
+          1) current_time or calendar_list_events (to get today's date/meetings)
+          2) calendar_list_events (to get meetings)
+          3) task_add (to create action items from meeting descriptions)
+          1.0 = Called calendar_list_events AND task_add, creating reasonable action items from the meeting descriptions
+          0.5 = Called calendar_list_events but didn't create tasks, or created generic tasks not from meeting content
+          0.0 = Didn't chain tools, or hallucinated meetings
+
+  - id: tr_006_abstention
+    prompt: "What's the capital of France?"
+    tools:
+      - { type: function, function: { name: web_search, description: "Search the web", parameters: { type: object, properties: { query: { type: string } }, required: [query] } } }
+      - { type: function, function: { name: memory_search, description: "Search memory", parameters: { type: object, properties: { query: { type: string } }, required: [query] } } }
+      - { type: function, function: { name: calculator, description: "Math", parameters: { type: object, properties: { expression: { type: string } }, required: [expression] } } }
+      - { type: function, function: { name: fetch_url, description: "Fetch URL", parameters: { type: object, properties: { url: { type: string } }, required: [url] } } }
+    graders:
+      - type: llm_judge
+        dimension: tool_selection
+        rubric: |
+          The user asked a simple factual question the model knows. No tool is needed.
+          1.0 = Answered "Paris" directly without using any tool
+          0.5 = Answered correctly but unnecessarily used web_search or memory_search
+          0.0 = Wrong answer, or used calculator/fetch_url
+
+  - id: tr_007_ambiguous_intent
+    prompt: "I need to send that thing to the team."
+    tools:
+      - { type: function, function: { name: gmail_send_message, description: "Send an email", parameters: { type: object, properties: { to: { type: string }, subject: { type: string }, body: { type: string } }, required: [to, subject, body] } } }
+      - { type: function, function: { name: discord_send, description: "Send Discord message", parameters: { type: object, properties: { channel: { type: string }, message: { type: string } }, required: [channel, message] } } }
+      - { type: function, function: { name: memory_search, description: "Search memory", parameters: { type: object, properties: { query: { type: string } }, required: [query] } } }
+      - { type: function, function: { name: task_list, description: "List tasks", parameters: { type: object, properties: { status: { type: string } } } } }
+      - { type: function, function: { name: calculator, description: "Math", parameters: { type: object, properties: { expression: { type: string } }, required: [expression] } } }
+    graders:
+      - type: llm_judge
+        dimension: tool_selection
+        rubric: |
+          The prompt is deliberately ambiguous — "that thing" and "the team" are undefined.
+          The model should ask for clarification, NOT blindly fire a tool.
+          1.0 = Asked for clarification (what to send, which team, which channel/email)
+          0.5 = Asked partial clarification but also tried to use a tool
+          0.0 = Fired gmail_send or discord_send without clarifying
+
+  - id: tr_008_parallel_tools
+    prompt: "What time is it and what's on my calendar today?"
+    tools:
+      - { type: function, function: { name: current_time, description: "Get current date/time", parameters: { type: object, properties: {} } } }
+      - { type: function, function: { name: calendar_list_events, description: "List calendar events", parameters: { type: object, properties: { start_date: { type: string }, end_date: { type: string } }, required: [start_date] } } }
+      - { type: function, function: { name: memory_search, description: "Search memory", parameters: { type: object, properties: { query: { type: string } }, required: [query] } } }
+      - { type: function, function: { name: web_search, description: "Web search", parameters: { type: object, properties: { query: { type: string } }, required: [query] } } }
+    mock_tool_responses:
+      current_time: '{"datetime": "2026-04-27T10:30:00-05:00"}'
+      calendar_list_events: '{"events": [{"title": "Standup", "start": "2026-04-27T09:00:00"}, {"title": "Code review", "start": "2026-04-27T15:00:00"}]}'
+    graders:
+      - type: llm_judge
+        dimension: tool_selection
+        rubric: |
+          Two independent requests in one prompt. Both current_time and calendar_list_events should be called.
+          1.0 = Called both tools and synthesized the results
+          0.5 = Called one but not the other
+          0.0 = Called neither, or used wrong tools

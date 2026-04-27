@@ -1,0 +1,83 @@
+# protolabs fleet eval — alias routing fitness
+# Tests tasks that have clear smart-vs-fast routing preferences.
+# Run against both aliases to build a routing fitness matrix.
+
+id: alias_routing
+name: "Alias Routing Fitness"
+category: protolabs
+difficulty: medium
+
+tests:
+  - id: route_001_complex_reasoning
+    prompt: |
+      A farmer has a fox, a chicken, and a sack of grain. He needs to cross a river
+      in a boat that can only carry him and one item at a time. If left alone, the fox
+      will eat the chicken, and the chicken will eat the grain. How does he get everything
+      across safely? Show your reasoning step by step.
+    graders:
+      - type: llm_judge
+        dimension: reasoning_quality
+        rubric: |
+          Classic river crossing puzzle. Correct solution requires 7 crossings.
+          1.0 = Correct solution with clear step-by-step reasoning, all constraints satisfied
+          0.5 = Correct final answer but reasoning has gaps, or minor error in one step
+          0.0 = Wrong solution, or violates constraints (fox eats chicken, etc.)
+
+  - id: route_002_quick_factual
+    prompt: "What year was Python first released?"
+    extra_body:
+      chat_template_kwargs:
+        enable_thinking: false
+    graders:
+      - type: llm_judge
+        dimension: speed_fitness
+        rubric: |
+          Simple factual question — Python was first released in 1991.
+          1.0 = Correct (1991), concise response (1-2 sentences)
+          0.5 = Correct but overly verbose
+          0.0 = Wrong year
+
+  - id: route_003_code_generation
+    prompt: |
+      Write a Python function that implements binary search on a sorted list.
+      Include type hints, docstring, and handle edge cases.
+    graders:
+      - type: llm_judge
+        dimension: reasoning_quality
+        rubric: |
+          Binary search implementation quality.
+          1.0 = Correct O(log n) implementation with type hints, docstring, handles empty list and missing element
+          0.5 = Correct algorithm but missing type hints/docstring, or doesn't handle edge cases
+          0.0 = Wrong algorithm (linear search), or doesn't compile
+
+  - id: route_004_creative_quick
+    prompt: "Write a haiku about GPU servers humming in the night."
+    extra_body:
+      chat_template_kwargs:
+        enable_thinking: false
+    graders:
+      - type: llm_judge
+        dimension: creative_quality
+        rubric: |
+          Haiku: 5-7-5 syllable structure, evocative imagery.
+          1.0 = Correct syllable count (5-7-5), evocative imagery about GPU/servers/night, poetic
+          0.5 = Good imagery but wrong syllable count, or correct count but flat/generic
+          0.0 = Not a haiku, or generic AI-generated filler
+
+  - id: route_005_multi_step_analysis
+    prompt: |
+      I'm comparing three cloud GPU providers for running a 70B parameter LLM:
+      - Provider A: 8x A100 80GB at $12/hr, 2TB NVMe, 400Gbps network
+      - Provider B: 4x H100 80GB at $16/hr, 4TB NVMe, 800Gbps network
+      - Provider C: 2x A100 80GB at $4/hr, 500GB SSD, 100Gbps network
+
+      Which should I choose for: (1) production inference at 1000 req/min, (2) fine-tuning a LoRA adapter, (3) batch processing overnight? Justify each choice.
+    graders:
+      - type: llm_judge
+        dimension: reasoning_quality
+        rubric: |
+          Multi-criteria decision requiring understanding of GPU architectures, memory, and workload patterns.
+          1.0 = Correct recommendations for all 3 use cases with sound technical justification
+                (e.g., B for production due to H100 throughput, A or B for fine-tuning due to memory, C for batch due to cost)
+          0.5 = 2/3 correct recommendations, or right answers with weak justification
+          0.0 = Wrong recommendations or demonstrates misunderstanding of GPU workloads
