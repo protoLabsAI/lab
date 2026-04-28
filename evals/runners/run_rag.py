@@ -33,8 +33,15 @@ def generate_answer(client: OpenAI, model: str, question: str, context: str) -> 
     response = client.chat.completions.create(
         model=model,
         messages=messages,
-        temperature=0.0,
+        temperature=0.7,
+        top_p=0.8,
         max_tokens=1000,
+        extra_body={
+            "top_k": 20,
+            "min_p": 0.0,
+            "presence_penalty": 1.5,
+            "repetition_penalty": 1.0,
+        },
     )
     return response.choices[0].message.content or ""
 

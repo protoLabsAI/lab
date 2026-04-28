@@ -64,13 +64,28 @@ def run_agent(client: OpenAI, model: str, task: dict, max_turns: int = 20) -> di
     start = time.time()
 
     while turns < max_turns:
-        kwargs = {"model": model, "messages": messages, "temperature": 0.0, "max_tokens": 8000}
-        if tools:
-            kwargs["tools"] = tools
         extra_body = dict(task.get("extra_body") or {})
         ctk = dict(extra_body.get("chat_template_kwargs") or {})
         ctk.setdefault("enable_thinking", False)
         extra_body["chat_template_kwargs"] = ctk
+
+        # Qwen-recommended sampling params (vLLM-specific go in extra_body)
+        # Thinking uses precise coding preset (temp=0.6, no presence_penalty)
+        is_thinking = ctk.get("enable_thinking", False)
+        extra_body.setdefault("top_k", 20)
+        extra_body.setdefault("min_p", 0.0)
+        extra_body.setdefault("presence_penalty", 0.0 if is_thinking else 1.5)
+        extra_body.setdefault("repetition_penalty", 1.0)
+
+        kwargs = {
+            "model": model,
+            "messages": messages,
+            "temperature": 0.6 if is_thinking else 0.7,
+            "top_p": 0.95 if is_thinking else 0.8,
+            "max_tokens": 32768,
+        }
+        if tools:
+            kwargs["tools"] = tools
         kwargs["extra_body"] = extra_body
 
         response = client.chat.completions.create(**kwargs)
