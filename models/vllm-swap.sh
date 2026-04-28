@@ -5,11 +5,11 @@
 # === Qwen 3.6 Dual-GPU Production Setup ===
 #   dual                              — start both models at once (recommended)
 #   GPU 0 (:8000) — qwen36-27b-fp8   — 27B FP8, thinking+planning, 256K
-#   GPU 1 (:8002) — qwen-36b-voice   — 35B FP8, NO thinking, voice/agentic, 256K
+#   GPU 1 (:8002) — qwen-36b-fast    — 35B FP8, NO thinking, fast execution, 131K
 #
 # === Qwen 3.6 (Single GPU) ===
 #   qwen-36b-fp8       — Qwen3.6-35B-A3B MoE + on-the-fly FP8 (single GPU, 262K)
-#   qwen-36b-voice     — Qwen3.6-35B-A3B MoE FP8, NO thinking, voice/agentic (GPU 1, :8002, 256K)
+#   qwen-36b-fast      — Qwen3.6-35B-A3B MoE FP8, NO thinking, fast execution (GPU 1, :8002, 131K)
 #   qwen-36b-bf16      — Qwen3.6-35B-A3B MoE bf16 (single GPU, 64K)
 #   qwen36-27b-fp8     — Qwen3.6-27B FP8 official (single GPU, 256K)
 #
@@ -39,7 +39,7 @@ PORT=8000
 VOICE_PORT=8002
 VLLM_BIN="$HOME/dev/vllm-env/bin/vllm"
 LOG_DIR="/mnt/scratch/logs"
-NONTHINKING_TEMPLATE="$HOME/dev/lab/models/templates/qwen3_nonthinking.jinja"
+NONTHINKING_TEMPLATE="$HOME/dev/lab/models/qwen3.5-tool-calling-nothink.jinja"
 export HF_HOME="/mnt/models/huggingface"
 export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
 export VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=1
@@ -62,7 +62,7 @@ usage() {
     echo "  $0 {cydonia-24b|cydonia-24b-mtp|llama-70b|llama-8b|hermes-70b|context-1|context-1-gpu1}"
     echo ""
     echo "Dual GPU (one model per GPU):"
-    echo "  $0 dual                — 27B thinking (GPU 0) + 35B no-thinking (GPU 1)"
+    echo "  $0 dual                — 27B thinking (GPU 0) + 35B fast no-thinking (GPU 1)"
     echo ""
     echo "TP=2 (both GPUs):"
     echo "  $0 {qwen-36b-tp2|qwen36-27b-fp8-tp2|gemma4-31b-tp2}"
@@ -85,7 +85,7 @@ stop_vllm() {
 stop_all() {
     echo "Stopping all vLLM services..."
     sudo systemctl stop vllm 2>/dev/null || true
-    sudo systemctl stop vllm-voice 2>/dev/null || true
+    sudo systemctl stop vllm-fast 2>/dev/null || true
     # Also kill any ad-hoc processes not managed by systemd
     stop_vllm
     stop_vllm_voice
@@ -131,7 +131,7 @@ wait_ready_voice() {
 [[ $# -lt 1 ]] && usage
 # Voice/dual configs manage their own stop — don't kill blindly
 case "$1" in
-    qwen-36b-voice) ;; # voice only touches GPU 1 / :8002
+    qwen-36b-fast) ;; # fast only touches GPU 1 / :8002
     dual)            ;; # dual does stop_all itself
     *) stop_vllm ;;
 esac
@@ -147,26 +147,26 @@ case "$1" in
         wait_ready
 
         echo ""
-        echo "Starting vllm-voice.service (35B MoE FP8, GPU 1, port ${VOICE_PORT})..."
-        sudo systemctl start vllm-voice
+        echo "Starting vllm-fast.service (35B MoE FP8, GPU 1, port ${VOICE_PORT})..."
+        sudo systemctl start vllm-fast
         wait_ready_voice
 
         echo ""
         echo "=== Both models ready ==="
         echo "  GPU 0 :${PORT}        — local       (27B FP8, thinking)"
-        echo "  GPU 1 :${VOICE_PORT}  — local-voice  (35B MoE FP8, no thinking)"
+        echo "  GPU 1 :${VOICE_PORT}  — local-fast   (35B MoE FP8, no thinking)"
         exit 0
         ;;
-    qwen-36b-voice)
-        echo "Starting Qwen3.6-35B-A3B-FP8 NO-THINKING voice/agentic (GPU 1, port ${VOICE_PORT}, 256K)..."
+    qwen-36b-fast)
+        echo "Starting Qwen3.6-35B-A3B-FP8 NO-THINKING fast (GPU 1, port ${VOICE_PORT}, 131K)..."
         stop_vllm_voice
         (
             export CUDA_VISIBLE_DEVICES=1
             exec $VLLM_BIN serve Qwen/Qwen3.6-35B-A3B-FP8 \
                 $O3 \
                 --host 0.0.0.0 --port $VOICE_PORT \
-                --served-model-name local-voice \
-                --max-model-len 262144 \
+                --served-model-name local-fast \
+                --max-model-len 131072 \
                 --chat-template "$NONTHINKING_TEMPLATE" \
                 --enable-auto-tool-choice --tool-call-parser qwen3_xml \
                 --gpu-memory-utilization 0.85 \
