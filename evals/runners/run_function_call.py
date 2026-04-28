@@ -42,13 +42,19 @@ def run_function_call_test(client: OpenAI, model: str, test: dict) -> dict:
     tools = test.get("tools", [])
 
     try:
+        # extra_body only for local vLLM models (cloud APIs reject it)
+        kwargs: dict = {}
+        if model.startswith("protolabs/"):
+            kwargs["extra_body"] = {
+                "chat_template_kwargs": {"enable_thinking": False},
+            }
         response = client.chat.completions.create(
             model=model,
             messages=messages,
             tools=tools,
             temperature=0.0,
             max_tokens=1000,
-            extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+            **kwargs,
         )
         choice = response.choices[0]
 
@@ -77,7 +83,7 @@ def compute_bucket_stats(test_results: list[dict]) -> dict:
     """Compute pass rates per bucket (inprocess / external / overall)."""
     buckets: dict[str, dict] = {}
     for tr in test_results:
-        bucket = tr.get("bucket", "untagged")
+        bucket = tr.get("bucket") or "untagged"
         if bucket not in buckets:
             buckets[bucket] = {"total": 0, "passed": 0}
         buckets[bucket]["total"] += 1
@@ -236,8 +242,9 @@ def main(model, suite, all_suites, gateway_url, api_key, submit_langfuse, output
     click.echo(f"Results: {total_passed}/{total_tests} passed ({overall_rate:.0%})")
 
     # Print per-bucket breakdown
-    for bucket, stats in sorted(bucket_stats.items()):
-        click.echo(f"  {bucket:12s}: {stats['passed']}/{stats['total']} ({stats['pass_rate']:.0%})")
+    for bucket, stats in sorted(bucket_stats.items(), key=lambda x: x[0] or ""):
+        label = bucket or "untagged"
+        click.echo(f"  {label:12s}: {stats['passed']}/{stats['total']} ({stats['pass_rate']:.0%})")
 
     # --- Gate enforcement ---
     gate_results = []
