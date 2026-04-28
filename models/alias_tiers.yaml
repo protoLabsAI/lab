@@ -7,48 +7,66 @@
 #   native-tool-calls   — Full structured tool calling, >=95% pass expected
 #   tool-calls-best-effort — Tool calling works but may have edge-case failures, >=80% pass
 #   chat-only           — No tool calling support, skip FC suites
+#
+# FC gates are split into in-process (memory, tasks, docs) and external
+# (HTTP, email, calendar, database) buckets. External-call tools degrade
+# more on weaker models. See Issue #1.
 
 aliases:
-  local:
-    model_id: "Qwen/Qwen3.5-27B"
+  protolabs/smart:
+    model_id: "Qwen/Qwen3.6-27B-FP8"
     quantization: "FP8"
     tier: "native-tool-calls"
     fc_gate: 0.95
-    notes: "Daily driver. Dense 27B, strong tool calling."
+    fc_gate_inprocess: 0.95
+    fc_gate_external: 0.90
+    notes: "Daily driver. Dense 27B, strong tool calling and instruction following."
 
-  fast:
-    model_id: "Qwen/Qwen3.5-35B-A3B"
+  protolabs/fast:
+    model_id: "llmfan46/Qwen3.6-35B-A3B-uncensored-heretic"
     quantization: "FP8"
     tier: "tool-calls-best-effort"
     fc_gate: 0.80
+    fc_gate_inprocess: 0.90
+    fc_gate_external: 0.60
     notes: >
-      MoE speed king. Known issue: malformed delimiters on zero-arg
-      module-level @tool functions. See lab Issue #1.
+      MoE speed king. Known issue: skips tool-calling channel on external-
+      call tools ~50% of the time when bound with 30+ tools and structured
+      output protocol. In-process tools reliable after prompt fix.
+      See lab Issue #1.
 
-  local-mtp:
+  protolabs/smart-mtp:
     model_id: "Qwen/Qwen3.5-27B"
     quantization: "INT4"
     tier: "tool-calls-best-effort"
     fc_gate: 0.80
+    fc_gate_inprocess: 0.85
+    fc_gate_external: 0.75
     notes: "MTP speculative decoding. T08 quality regresses under MTP."
 
-  qwen-9b:
+  protolabs/9b:
     model_id: "Qwen/Qwen3.5-9B"
     quantization: "BF16"
     tier: "native-tool-calls"
     fc_gate: 0.90
+    fc_gate_inprocess: 0.90
+    fc_gate_external: 0.85
     notes: "Fine-tune base. Good FC at 9B."
 
-  qwen-4b:
+  protolabs/4b:
     model_id: "Qwen/Qwen3.5-4B"
     quantization: "BF16"
     tier: "tool-calls-best-effort"
     fc_gate: 0.70
+    fc_gate_inprocess: 0.75
+    fc_gate_external: 0.60
     notes: "Edge deploy. Capability cliff below 4B."
 
-  qwen-122b:
+  protolabs/122b:
     model_id: "Qwen/Qwen3.5-122B-A10B-FP8"
     quantization: "FP8"
     tier: "native-tool-calls"
     fc_gate: 0.95
+    fc_gate_inprocess: 0.95
+    fc_gate_external: 0.90
     notes: "Quality ceiling. TP=2 across both GPUs."

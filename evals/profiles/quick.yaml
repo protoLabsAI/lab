@@ -39,6 +39,6 @@ custom:
   - suite: protolabs/function_call
   - suite: protolabs/routing
 
-# Function calling
+# Function calling (canary suite has gate enforcement via alias_tiers.yaml)
 function_call:
-  suites: ["basic", "edge_cases"]
+  suites: ["basic", "edge_cases", "canary"]

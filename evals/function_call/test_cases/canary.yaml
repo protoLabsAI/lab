@@ -9,6 +9,7 @@ tests:
   # MoE models emit malformed delimiters (<tool_calls> open / </tool_call> close)
   # on these. Gate: smart >= 95%, fast >= 80%.
   - id: canary_001
+    bucket: inprocess
     prompt: "Get the current server status."
     tools:
       - type: function
@@ -25,6 +26,7 @@ tests:
 
   # Zero-arg with explicit empty required array
   - id: canary_002
+    bucket: inprocess
     prompt: "What version of the API is running?"
     tools:
       - type: function
@@ -42,6 +44,7 @@ tests:
 
   # Zero-arg alongside a multi-arg tool — tests tool selection under ambiguity
   - id: canary_003
+    bucket: inprocess
     prompt: "List all available models."
     tools:
       - type: function
@@ -69,6 +72,7 @@ tests:
 
   # Multi-call: zero-arg then arg-bearing (sequential)
   - id: canary_004
+    bucket: inprocess
     prompt: "First check the server status, then get the weather in NYC."
     tools:
       - type: function
@@ -99,6 +103,7 @@ tests:
   # Boolean-only argument — another observed failure mode where models
   # sometimes omit the arg or stringify it
   - id: canary_005
+    bucket: inprocess
     prompt: "Enable debug mode."
     tools:
       - type: function
@@ -117,3 +122,132 @@ tests:
         - name: set_debug_mode
           arguments:
             enabled: true
+
+  # --- External-call canaries ---
+  # protolabs/fast degrades specifically on tools that pull external/API data
+  # (HTTP fetch, Gmail, Calendar, OAuth) while in-process tools pass.
+  # See Issue #1: prompt fix recovered in-process tools but external tools
+  # still fail ~50% on fast. These canaries catch that regression.
+
+  # External-call canary: HTTP fetch
+  - id: canary_006
+    bucket: external
+    prompt: "Fetch the contents of https://example.com"
+    tools:
+      - type: function
+        function:
+          name: fetch_url
+          description: "Fetch the contents of a URL over HTTP."
+          parameters:
+            type: object
+            properties:
+              url:
+                type: string
+                description: "The URL to fetch"
+            required: ["url"]
+    expected:
+      tool_calls:
+        - name: fetch_url
+          arguments:
+            url: "https://example.com"
+
+  # External-call canary: email API
+  - id: canary_007
+    bucket: external
+    prompt: "Show me my inbox emails."
+    tools:
+      - type: function
+        function:
+          name: list_emails
+          description: "List emails from a specified mail folder."
+          parameters:
+            type: object
+            properties:
+              folder:
+                type: string
+                description: "The mail folder to list emails from"
+            required: ["folder"]
+    expected:
+      tool_calls:
+        - name: list_emails
+          arguments:
+            folder: "inbox"
+
+  # External-call canary: calendar write
+  - id: canary_008
+    bucket: external
+    prompt: "Create a meeting called 'Team Standup' tomorrow at 10am."
+    tools:
+      - type: function
+        function:
+          name: create_calendar_event
+          description: "Create a new calendar event."
+          parameters:
+            type: object
+            properties:
+              title:
+                type: string
+                description: "Title of the event"
+              time:
+                type: string
+                description: "When the event should be scheduled"
+            required: ["title", "time"]
+    expected:
+      tool_calls:
+        - name: create_calendar_event
+          arguments:
+            title: "Team Standup"
+            time: "tomorrow at 10am"
+
+  # External-call canary: database query
+  - id: canary_009
+    bucket: external
+    prompt: "Look up user ID 42 in the database."
+    tools:
+      - type: function
+        function:
+          name: query_user
+          description: "Look up a user by their ID in the database."
+          parameters:
+            type: object
+            properties:
+              user_id:
+                type: integer
+                description: "The user ID to look up"
+            required: ["user_id"]
+    expected:
+      tool_calls:
+        - name: query_user
+          arguments:
+            user_id: 42
+
+  # External-call canary: mixed in-process + external
+  - id: canary_010
+    bucket: external
+    prompt: "Check my identity and then fetch my recent emails from inbox."
+    tools:
+      - type: function
+        function:
+          name: whoami
+          description: "Returns the current authenticated user identity. Takes no arguments."
+          parameters:
+            type: object
+            properties: {}
+      - type: function
+        function:
+          name: list_emails
+          description: "List emails from a specified mail folder."
+          parameters:
+            type: object
+            properties:
+              folder:
+                type: string
+                description: "The mail folder to list emails from"
+            required: ["folder"]
+    expected:
+      tool_calls:
+        - name: whoami
+          arguments: {}
+        - name: list_emails
+          arguments:
+            folder: "inbox"

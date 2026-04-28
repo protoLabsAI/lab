@@ -20,6 +20,6 @@ custom:
   - suite: reasoning
   - suite: safety
 
-# Function calling — basic suite only
+# Function calling — basic + canary (gate enforcement)
 function_call:
-  suites: ["basic"]
+  suites: ["basic", "canary"]
