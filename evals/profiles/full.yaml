@@ -38,7 +38,7 @@ custom:
 
 # Function calling — all suites
 function_call:
-  suites: ["basic", "edge_cases"]
+  suites: ["basic", "edge_cases", "canary", "gina_tools", "gina_advanced"]
 
 # RAG evaluation
 # rag:
