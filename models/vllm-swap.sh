@@ -162,7 +162,7 @@ case "$1" in
         stop_vllm_voice
         (
             export CUDA_VISIBLE_DEVICES=1
-            exec $VLLM_BIN serve Qwen/Qwen3.6-35B-A3B-FP8 \
+            exec $VLLM_BIN serve /mnt/models/quantized/Qwen3.6-35B-A3B-uncensored-heretic-FP8 \
                 $O3 \
                 --host 0.0.0.0 --port $VOICE_PORT \
                 --served-model-name local-fast \
@@ -172,7 +172,6 @@ case "$1" in
                 --gpu-memory-utilization 0.85 \
                 --language-model-only \
                 --enable-chunked-prefill \
-                --kv-cache-dtype fp8 \
                 --async-scheduling \
                 --performance-mode interactivity \
                 $PREFIX_FLAGS \
