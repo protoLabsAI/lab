@@ -17,7 +17,6 @@ from pathlib import Path
 import click
 import yaml
 from graders.function_call import FunctionCallGrader
-from graders.langfuse_scorer import LangfuseScorer
 from openai import OpenAI
 
 SUITE_DIR = Path(__file__).parent.parent / "function_call" / "test_cases"
@@ -76,7 +75,7 @@ def main(model, suite, all_suites, gateway_url, api_key, submit_langfuse, output
     """Run function calling accuracy evals."""
     client = OpenAI(base_url=gateway_url, api_key=api_key)
     grader = FunctionCallGrader()
-    scorer = LangfuseScorer() if submit_langfuse else None
+    # TODO: wire Langfuse scoring (needs TaskResult adapter, works in run_custom.py)
 
     # Collect test files
     if suite:

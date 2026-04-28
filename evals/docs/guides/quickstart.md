@@ -17,17 +17,17 @@ source venv/bin/activate
 
 ## Run Your First Eval
 
-### Custom task (fastest)
+### Custom suite (fastest)
 
 ```bash
-# Run the example calculator task against the local model
+# Run the coding eval suite against the local model
 python -m runners.run_custom \
-    --task tasks/tool_use/example_calculator.yaml \
+    --suite coding \
     --model local
 
-# Same task against a cloud model
+# Same suite against a cloud model
 python -m runners.run_custom \
-    --task tasks/tool_use/example_calculator.yaml \
+    --suite coding \
     --model claude-sonnet-4-6
 ```
 
