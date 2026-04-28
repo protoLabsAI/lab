@@ -2,13 +2,15 @@
 # protoLabs Evals — Run with Infisical secret injection
 #
 # Usage:
-#   ./run.sh claw --model local --tasks T01,T02
-#   ./run.sh custom --suite tool_use --model local --submit-langfuse
-#   ./run.sh profile --name quick --model local
-#   ./run.sh profile --name full --model local
-#   ./run.sh wildbench infer --model local          # generate responses (1,024 tasks)
-#   ./run.sh wildbench judge --results X --judge gpt-5.4  # score with cloud judge (~$5)
-#   ./run.sh wildbench run --model local --judge gpt-5.4  # both phases
+#   ./run.sh profile --name smoke                              # ~5 min sanity check
+#   ./run.sh profile --name quick                              # ~15 min pre-merge
+#   ./run.sh profile --name full                               # ~60-90 min release gate
+#   ./run.sh claw --tasks T01,T02                              # specific claw tasks
+#   ./run.sh custom --suite coding                             # single custom suite
+#   ./run.sh function-call --all-suites                        # all FC suites
+#   ./run.sh profile --name quick --model protolabs/fast       # test a different model
+#   ./run.sh wildbench infer                                   # generate responses (1,024 tasks)
+#   ./run.sh wildbench judge --results X --judge gpt-5.4       # score with cloud judge (~$5)
 #   ./run.sh compare results/model_a results/model_b
 #   ./run.sh --setup       # configure machine identity (first time)
 #   ./run.sh --local ...   # use local .env instead of Infisical

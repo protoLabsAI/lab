@@ -142,7 +142,7 @@ def grade_task(task: dict, output: dict, gateway_url: str = "http://ava:4000/v1"
 @click.command()
 @click.option("--task", "task_path", type=click.Path(exists=True), help="Path to a single task YAML")
 @click.option("--suite", help="Task suite directory name (e.g., tool_use, browser)")
-@click.option("--model", default="local", help="Gateway model name")
+@click.option("--model", default="protolabs/smart", help="Gateway model name")
 @click.option("--trials", default=3, help="Trials per task")
 @click.option("--gateway-url", default="http://ava:4000/v1")
 @click.option("--api-key", envvar="GATEWAY_API_KEY", default="not-needed")

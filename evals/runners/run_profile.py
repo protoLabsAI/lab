@@ -150,7 +150,7 @@ def _get_git_hash() -> str:
 
 @click.command()
 @click.option("--name", required=True, help="Profile name (smoke, quick, full)")
-@click.option("--model", default="local", help="Gateway model name")
+@click.option("--model", default="protolabs/smart", help="Gateway model name")
 @click.option("--gateway-url", default="http://ava:4000/v1")
 @click.option("--api-key", envvar="GATEWAY_API_KEY", default="not-needed")
 @click.option("--trials", default=None, type=int, help="Override profile trial count")

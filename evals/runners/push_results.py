@@ -135,8 +135,8 @@ def push_to_hf(row: dict, profile: str = "results") -> str:
 
 # Well-known model aliases → metadata
 KNOWN_MODELS: dict[str, dict] = {
-    "local": {
-        "model_id": "Qwen/Qwen3.5-27B",
+    "protolabs/smart": {
+        "model_id": "Qwen/Qwen3.6-27B-FP8",
         "quantization": "FP8",
         "parameters_b": 27.0,
         "architecture": "dense",
@@ -144,8 +144,8 @@ KNOWN_MODELS: dict[str, dict] = {
         "tp_size": 1,
         "gpu_config": "1x RTX PRO 6000 Blackwell",
     },
-    "local-voice": {
-        "model_id": "Qwen/Qwen3.5-35B-A3B",
+    "protolabs/fast": {
+        "model_id": "llmfan46/Qwen3.6-35B-A3B-uncensored-heretic",
         "quantization": "FP8",
         "parameters_b": 35.0,
         "architecture": "moe",

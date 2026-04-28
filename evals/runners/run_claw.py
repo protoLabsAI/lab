@@ -82,7 +82,7 @@ def build_claw_config(model: str, gateway_url: str, api_key: str) -> Path:
 
 
 @click.command()
-@click.option("--model", default="local", help="Gateway model name to evaluate")
+@click.option("--model", default="protolabs/smart", help="Gateway model name to evaluate")
 @click.option("--tasks", default=None, help="Comma-separated task IDs (e.g., T01,T02)")
 @click.option("--all-tasks", is_flag=True, help="Run all available tasks")
 @click.option("--trials", default=3, help="Number of trials per task (default: 3 for pass^3)")

@@ -60,7 +60,7 @@ def run_function_call_test(client: OpenAI, model: str, test: dict) -> dict:
 
 
 @click.command()
-@click.option("--model", default="local", help="Gateway model name")
+@click.option("--model", default="protolabs/smart", help="Gateway model name")
 @click.option("--suite", default=None, help="Test suite name (e.g., basic)")
 @click.option("--all-suites", is_flag=True, help="Run all test suites")
 @click.option("--gateway-url", default="http://ava:4000/v1")
