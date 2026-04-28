@@ -63,12 +63,20 @@ def build_claw_config(model: str, gateway_url: str, api_key: str) -> Path:
     config["model"]["base_url"] = gateway_url
     config["model"]["api_key"] = api_key
 
-    # Judge always routes through the ava gateway (cloud models live there)
+    # Judge defaults to local fast model (free, no cloud costs)
+    # Override with JUDGE_GATEWAY_URL to use cloud judge
     if "judge" in config:
-        judge_url = os.environ.get("JUDGE_GATEWAY_URL", "http://ava:4000/v1")
+        judge_url = os.environ.get(
+            "JUDGE_GATEWAY_URL", "http://localhost:8002/v1"
+        )
         judge_key = os.environ.get("GATEWAY_API_KEY", api_key)
         config["judge"]["base_url"] = judge_url
         config["judge"]["api_key"] = judge_key
+        # Use local-fast (35B MoE) as default judge model
+        if "JUDGE_MODEL" in os.environ:
+            config["judge"]["model_id"] = os.environ["JUDGE_MODEL"]
+        elif "localhost:8002" in judge_url:
+            config["judge"]["model_id"] = "local-fast"
 
     run_dir = RESULTS_DIR / f"{model}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -89,7 +97,7 @@ def build_claw_config(model: str, gateway_url: str, api_key: str) -> Path:
 @click.option("--gateway-url", default="http://ava:4000/v1", help="Gateway base URL")
 @click.option("--api-key", envvar=["GATEWAY_API_KEY", "LITELLM_API_KEY"], default="not-needed")
 @click.option("--workers", default=4, help="Parallel workers for batch mode")
-@click.option("--port-offset", default=0, help="Port offset for mock services (use different values for parallel runs)")
+@click.option("--port-offset", default=200, help="Port offset for mock services. Default 200 dodges Prometheus node_exporter (:9100) and other monitoring services. Use different values for parallel runs.")
 def main(model, tasks, all_tasks, trials, gateway_url, api_key, workers, port_offset):
     """Run claw-eval tasks against a gateway model."""
     if not CLAW_DIR.exists():
