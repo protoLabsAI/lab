@@ -15,9 +15,8 @@ tests:
       - type: llm_judge
         dimension: correctness
         rubric: |
-          Correct answer: B=80kg, A=160kg, C=190kg (total 430... wait let me recheck)
           Let B=x, A=2x, C=2x+30. Sum: x+2x+2x+30=550, 5x=520, x=104.
-          B=104, A=208, C=238. Total=550. ✓
+          Correct answer: B=104kg, A=208kg, C=238kg. Total=550kg. ✓
           1.0 = correct values (B=104, A=208, C=238) with clear reasoning
           0.75 = correct setup but arithmetic error
           0.5 = partially correct approach

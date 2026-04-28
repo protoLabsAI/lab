@@ -1,0 +1,54 @@
+# Model Alias Tool-Calling Tiers
+#
+# Defines the expected tool-calling reliability for each model alias.
+# Used by the eval system to set pass/fail gates per alias.
+#
+# Tiers:
+#   native-tool-calls   — Full structured tool calling, >=95% pass expected
+#   tool-calls-best-effort — Tool calling works but may have edge-case failures, >=80% pass
+#   chat-only           — No tool calling support, skip FC suites
+
+aliases:
+  local:
+    model_id: "Qwen/Qwen3.5-27B"
+    quantization: "FP8"
+    tier: "native-tool-calls"
+    fc_gate: 0.95
+    notes: "Daily driver. Dense 27B, strong tool calling."
+
+  fast:
+    model_id: "Qwen/Qwen3.5-35B-A3B"
+    quantization: "FP8"
+    tier: "tool-calls-best-effort"
+    fc_gate: 0.80
+    notes: >
+      MoE speed king. Known issue: malformed delimiters on zero-arg
+      module-level @tool functions. See lab Issue #1.
+
+  local-mtp:
+    model_id: "Qwen/Qwen3.5-27B"
+    quantization: "INT4"
+    tier: "tool-calls-best-effort"
+    fc_gate: 0.80
+    notes: "MTP speculative decoding. T08 quality regresses under MTP."
+
+  qwen-9b:
+    model_id: "Qwen/Qwen3.5-9B"
+    quantization: "BF16"
+    tier: "native-tool-calls"
+    fc_gate: 0.90
+    notes: "Fine-tune base. Good FC at 9B."
+
+  qwen-4b:
+    model_id: "Qwen/Qwen3.5-4B"
+    quantization: "BF16"
+    tier: "tool-calls-best-effort"
+    fc_gate: 0.70
+    notes: "Edge deploy. Capability cliff below 4B."
+
+  qwen-122b:
+    model_id: "Qwen/Qwen3.5-122B-A10B-FP8"
+    quantization: "FP8"
+    tier: "native-tool-calls"
+    fc_gate: 0.95
+    notes: "Quality ceiling. TP=2 across both GPUs."

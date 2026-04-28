@@ -1,0 +1,119 @@
+name: "Tool Call Canaries"
+description: >
+  Regression canaries for tool-call reliability. Targets known failure modes:
+  zero-arg functions, module-level tools, closure-bound tools, and mixed-arity
+  calls. See lab Issue #1 (wishy-washy tool calls with template).
+
+tests:
+  # Zero-arg module-level function — the primary regression from Issue #1.
+  # MoE models emit malformed delimiters (<tool_calls> open / </tool_call> close)
+  # on these. Gate: smart >= 95%, fast >= 80%.
+  - id: canary_001
+    prompt: "Get the current server status."
+    tools:
+      - type: function
+        function:
+          name: get_server_status
+          description: "Returns the current server health status. Takes no arguments."
+          parameters:
+            type: object
+            properties: {}
+    expected:
+      tool_calls:
+        - name: get_server_status
+          arguments: {}
+
+  # Zero-arg with explicit empty required array
+  - id: canary_002
+    prompt: "What version of the API is running?"
+    tools:
+      - type: function
+        function:
+          name: get_api_version
+          description: "Returns the current API version string."
+          parameters:
+            type: object
+            properties: {}
+            required: []
+    expected:
+      tool_calls:
+        - name: get_api_version
+          arguments: {}
+
+  # Zero-arg alongside a multi-arg tool — tests tool selection under ambiguity
+  - id: canary_003
+    prompt: "List all available models."
+    tools:
+      - type: function
+        function:
+          name: list_models
+          description: "Returns a list of all available models. Takes no arguments."
+          parameters:
+            type: object
+            properties: {}
+      - type: function
+        function:
+          name: get_model_info
+          description: "Get detailed information about a specific model."
+          parameters:
+            type: object
+            properties:
+              model_name:
+                type: string
+                description: "Name of the model"
+            required: ["model_name"]
+    expected:
+      tool_calls:
+        - name: list_models
+          arguments: {}
+
+  # Multi-call: zero-arg then arg-bearing (sequential)
+  - id: canary_004
+    prompt: "First check the server status, then get the weather in NYC."
+    tools:
+      - type: function
+        function:
+          name: get_server_status
+          description: "Returns the current server health status. Takes no arguments."
+          parameters:
+            type: object
+            properties: {}
+      - type: function
+        function:
+          name: get_weather
+          description: "Get current weather for a city."
+          parameters:
+            type: object
+            properties:
+              city:
+                type: string
+            required: ["city"]
+    expected:
+      tool_calls:
+        - name: get_server_status
+          arguments: {}
+        - name: get_weather
+          arguments:
+            city: "NYC"
+
+  # Boolean-only argument — another observed failure mode where models
+  # sometimes omit the arg or stringify it
+  - id: canary_005
+    prompt: "Enable debug mode."
+    tools:
+      - type: function
+        function:
+          name: set_debug_mode
+          description: "Enable or disable debug mode."
+          parameters:
+            type: object
+            properties:
+              enabled:
+                type: boolean
+                description: "Whether to enable debug mode"
+            required: ["enabled"]
+    expected:
+      tool_calls:
+        - name: set_debug_mode
+          arguments:
+            enabled: true

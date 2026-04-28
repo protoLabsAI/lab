@@ -28,7 +28,7 @@ def _get_deepeval_model(model: str = "claude-sonnet-4-6"):
     from deepeval.models import DeepEvalBaseLLM
     from openai import OpenAI
 
-    gateway_url = os.environ.get("GATEWAY_URL", "http://localhost:4000/v1")
+    gateway_url = os.environ.get("JUDGE_GATEWAY_URL", "http://ava:4000/v1")
     api_key = os.environ.get("GATEWAY_API_KEY", "not-needed")
 
     class GatewayModel(DeepEvalBaseLLM):

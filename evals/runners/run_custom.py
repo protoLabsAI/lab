@@ -20,12 +20,28 @@ from typing import Any
 
 import click
 import yaml
+from graders.base import GradeResult, TaskResult
+from graders.creative import (
+    CHARACTER_VOICE_RUBRIC,
+    ENGAGEMENT_RUBRIC,
+    GM_QUALITY_RUBRIC,
+    NARRATIVE_RUBRIC,
+    RESEARCH_SYNTHESIS_RUBRIC,
+    WORLD_BUILDING_RUBRIC,
+)
+from graders.langfuse_scorer import LangfuseScorer
+from graders.llm_judge import LLMJudge
 from openai import OpenAI
 
-from graders.base import GradeResult, TaskResult
-from graders.outcome import OutcomeGrader
-from graders.llm_judge import LLMJudge
-from graders.langfuse_scorer import LangfuseScorer
+# Dimension-specific rubrics — override the generic DEFAULT_RUBRIC when available
+DIMENSION_RUBRICS: dict[str, str] = {
+    "narrative_quality": NARRATIVE_RUBRIC,
+    "character_voice": CHARACTER_VOICE_RUBRIC,
+    "world_building": WORLD_BUILDING_RUBRIC,
+    "engagement": ENGAGEMENT_RUBRIC,
+    "gm_quality": GM_QUALITY_RUBRIC,
+    "research_synthesis": RESEARCH_SYNTHESIS_RUBRIC,
+}
 
 
 def load_task(task_path: Path) -> dict:
@@ -104,9 +120,10 @@ def grade_task(task: dict, output: dict, gateway_url: str = "http://ava:4000/v1"
 
     for gc in grader_configs:
         if gc["type"] == "llm_judge":
+            rubric = gc.get("rubric") or DIMENSION_RUBRICS.get(gc["dimension"])
             grader = LLMJudge(
                 dimension=gc["dimension"],
-                rubric=gc.get("rubric"),
+                rubric=rubric,
                 model=gc.get("model", "claude-sonnet-4-6"),
                 base_url=judge_url or gateway_url,
                 api_key=api_key,
@@ -131,7 +148,8 @@ def grade_task(task: dict, output: dict, gateway_url: str = "http://ava:4000/v1"
 @click.option("--api-key", envvar="GATEWAY_API_KEY", default="not-needed")
 @click.option("--submit-langfuse", is_flag=True, help="Submit scores to Langfuse")
 @click.option("--thinking", is_flag=True, help="Enable thinking/reasoning mode (Gemma 4, etc.)")
-def main(task_path, suite, model, trials, gateway_url, api_key, submit_langfuse, thinking):
+@click.option("--output-dir", type=click.Path(), default=None, help="Directory to write result JSON")
+def main(task_path, suite, model, trials, gateway_url, api_key, submit_langfuse, thinking, output_dir):
     """Run custom eval tasks and grade results."""
     client = OpenAI(base_url=gateway_url, api_key=api_key)
     scorer = LangfuseScorer() if submit_langfuse else None
@@ -151,6 +169,7 @@ def main(task_path, suite, model, trials, gateway_url, api_key, submit_langfuse,
     click.echo("=" * 60)
 
     all_results = []
+    suite_results: dict[str, dict] = {}
 
     for tf in task_files:
         file_data = load_task(tf)
@@ -174,6 +193,8 @@ def main(task_path, suite, model, trials, gateway_url, api_key, submit_langfuse,
 
         click.echo(f"\n{suite_name} ({len(tasks)} tests)")
 
+        suite_task_results: list[dict] = []
+
         for task in tasks:
             if thinking:
                 eb = dict(task.get("extra_body") or {})
@@ -185,6 +206,7 @@ def main(task_path, suite, model, trials, gateway_url, api_key, submit_langfuse,
             click.echo(f"\n  {task_id}:")
 
             trial_results = []
+            trial_records: list[dict] = []
             for trial in range(1, trials + 1):
                 output = run_agent(client, model, task)
                 judge_gateway = os.environ.get("JUDGE_GATEWAY_URL", "http://ava:4000/v1")
@@ -204,16 +226,76 @@ def main(task_path, suite, model, trials, gateway_url, api_key, submit_langfuse,
                 if scorer:
                     scorer.submit_grades(result)
 
+                trial_records.append({
+                    "trial": trial,
+                    "passed": result.passed,
+                    "score": result.score,
+                    "grades": [
+                        {"dimension": g.dimension, "score": g.score, "passed": g.passed}
+                        for g in grades
+                    ],
+                    "duration_s": output["duration_s"],
+                    "turns": output["turns"],
+                })
+
             all_passed = all(r.passed for r in trial_results)
             avg_score = sum(r.score for r in trial_results) / len(trial_results)
             click.echo(f"    Pass^{trials}: {'PASS' if all_passed else 'FAIL'} (avg={avg_score:.2f})")
             all_results.append(trial_results)
+
+            suite_task_results.append({
+                "task_id": task_id,
+                "trials": trial_records,
+                "all_passed": all_passed,
+                "avg_score": avg_score,
+            })
+
+        suite_results[suite_name] = {
+            "tasks": suite_task_results,
+        }
 
     # Summary
     total_tasks = len(all_results)
     passed_tasks = sum(1 for trials_list in all_results if all(r.passed for r in trials_list))
     click.echo(f"\n{'='*60}")
     click.echo(f"Results: {passed_tasks}/{total_tasks} tasks passed (pass^{trials})")
+
+    # Write structured results (merge with existing file if present —
+    # the profile runner calls us once per suite into the same output dir)
+    if output_dir:
+        out_path = Path(output_dir)
+        out_path.mkdir(parents=True, exist_ok=True)
+        results_file = out_path / "custom_results.json"
+
+        # Load existing results to merge suites across invocations
+        existing: dict = {}
+        if results_file.exists():
+            with open(results_file) as f:
+                existing = json.load(f)
+
+        merged_suites = existing.get("suites", {})
+        merged_suites.update(suite_results)
+
+        # Recompute summary across all merged suites
+        all_task_results = [t for s in merged_suites.values() for t in s.get("tasks", [])]
+        merged_total = len(all_task_results)
+        merged_passed = sum(1 for t in all_task_results if t.get("all_passed"))
+
+        results_data = {
+            "model": model,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "trials": trials,
+            "thinking": thinking,
+            "suites": merged_suites,
+            "summary": {
+                "total_tasks": merged_total,
+                "passed_tasks": merged_passed,
+                "pass_rate": merged_passed / merged_total if merged_total > 0 else 0.0,
+            },
+        }
+        with open(results_file, "w") as f:
+            json.dump(results_data, f, indent=2)
+        click.echo(f"Results written to {results_file}")
 
 
 if __name__ == "__main__":

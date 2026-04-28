@@ -1,0 +1,25 @@
+# Smoke Test Profile
+# ~5 min, 1 trial — "does inference + grading work at all"
+# Usage: ./run.sh profile --name smoke --model local
+
+name: "Smoke Test"
+description: "Minimal sanity check. 1 trial, ~10 tests. Run before any real eval."
+trials: 1
+
+# 3 claw-eval tasks — one easy, one medium, one complex
+claw:
+  tasks: "T02,T08,T28"
+  port_offset: 200
+  # T02: email triage (basic tool use)
+  # T08: todo management (multi-tool orchestration)
+  # T28: api config audit (technical analysis)
+
+# 3 custom suites — core capabilities
+custom:
+  - suite: coding
+  - suite: reasoning
+  - suite: safety
+
+# Function calling — basic suite only
+function_call:
+  suites: ["basic"]

@@ -10,6 +10,7 @@ Best practices from Anthropic:
 from __future__ import annotations
 
 import json
+import os
 from typing import Any
 
 from openai import OpenAI
@@ -50,7 +51,7 @@ class LLMJudge(Grader):
         dimension: str,
         rubric: str | None = None,
         model: str = "claude-sonnet-4-6",
-        base_url: str = "http://localhost:4000/v1",
+        base_url: str = os.environ.get("JUDGE_GATEWAY_URL", "http://ava:4000/v1"),
         api_key: str | None = None,
         threshold: float = 0.75,
     ):

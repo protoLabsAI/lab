@@ -8,6 +8,7 @@ avoid position bias, and exposes the swap so results can be de-biased.
 from __future__ import annotations
 
 import json
+import os
 import random
 from dataclasses import dataclass, field
 from typing import Any
@@ -62,7 +63,7 @@ class PairwiseJudge:
 
     def __init__(
         self,
-        base_url: str = "http://localhost:4000/v1",
+        base_url: str = os.environ.get("JUDGE_GATEWAY_URL", "http://ava:4000/v1"),
         api_key: str | None = None,
     ):
         self.client = OpenAI(base_url=base_url, api_key=api_key or "not-needed")

@@ -13,7 +13,7 @@ system_prompt: |
   response — always use the structured tool calling mechanism.
 
 tests:
-  - id: fc_001_simple_tool
+  - id: pfc_001_simple_tool
     prompt: "What time is it?"
     tools:
       - type: function
@@ -35,7 +35,7 @@ tests:
           0.5 = Got the right answer but emitted the tool call as text (XML tags, JSON in content, or <tool_code>)
           0.0 = Didn't call the tool at all, or hallucinated the time
 
-  - id: fc_002_tool_with_args
+  - id: pfc_002_tool_with_args
     prompt: "Search the web for 'vLLM Blackwell GPU support'"
     tools:
       - type: function
@@ -60,7 +60,7 @@ tests:
           0.5 = Emitted tool call as text/XML in content instead of tool_calls field
           0.0 = Didn't search, or hallucinated results
 
-  - id: fc_003_multi_tool_selection
+  - id: pfc_003_multi_tool_selection
     prompt: "What's 234 * 567 and what time is it?"
     tools:
       - type: function
@@ -102,7 +102,7 @@ tests:
           0.5 = One structured + one as text, or only one tool called
           0.0 = Both as text in content, or neither called
 
-  - id: fc_004_tool_with_complex_args
+  - id: pfc_004_tool_with_complex_args
     prompt: "Send an email to sarah@company.com about the GPU benchmark results. Subject: 'Benchmark Complete'. Body should mention 27B won quality and 35B won speed."
     tools:
       - type: function
@@ -147,7 +147,7 @@ tests:
           0.5 = Structured call but missing/wrong args, or emitted as text
           0.0 = Didn't call the tool, or used gmail_draft instead of gmail_send_message
 
-  - id: fc_005_no_tool_needed
+  - id: pfc_005_no_tool_needed
     prompt: "Thanks, that's all I needed!"
     tools:
       - type: function
