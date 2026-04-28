@@ -20,6 +20,6 @@ custom:
   - suite: reasoning
   - suite: safety
 
-# Function calling — basic + canary (gate enforcement)
+# Function calling — basic + canary (gate enforcement) + gina tool routing
 function_call:
-  suites: ["basic", "canary"]
+  suites: ["basic", "canary", "gina_tools"]

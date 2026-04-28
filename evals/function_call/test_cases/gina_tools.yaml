@@ -1,0 +1,674 @@
+name: "Gina Tool Routing"
+description: >
+  Ported from protoLabsAI/gina eval suite. Tests that the model routes to
+  the correct tool given natural-language prompts with 30+ tools available.
+  Each test binds ALL tools to reproduce the real routing challenge.
+  See Issue #1 for context on tool-calling degradation under load.
+
+# Shared tool definitions — all 30 tools bound on every test to reproduce
+# the real-world routing challenge. Defined once, referenced via YAML anchor.
+tool_defs: &all_tools
+  - type: function
+    function:
+      name: current_time
+      description: "Returns the current date and time in the specified timezone."
+      parameters:
+        type: object
+        properties:
+          timezone:
+            type: string
+            description: "IANA timezone (e.g. 'US/Eastern', 'UTC')"
+        required: ["timezone"]
+  - type: function
+    function:
+      name: calculator
+      description: "Evaluate a mathematical expression."
+      parameters:
+        type: object
+        properties:
+          expression:
+            type: string
+            description: "Math expression to evaluate (e.g. '17 * 23 + 1')"
+        required: ["expression"]
+  - type: function
+    function:
+      name: web_search
+      description: "Search the web for information."
+      parameters:
+        type: object
+        properties:
+          query:
+            type: string
+            description: "Search query"
+          max_results:
+            type: integer
+            description: "Maximum results to return"
+        required: ["query"]
+  - type: function
+    function:
+      name: fetch_url
+      description: "Fetch and return the content of a URL."
+      parameters:
+        type: object
+        properties:
+          url:
+            type: string
+            description: "URL to fetch"
+          max_chars:
+            type: integer
+            description: "Max characters to return"
+        required: ["url"]
+  - type: function
+    function:
+      name: memory_search
+      description: "Search stored knowledge chunks by semantic similarity."
+      parameters:
+        type: object
+        properties:
+          query:
+            type: string
+          domain:
+            type: string
+          k:
+            type: integer
+        required: ["query"]
+  - type: function
+    function:
+      name: memory_ingest
+      description: "Store a new knowledge chunk in long-term memory."
+      parameters:
+        type: object
+        properties:
+          content:
+            type: string
+          domain:
+            type: string
+          heading:
+            type: string
+        required: ["content"]
+  - type: function
+    function:
+      name: daily_log
+      description: "Append an entry to the daily log."
+      parameters:
+        type: object
+        properties:
+          message:
+            type: string
+            description: "Log entry text"
+        required: ["message"]
+  - type: function
+    function:
+      name: memory_forget
+      description: "Delete a specific knowledge chunk by ID."
+      parameters:
+        type: object
+        properties:
+          chunk_id:
+            type: string
+        required: ["chunk_id"]
+  - type: function
+    function:
+      name: memory_list
+      description: "List stored knowledge chunks filtered by domain/heading."
+      parameters:
+        type: object
+        properties:
+          domain:
+            type: string
+          heading:
+            type: string
+          limit:
+            type: integer
+        required: []
+  - type: function
+    function:
+      name: memory_stats
+      description: "Returns counts of stored knowledge chunks per domain. Takes no arguments."
+      parameters:
+        type: object
+        properties: {}
+  - type: function
+    function:
+      name: agent_task_create
+      description: "Create a new tracked task/issue."
+      parameters:
+        type: object
+        properties:
+          title:
+            type: string
+          description:
+            type: string
+          priority:
+            type: integer
+            description: "Priority 1-4 (1=highest)"
+          depends_on:
+            type: array
+            items:
+              type: string
+        required: ["title"]
+  - type: function
+    function:
+      name: agent_task_close
+      description: "Close/complete a tracked task by issue ID."
+      parameters:
+        type: object
+        properties:
+          issue_id:
+            type: string
+          comment:
+            type: string
+        required: ["issue_id"]
+  - type: function
+    function:
+      name: agent_task_update
+      description: "Update a task's state or priority."
+      parameters:
+        type: object
+        properties:
+          issue_id:
+            type: string
+          state:
+            type: string
+          priority:
+            type: integer
+        required: ["issue_id"]
+  - type: function
+    function:
+      name: agent_task_list
+      description: "List tracked tasks, optionally filtered by state."
+      parameters:
+        type: object
+        properties:
+          state:
+            type: string
+          limit:
+            type: integer
+        required: []
+  - type: function
+    function:
+      name: agent_task_show
+      description: "Show details of a specific task by issue ID."
+      parameters:
+        type: object
+        properties:
+          issue_id:
+            type: string
+        required: ["issue_id"]
+  - type: function
+    function:
+      name: agent_task_ready
+      description: "List tasks that are ready to work on (unblocked, by priority)."
+      parameters:
+        type: object
+        properties:
+          limit:
+            type: integer
+        required: []
+  - type: function
+    function:
+      name: discord_send
+      description: "Send a message to a Discord channel."
+      parameters:
+        type: object
+        properties:
+          channel_id:
+            type: string
+          content:
+            type: string
+        required: ["channel_id", "content"]
+  - type: function
+    function:
+      name: discord_read
+      description: "Read recent messages from a Discord channel."
+      parameters:
+        type: object
+        properties:
+          channel_id:
+            type: string
+          limit:
+            type: integer
+        required: ["channel_id"]
+  - type: function
+    function:
+      name: whoami
+      description: "Returns the authenticated Google account info. Takes no arguments."
+      parameters:
+        type: object
+        properties: {}
+  - type: function
+    function:
+      name: calendar_list_events
+      description: "List upcoming calendar events."
+      parameters:
+        type: object
+        properties:
+          time_min:
+            type: string
+          time_max:
+            type: string
+          max_results:
+            type: integer
+          calendar_id:
+            type: string
+        required: []
+  - type: function
+    function:
+      name: calendar_create_event
+      description: "Create a new calendar event."
+      parameters:
+        type: object
+        properties:
+          summary:
+            type: string
+          start:
+            type: string
+          end:
+            type: string
+          description:
+            type: string
+          location:
+            type: string
+          calendar_id:
+            type: string
+        required: ["summary", "start", "end"]
+  - type: function
+    function:
+      name: calendar_busy
+      description: "Check free/busy status for a time range."
+      parameters:
+        type: object
+        properties:
+          time_min:
+            type: string
+          time_max:
+            type: string
+          calendars:
+            type: array
+            items:
+              type: string
+        required: ["time_min", "time_max"]
+  - type: function
+    function:
+      name: gmail_list_messages
+      description: "List recent Gmail messages."
+      parameters:
+        type: object
+        properties:
+          query:
+            type: string
+          max_results:
+            type: integer
+        required: []
+  - type: function
+    function:
+      name: gmail_get_message
+      description: "Get a specific Gmail message by ID."
+      parameters:
+        type: object
+        properties:
+          message_id:
+            type: string
+        required: ["message_id"]
+  - type: function
+    function:
+      name: gmail_draft
+      description: "Draft a new Gmail message."
+      parameters:
+        type: object
+        properties:
+          to:
+            type: string
+          subject:
+            type: string
+          body:
+            type: string
+        required: ["to", "subject", "body"]
+  - type: function
+    function:
+      name: drive_search
+      description: "Search Google Drive for files."
+      parameters:
+        type: object
+        properties:
+          query:
+            type: string
+          max_results:
+            type: integer
+        required: ["query"]
+  - type: function
+    function:
+      name: docs_create
+      description: "Create a new Google Doc."
+      parameters:
+        type: object
+        properties:
+          title:
+            type: string
+          body:
+            type: string
+        required: ["title"]
+  - type: function
+    function:
+      name: docs_append
+      description: "Append content to an existing Google Doc."
+      parameters:
+        type: object
+        properties:
+          document_id:
+            type: string
+          content:
+            type: string
+        required: ["document_id", "content"]
+  - type: function
+    function:
+      name: docs_search
+      description: "Search Google Docs by query."
+      parameters:
+        type: object
+        properties:
+          query:
+            type: string
+          max_results:
+            type: integer
+        required: ["query"]
+  - type: function
+    function:
+      name: peer_list
+      description: "List available peer agents. Takes no arguments."
+      parameters:
+        type: object
+        properties: {}
+  - type: function
+    function:
+      name: peer_consult
+      description: "Consult a peer agent with a message."
+      parameters:
+        type: object
+        properties:
+          name:
+            type: string
+          message:
+            type: string
+          context:
+            type: string
+        required: ["name", "message"]
+  - type: function
+    function:
+      name: schedule_task
+      description: "Schedule a future task to run at a specific time."
+      parameters:
+        type: object
+        properties:
+          prompt:
+            type: string
+          when:
+            type: string
+          job_id:
+            type: string
+        required: ["prompt", "when"]
+  - type: function
+    function:
+      name: list_schedules
+      description: "List all scheduled tasks. Takes no arguments."
+      parameters:
+        type: object
+        properties: {}
+  - type: function
+    function:
+      name: cancel_schedule
+      description: "Cancel a scheduled task by job ID."
+      parameters:
+        type: object
+        properties:
+          job_id:
+            type: string
+        required: ["job_id"]
+
+tests:
+  # --- In-process tool routing ---
+
+  - id: gina_001
+    bucket: inprocess
+    prompt: "What time is it in UTC right now?"
+    tools: *all_tools
+    expected:
+      tool_calls:
+        - name: current_time
+          arguments:
+            timezone: "UTC"
+
+  - id: gina_002
+    bucket: inprocess
+    prompt: "How much is 17 times 23, plus 1?"
+    tools: *all_tools
+    expected:
+      tool_calls:
+        - name: calculator
+
+  - id: gina_003
+    bucket: inprocess
+    prompt: "Log this: my standup just ended, team is unblocked on the auth migration."
+    tools: *all_tools
+    expected:
+      tool_calls:
+        - name: daily_log
+
+  - id: gina_004
+    bucket: inprocess
+    prompt: "Remember that I prefer protoLabs Studio standups at 9am Eastern."
+    tools: *all_tools
+    expected:
+      tool_calls:
+        - name: memory_ingest
+
+  - id: gina_005
+    bucket: inprocess
+    prompt: "Use memory_list to show the last 5 entries in the daily-log domain."
+    tools: *all_tools
+    expected:
+      tool_calls:
+        - name: memory_list
+
+  - id: gina_006
+    bucket: inprocess
+    prompt: "How much have I got stored across each memory domain?"
+    tools: *all_tools
+    expected:
+      tool_calls:
+        - name: memory_stats
+
+  - id: gina_007
+    bucket: inprocess
+    prompt: "Track this for me: review the eval coverage report by end of week. High priority."
+    tools: *all_tools
+    expected:
+      tool_calls:
+        - name: agent_task_create
+
+  - id: gina_008
+    bucket: inprocess
+    prompt: "What's on my plate right now?"
+    tools: *all_tools
+    expected:
+      tool_calls:
+        - name: agent_task_list
+
+  - id: gina_009
+    bucket: inprocess
+    prompt: >
+      I want to give you a multi-step task: research how other people index
+      Obsidian-style notes, draft a comparison, and post it back. Track your
+      own progress on this in your own work tracker.
+    tools: *all_tools
+    expected:
+      tool_calls:
+        - name: agent_task_create
+
+  - id: gina_010
+    bucket: inprocess
+    prompt: "What are you currently working on for me, internally?"
+    tools: *all_tools
+    expected:
+      tool_calls:
+        - name: agent_task_list
+
+  - id: gina_011
+    bucket: inprocess
+    prompt: "Run memory_stats and reply with only the tool output."
+    tools: *all_tools
+    expected:
+      tool_calls:
+        - name: memory_stats
+
+  - id: gina_012
+    bucket: inprocess
+    prompt: >
+      Schedule a one-shot job for January 1, 2099 at noon UTC with the prompt
+      'EVAL-SCHED-CREATE-PROBE'. Use the job_id 'eval-create-probe'.
+    tools: *all_tools
+    expected:
+      tool_calls:
+        - name: schedule_task
+
+  - id: gina_013
+    bucket: inprocess
+    prompt: "Use list_schedules and reply with only the tool output."
+    tools: *all_tools
+    expected:
+      tool_calls:
+        - name: list_schedules
+
+  - id: gina_014
+    bucket: inprocess
+    prompt: "Use cancel_schedule with job_id 'eval-cancel-probe' and reply with only the tool output."
+    tools: *all_tools
+    expected:
+      tool_calls:
+        - name: cancel_schedule
+          arguments:
+            job_id: "eval-cancel-probe"
+
+  # --- External-call tool routing ---
+
+  - id: gina_015
+    bucket: external
+    prompt: "Anything notable in the news about Anthropic this week?"
+    tools: *all_tools
+    expected:
+      tool_calls:
+        - name: web_search
+
+  - id: gina_016
+    bucket: external
+    prompt: "What's on https://example.com? Just the page title is fine."
+    tools: *all_tools
+    expected:
+      tool_calls:
+        - name: fetch_url
+          arguments:
+            url: "https://example.com"
+
+  - id: gina_017
+    bucket: external
+    prompt: "Drop a note in channel 000000000000000000 saying 'standup at 9'."
+    tools: *all_tools
+    expected:
+      tool_calls:
+        - name: discord_send
+
+  - id: gina_018
+    bucket: external
+    prompt: "What were the last few messages in channel 000000000000000000?"
+    tools: *all_tools
+    expected:
+      tool_calls:
+        - name: discord_read
+
+  - id: gina_019
+    bucket: external
+    prompt: "What's on my calendar today?"
+    tools: *all_tools
+    expected:
+      tool_calls:
+        - name: calendar_list_events
+
+  - id: gina_020
+    bucket: external
+    prompt: "Use calendar_create_event to create an event with summary 'eval review', start '2026-04-28T14:00:00', end '2026-04-28T15:00:00'."
+    tools: *all_tools
+    expected:
+      tool_calls:
+        - name: calendar_create_event
+
+  - id: gina_021
+    bucket: external
+    prompt: "Am I free Thursday afternoon between 2pm and 5pm Pacific?"
+    tools: *all_tools
+    expected:
+      tool_calls:
+        - name: calendar_busy
+
+  - id: gina_022
+    bucket: external
+    prompt: "Anything new in my inbox?"
+    tools: *all_tools
+    expected:
+      tool_calls:
+        - name: gmail_list_messages
+
+  - id: gina_023
+    bucket: external
+    prompt: "Draft a reply to alex@example.com saying I'll be ten minutes late to our 3pm."
+    tools: *all_tools
+    expected:
+      tool_calls:
+        - name: gmail_draft
+
+  - id: gina_024
+    bucket: external
+    prompt: "Which Google account am I signed in as?"
+    tools: *all_tools
+    expected:
+      tool_calls:
+        - name: whoami
+
+  - id: gina_025
+    bucket: external
+    prompt: "Find anything in my Drive about the Q3 budget."
+    tools: *all_tools
+    expected:
+      tool_calls:
+        - name: drive_search
+
+  - id: gina_026
+    bucket: external
+    prompt: "Spin up a new Google Doc called 'Eval Notes' with a single line saying 'first entry'."
+    tools: *all_tools
+    expected:
+      tool_calls:
+        - name: docs_create
+
+  - id: gina_027
+    bucket: external
+    prompt: "Find that Google Doc I started about evals."
+    tools: *all_tools
+    expected:
+      tool_calls:
+        - name: docs_search
+
+  - id: gina_028
+    bucket: external
+    prompt: "Use whoami and reply with only the tool output."
+    tools: *all_tools
+    expected:
+      tool_calls:
+        - name: whoami
+
+  - id: gina_029
+    bucket: external
+    prompt: "Get a status check from Quinn on whether Friday's deploy is ready."
+    tools: *all_tools
+    expected:
+      tool_calls:
+        - name: peer_consult

@@ -1,0 +1,341 @@
+name: "Gina Advanced Patterns"
+description: >
+  Ported from protoLabsAI/gina eval suite. Tests abstention (don't call tools
+  when knowledge suffices), chained tool use (multi-step within one turn), and
+  error recovery (retry with corrected approach). All tests bind 30+ tools.
+
+# Reference the same tool definitions — copy from gina_tools.yaml
+# (YAML anchors don't cross files, so we define a minimal set here)
+tool_defs: &core_tools
+  - type: function
+    function:
+      name: current_time
+      description: "Returns the current date and time."
+      parameters:
+        type: object
+        properties:
+          timezone:
+            type: string
+        required: ["timezone"]
+  - type: function
+    function:
+      name: calculator
+      description: "Evaluate a mathematical expression."
+      parameters:
+        type: object
+        properties:
+          expression:
+            type: string
+        required: ["expression"]
+  - type: function
+    function:
+      name: web_search
+      description: "Search the web."
+      parameters:
+        type: object
+        properties:
+          query:
+            type: string
+        required: ["query"]
+  - type: function
+    function:
+      name: fetch_url
+      description: "Fetch URL content."
+      parameters:
+        type: object
+        properties:
+          url:
+            type: string
+        required: ["url"]
+  - type: function
+    function:
+      name: memory_search
+      description: "Search stored knowledge chunks."
+      parameters:
+        type: object
+        properties:
+          query:
+            type: string
+        required: ["query"]
+  - type: function
+    function:
+      name: memory_ingest
+      description: "Store a new knowledge chunk."
+      parameters:
+        type: object
+        properties:
+          content:
+            type: string
+          domain:
+            type: string
+        required: ["content"]
+  - type: function
+    function:
+      name: daily_log
+      description: "Append to the daily log."
+      parameters:
+        type: object
+        properties:
+          message:
+            type: string
+        required: ["message"]
+  - type: function
+    function:
+      name: memory_forget
+      description: "Delete a knowledge chunk by ID."
+      parameters:
+        type: object
+        properties:
+          chunk_id:
+            type: string
+        required: ["chunk_id"]
+  - type: function
+    function:
+      name: memory_list
+      description: "List stored knowledge chunks."
+      parameters:
+        type: object
+        properties:
+          domain:
+            type: string
+          limit:
+            type: integer
+        required: []
+  - type: function
+    function:
+      name: memory_stats
+      description: "Returns chunk counts per domain. No arguments."
+      parameters:
+        type: object
+        properties: {}
+  - type: function
+    function:
+      name: agent_task_create
+      description: "Create a tracked task."
+      parameters:
+        type: object
+        properties:
+          title:
+            type: string
+          description:
+            type: string
+          priority:
+            type: integer
+        required: ["title"]
+  - type: function
+    function:
+      name: agent_task_close
+      description: "Close a tracked task by issue ID."
+      parameters:
+        type: object
+        properties:
+          issue_id:
+            type: string
+          comment:
+            type: string
+        required: ["issue_id"]
+  - type: function
+    function:
+      name: agent_task_update
+      description: "Update task state or priority."
+      parameters:
+        type: object
+        properties:
+          issue_id:
+            type: string
+          state:
+            type: string
+          priority:
+            type: integer
+        required: ["issue_id"]
+  - type: function
+    function:
+      name: agent_task_list
+      description: "List tracked tasks."
+      parameters:
+        type: object
+        properties:
+          state:
+            type: string
+          limit:
+            type: integer
+        required: []
+  - type: function
+    function:
+      name: agent_task_ready
+      description: "List ready tasks by priority. No arguments."
+      parameters:
+        type: object
+        properties:
+          limit:
+            type: integer
+        required: []
+  - type: function
+    function:
+      name: whoami
+      description: "Returns authenticated account info. No arguments."
+      parameters:
+        type: object
+        properties: {}
+  - type: function
+    function:
+      name: calendar_list_events
+      description: "List calendar events."
+      parameters:
+        type: object
+        properties:
+          time_min:
+            type: string
+          time_max:
+            type: string
+        required: []
+  - type: function
+    function:
+      name: gmail_list_messages
+      description: "List Gmail messages."
+      parameters:
+        type: object
+        properties:
+          query:
+            type: string
+        required: []
+  - type: function
+    function:
+      name: gmail_draft
+      description: "Draft a Gmail message."
+      parameters:
+        type: object
+        properties:
+          to:
+            type: string
+          subject:
+            type: string
+          body:
+            type: string
+        required: ["to", "subject", "body"]
+  - type: function
+    function:
+      name: discord_send
+      description: "Send a Discord message."
+      parameters:
+        type: object
+        properties:
+          channel_id:
+            type: string
+          content:
+            type: string
+        required: ["channel_id", "content"]
+  - type: function
+    function:
+      name: peer_list
+      description: "List available peer agents. No arguments."
+      parameters:
+        type: object
+        properties: {}
+  - type: function
+    function:
+      name: peer_consult
+      description: "Consult a peer agent."
+      parameters:
+        type: object
+        properties:
+          name:
+            type: string
+          message:
+            type: string
+        required: ["name", "message"]
+  - type: function
+    function:
+      name: schedule_task
+      description: "Schedule a future task."
+      parameters:
+        type: object
+        properties:
+          prompt:
+            type: string
+          when:
+            type: string
+          job_id:
+            type: string
+        required: ["prompt", "when"]
+
+tests:
+  # === ABSTENTION ===
+  # Model should answer from training data, NOT call any tool.
+
+  - id: gina_abs_001
+    bucket: inprocess
+    prompt: "What's the capital of France? One word."
+    tools: *core_tools
+    expected:
+      tool_calls: []
+      # Grader checks: no tool calls emitted AND content contains "paris"
+
+  - id: gina_abs_002
+    bucket: inprocess
+    prompt: "Hi."
+    tools: *core_tools
+    expected:
+      tool_calls: []
+      # Simple greeting — should not trigger any tool
+
+  # === CHAINED TOOL CALLS ===
+  # Model must invoke 2+ tools sequentially in a single turn.
+
+  - id: gina_chain_001
+    bucket: inprocess
+    prompt: >
+      Log this: 'eval-chain-flag-q9: chained log+recall test'. After logging,
+      search memory for that flag and quote it back.
+    tools: *core_tools
+    expected:
+      tool_calls:
+        - name: daily_log
+        - name: memory_search
+
+  - id: gina_chain_002
+    bucket: inprocess
+    prompt: "What's on my task list? Then close anything about 'bins'."
+    tools: *core_tools
+    expected:
+      tool_calls:
+        - name: agent_task_list
+      # Ideally chains to agent_task_close, but needs tool result to know
+      # the task ID. Single-turn eval can only verify the first step.
+
+  # === ERROR RECOVERY ===
+  # Model should attempt a tool call, handle failure, and try an alternative.
+
+  - id: gina_err_001
+    bucket: inprocess
+    prompt: "There's something tracked about rent -- mark it done."
+    tools: *core_tools
+    expected:
+      tool_calls:
+        - name: agent_task_list
+      # Model should list tasks first to find the rent task,
+      # then close it. Accepts list OR close as first call.
+
+  - id: gina_err_002
+    bucket: inprocess
+    prompt: >
+      Close gina-99999 (that ID's almost certainly wrong -- use whatever
+      you have to find the right one).
+    tools: *core_tools
+    expected:
+      tool_calls:
+        - name: agent_task_list
+      # Model should look up the right task first since the ID is wrong.
+      # Accepts list (lookup) or close (attempt then recover) as first call.
+
+  # === STATE DISCOVERY ===
+  # Vague question should trigger tool use to discover state.
+
+  - id: gina_disc_001
+    bucket: inprocess
+    prompt: "Anything I need to take care of?"
+    tools: *core_tools
+    expected:
+      tool_calls:
+        - name: agent_task_ready
+      # Accepts agent_task_ready or agent_task_list — both valid

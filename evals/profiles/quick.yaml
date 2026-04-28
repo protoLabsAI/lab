@@ -41,4 +41,4 @@ custom:
 
 # Function calling (canary suite has gate enforcement via alias_tiers.yaml)
 function_call:
-  suites: ["basic", "edge_cases", "canary"]
+  suites: ["basic", "edge_cases", "canary", "gina_tools", "gina_advanced"]
