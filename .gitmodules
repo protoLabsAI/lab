@@ -1,3 +1,3 @@
 [submodule "evals/claw/claw-eval"]
 	path = evals/claw/claw-eval
-	url = https://github.com/claw-eval/claw-eval.git
+	url = https://github.com/protoLabsAI/claw-eval.git
