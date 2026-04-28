@@ -21,7 +21,7 @@ from pathlib import Path
 import click
 import yaml
 from graders.function_call import FunctionCallGrader
-from openai import OpenAI
+from openai import AuthenticationError, OpenAI
 
 SUITE_DIR = Path(__file__).parent.parent / "function_call" / "test_cases"
 ALIAS_TIERS_PATH = Path(__file__).parent.parent.parent / "models" / "alias_tiers.yaml"
@@ -75,6 +75,10 @@ def run_function_call_test(client: OpenAI, model: str, test: dict) -> dict:
             "content": choice.message.content or "",
             "finish_reason": choice.finish_reason,
         }
+    except AuthenticationError:
+        raise click.ClickException(
+            "Gateway authentication failed — set LITELLM_API_KEY or pass --api-key"
+        )
     except Exception as e:
         return {"tool_calls": [], "content": "", "error": str(e)}
 
@@ -150,7 +154,7 @@ def evaluate_gates(
 @click.option("--suite", default=None, help="Test suite name (e.g., basic, canary)")
 @click.option("--all-suites", is_flag=True, help="Run all test suites")
 @click.option("--gateway-url", default="http://ava:4000/v1")
-@click.option("--api-key", envvar="GATEWAY_API_KEY", default="not-needed")
+@click.option("--api-key", envvar=["GATEWAY_API_KEY", "LITELLM_API_KEY"], default="not-needed")
 @click.option("--submit-langfuse", is_flag=True, help="Submit scores to Langfuse")
 @click.option(
     "--output-dir", type=click.Path(), default=None,

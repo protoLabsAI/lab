@@ -145,7 +145,7 @@ def grade_task(task: dict, output: dict, gateway_url: str = "http://ava:4000/v1"
 @click.option("--model", default="protolabs/smart", help="Gateway model name")
 @click.option("--trials", default=3, help="Trials per task")
 @click.option("--gateway-url", default="http://ava:4000/v1")
-@click.option("--api-key", envvar="GATEWAY_API_KEY", default="not-needed")
+@click.option("--api-key", envvar=["GATEWAY_API_KEY", "LITELLM_API_KEY"], default="not-needed")
 @click.option("--submit-langfuse", is_flag=True, help="Submit scores to Langfuse")
 @click.option("--thinking", is_flag=True, help="Enable thinking/reasoning mode (Gemma 4, etc.)")
 @click.option("--output-dir", type=click.Path(), default=None, help="Directory to write result JSON")

@@ -44,7 +44,7 @@ def generate_answer(client: OpenAI, model: str, question: str, context: str) -> 
 @click.option("--judge-model", default="claude-sonnet-4-6", help="Model for LLM-as-judge scoring")
 @click.option("--test-file", type=click.Path(exists=True), help="YAML file with test cases")
 @click.option("--gateway-url", default="http://ava:4000/v1")
-@click.option("--api-key", envvar="GATEWAY_API_KEY", default="not-needed")
+@click.option("--api-key", envvar=["GATEWAY_API_KEY", "LITELLM_API_KEY"], default="not-needed")
 @click.option("--submit-langfuse", is_flag=True, help="Submit scores to Langfuse")
 def main(model, judge_model, test_file, gateway_url, api_key, submit_langfuse):
     """Run RAG quality evaluations."""

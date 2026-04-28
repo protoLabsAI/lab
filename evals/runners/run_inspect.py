@@ -44,7 +44,7 @@ def get_available_benchmarks() -> list[str]:
 @click.option("--benchmark", default=None, help="Inspect benchmark name (e.g., gaia, humaneval)")
 @click.option("--model", default="local", help="Gateway model name")
 @click.option("--gateway-url", default="http://ava:4000/v1")
-@click.option("--api-key", envvar="GATEWAY_API_KEY", default="not-needed")
+@click.option("--api-key", envvar=["GATEWAY_API_KEY", "LITELLM_API_KEY"], default="not-needed")
 @click.option("--limit", default=None, type=int, help="Limit number of samples")
 @click.option("--list", "list_benchmarks", is_flag=True, help="List available benchmarks")
 @click.option("--submit-langfuse", is_flag=True, help="Submit scores to Langfuse")

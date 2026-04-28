@@ -87,7 +87,7 @@ def build_claw_config(model: str, gateway_url: str, api_key: str) -> Path:
 @click.option("--all-tasks", is_flag=True, help="Run all available tasks")
 @click.option("--trials", default=3, help="Number of trials per task (default: 3 for pass^3)")
 @click.option("--gateway-url", default="http://ava:4000/v1", help="Gateway base URL")
-@click.option("--api-key", envvar="GATEWAY_API_KEY", default="not-needed")
+@click.option("--api-key", envvar=["GATEWAY_API_KEY", "LITELLM_API_KEY"], default="not-needed")
 @click.option("--workers", default=4, help="Parallel workers for batch mode")
 @click.option("--port-offset", default=0, help="Port offset for mock services (use different values for parallel runs)")
 def main(model, tasks, all_tasks, trials, gateway_url, api_key, workers, port_offset):

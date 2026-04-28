@@ -21,7 +21,7 @@ STANDARD_BATTERY = ["humaneval", "mmlu_pro", "gsm8k", "bbh", "arc"]
 @click.option("--model", default="local", help="Gateway model name")
 @click.option("--bench", default=None, help="Specific benchmark (default: run standard battery)")
 @click.option("--gateway-url", default="http://ava:4000/v1")
-@click.option("--api-key", envvar="GATEWAY_API_KEY", default="not-needed")
+@click.option("--api-key", envvar=["GATEWAY_API_KEY", "LITELLM_API_KEY"], default="not-needed")
 @click.option("--limit", default=None, type=int, help="Limit samples per benchmark")
 @click.option("--submit-langfuse", is_flag=True)
 def main(model, bench, gateway_url, api_key, limit, submit_langfuse):

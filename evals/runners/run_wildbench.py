@@ -90,7 +90,7 @@ def main():
 @main.command()
 @click.option("--model", default="local", help="Model name for the API")
 @click.option("--gateway-url", default="http://ava:4000/v1", help="API base URL")
-@click.option("--api-key", envvar="GATEWAY_API_KEY", default="not-needed")
+@click.option("--api-key", envvar=["GATEWAY_API_KEY", "LITELLM_API_KEY"], default="not-needed")
 @click.option("--max-tokens", default=4096, help="Max tokens per response")
 @click.option("--limit", default=None, type=int, help="Limit number of tasks (for testing)")
 @click.option("--output", default=None, help="Output file path (default: auto)")
@@ -169,7 +169,7 @@ def infer(model, gateway_url, api_key, max_tokens, limit, output):
 @click.option("--results", required=True, type=click.Path(exists=True), help="Inference results JSON")
 @click.option("--judge", default="gpt-5.4", help="Judge model name")
 @click.option("--gateway-url", default="http://ava:4000/v1", help="Gateway URL for judge")
-@click.option("--api-key", envvar="GATEWAY_API_KEY", default="not-needed")
+@click.option("--api-key", envvar=["GATEWAY_API_KEY", "LITELLM_API_KEY"], default="not-needed")
 @click.option("--limit", default=None, type=int, help="Limit tasks to judge")
 def judge(results, judge, gateway_url, api_key, limit):
     """Phase 2: Score responses using a judge model."""
@@ -278,7 +278,7 @@ def judge(results, judge, gateway_url, api_key, limit):
 @click.option("--model", required=True, help="Model name for the API")
 @click.option("--judge", "judge_model", default="gpt-5.4", help="Judge model")
 @click.option("--gateway-url", default="http://ava:4000/v1")
-@click.option("--api-key", envvar="GATEWAY_API_KEY", default="not-needed")
+@click.option("--api-key", envvar=["GATEWAY_API_KEY", "LITELLM_API_KEY"], default="not-needed")
 @click.option("--max-tokens", default=4096)
 @click.option("--limit", default=None, type=int, help="Limit tasks")
 def run(model, judge_model, gateway_url, api_key, max_tokens, limit):
