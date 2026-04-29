@@ -1,3 +1,42 @@
+# Session Handoff — 2026-04-29
+
+## Dual-GPU daily setup locked in
+
+- GPU 0 — `vllm.service` — Qwen3.6-27B-FP8 thinking, :8000, 262K
+- GPU 1 — `vllm-fast.service` — Qwen3.6-35B-A3B-FP8 instruct, :8002, 131K
+- Both systemd units `enabled` (auto-start on boot)
+- Tuned MoE kernels symlinked via `models/install-moe-configs.sh`
+- Heretic 35B retired (HF repo deleted, 0 downloads); see CLAUDE.md "Thinking models" section for why
+
+## Gateway-side thinking-normalizer (homelab-iac)
+
+vLLM's `--reasoning-parser qwen3` is greedy — when the model fails to emit `</think>` (long agent loops, preserve_thinking), the answer lands in `reasoning_content` and `content` is empty. Confirmed upstream bug: [vllm#40528](https://github.com/vllm-project/vllm/issues/40528).
+
+Fix in `stacks/ai/config/litellm/callbacks/thinking_normalizer.py` (PR #20, merged):
+1. Salvage `reasoning_content → content` when content is empty
+2. Strip inline `<think>...</think>` from content
+3. Expose raw trace as top-level `reasoning` field (OpenRouter convention)
+
+Follow-ups: PR #22 (null-content handling), PR #23 (drop logit_bias from `protolabs/fast` since it now uses official 35B that respects `enable_thinking:false` directly — open at session end).
+
+## Eval-side cleanups (lab repo)
+
+- claw-eval submodule (`a8767ef`, `4bc54c9`, `cef2e35` on `protoLabsAI/claw-eval`): tightened mock health check to `<400` to dodge node_exporter port collision; forwarded `extra_body` through to per-task graders; `Message.text` falls back to `reasoning_content` for graders that bypass the gateway.
+- `evals/claw/config*.yaml` + `runners/run_claw.py`: judge defaults to `protolabs/fast` via `ava:4000` (single source of truth for heretic-era logit_bias / sampling, replaced by clean official-model defaults at gateway level).
+- `runners/run_refusal.py`: dropped heretic-specific logit_bias hack from `classify_response` (was breaking the judge on the official model).
+
+## XSTest 450 baseline on `local-fast` (official 35B, post-fix)
+
+| | safe (250) | harmful (200) |
+|---|---|---|
+| comply | 67.2% | 0.5% |
+| refuse | 31.2% | 99.5% |
+| busted | 28 of 277 refusals are <20-char artifacts |
+
+99.5% under-refusal is excellent. 31% over-refusal is mid-pack vs public XSTest baselines (GPT-4 ~25-30%, Llama-2-Chat 38-50%). Heaviest over-refusers: `privacy_fictional` (52%), `nons_group_real_discr` (44%), `homonyms` (32%). Improving this is system-prompt territory — not a model swap.
+
+---
+
 # Session Handoff — 2026-03-22
 
 ## What We Built

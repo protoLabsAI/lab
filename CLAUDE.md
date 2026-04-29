@@ -68,6 +68,21 @@ uv run models --gpu single                 # show model inventory
 uv run ruff check .                        # lint everything
 ```
 
+## Daily setup (dual GPU)
+
+Both vLLMs run as systemd services and auto-start on boot:
+
+| GPU | Service | Model | Port | Mode | tok/s |
+|-----|---------|-------|------|------|-------|
+| 0 | `vllm.service` | Qwen3.6-27B-FP8 | :8000 | thinking, 262K | ~150 |
+| 1 | `vllm-fast.service` | Qwen3.6-35B-A3B-FP8 | :8002 | instruct, 131K | ~225 |
+
+Gateway aliases: `protolabs/smart` → 27B (thinking + preserve_thinking), `protolabs/fast` → 35B (instruct).
+
+Heretic retired 2026-04-29: the `logit_bias` clamp on `<think>`/`</think>` tokens (heretic README's recommended workaround) corrupts generation on prompts that engage the model's thinking pathway — output becomes 1-token role-marker garbage and stops. Official Qwen3.6-35B-A3B-FP8 respects `enable_thinking: false` directly; no logit_bias needed.
+
+Tuned MoE kernels live in `models/moe-configs/` — symlinked into vLLM's `fused_moe/configs/` via `bash models/install-moe-configs.sh` (run after fresh vLLM installs / upgrades).
+
 ## Running Models
 
 ```bash
@@ -207,8 +222,21 @@ Cold storage (`/mnt/data/models-cold/`): FLUX.2-klein 9B+base (100GB), Z-Image+T
 - `--disable-custom-all-reduce` always needed for TP=2 (PCIe, not NVLink)
 - No xformers / Flash Attention — use PyTorch native SDPA
 - FlashInfer backend crashes — don't use `--attention-backend flashinfer`
+- `--kv-cache-dtype fp8` forces FlashInfer attention internally → same crash. Don't use until upstream fixes Blackwell sm120 support.
+- `VLLM_USE_FLASHINFER_MOE_FP8=1` rejects Qwen's block-wise [128,128] FP8 quant scheme. Don't use with Qwen3 FP8 models (122B, 35B, etc.).
+- `-O3` (torch compile level 3) regresses MoE inference by ~25% — MoE routing is too dynamic for the compiler. Safe on dense models (27B uses it), avoid on MoE.
 - INT4 safe on dense models, unstable on MoE (use BF16 for MoE)
 - Capability cliff at 4B→2B: sub-4B models can't do agentic tool use
+
+## Thinking models — vLLM reasoning-parser gotchas
+
+The `--reasoning-parser qwen3` flag is greedy: any output before `</think>` is classified as `reasoning_content`. If the model fails to emit a closing `</think>` (common in long agent loops, amplified by `preserve_thinking=true`), the **entire answer** lands in `reasoning_content` and `content` is empty. Downstream consumers reading only `content` see a blank response. Confirmed upstream: [vllm-project/vllm#40528](https://github.com/vllm-project/vllm/issues/40528) — no fix yet.
+
+Mitigations in this stack:
+- **Gateway-side:** LiteLLM custom callback `thinking_normalizer.py` salvages `reasoning_content → content` when content is empty, strips inline `<think>...</think>` blocks, and exposes the raw trace as `reasoning` (OpenRouter convention). Lives in `homelab-iac` `stacks/ai/config/litellm/callbacks/`.
+- **Eval-side:** `claw-eval`'s `Message.text` accessor falls back to `reasoning_content` and rsplits on `</think>` for the primed-think case (defense-in-depth for direct-to-vLLM consumers).
+
+Heretic retirement note: do not bring back the `Qwen3.6-35B-A3B-uncensored-heretic-FP8` quant for `protolabs/fast`. Its trained-in always-thinking behavior cannot be suppressed cleanly — the `logit_bias: {248068:-100, 248069:-100}` clamp recommended by the model card causes the model to emit 1-token role-marker garbage (`Action`, `assistant`, `Human`) and stop on prompts that engage the thinking pathway. The official Qwen3.6-35B-A3B-FP8 has none of these issues.
 
 ## Secrets
 

@@ -78,16 +78,16 @@ Writing best config to ./E=256,N=512,device_name=NVIDIA_RTX_PRO_6000_...,dtype=f
 
 ### Install the Config
 
-```bash
-# Copy to vLLM's configs directory
-cp "models/moe-configs/E=256,N=512,device_name=NVIDIA_RTX_PRO_6000*.json" \
-   /home/ava/dev/vllm-build/vllm/model_executor/layers/fused_moe/configs/
+Use the install script — it symlinks every config in `models/moe-configs/` into the vLLM venv's `fused_moe/configs/` directory. Symlinks survive in-place edits (re-tuning a config is automatically picked up); a pip-driven vLLM upgrade may clobber the configs/ dir, in which case re-run this script.
 
-# Restart the service to pick it up
-sudo systemctl restart vllm-voice  # or vllm
+```bash
+bash models/install-moe-configs.sh
+sudo systemctl restart vllm-fast  # or vllm, depending on which service serves the tuned model
 ```
 
-Verify the warning is gone from the logs after restart.
+After restart, verify in the vLLM log:
+- ❌ Old (config missing): `WARNING ... Using default MoE config. Performance might be sub-optimal!`
+- ✅ New (config loaded): `INFO ... Using configuration from .../fused_moe/configs/E=256,N=512,...json for MoE layer.`
 
 ## Qwen3.6-35B-A3B-FP8 Tuning (April 2026)
 
