@@ -13,16 +13,10 @@ model:
       enable_thinking: false
 
 judge:
-  api_key: not-needed
-  base_url: http://localhost:8002/v1
-  model_id: local-fast  # 35B MoE on GPU 1, free + fast for binary classification
+  api_key: ${GATEWAY_API_KEY}
+  base_url: http://ava:4000/v1
+  model_id: protolabs/fast  # 35B heretic via gateway — logit_bias + sampling baked in there
   enabled: true
-  extra_body:
-    chat_template_kwargs:
-      enable_thinking: false
-    logit_bias:
-      "248068": -100  # suppress <think> (heretic ignores no-think template)
-      "248069": -100  # suppress </think>
 
 defaults:
   trace_dir: ../results

@@ -63,18 +63,19 @@ def build_claw_config(model: str, gateway_url: str, api_key: str) -> Path:
     config["model"]["base_url"] = gateway_url
     config["model"]["api_key"] = api_key
 
-    # Judge defaults to local fast model (free, no cloud costs)
-    # Override with JUDGE_GATEWAY_URL to use cloud judge
+    # Judge defaults to protolabs/fast via the gateway (35B heretic, free).
+    # The gateway pins the heretic-specific logit_bias + sampling profile in
+    # one place. Override JUDGE_GATEWAY_URL / JUDGE_MODEL to use a different
+    # judge (e.g. cloud Sonnet, or direct vLLM for debugging).
     if "judge" in config:
-        judge_url = os.environ.get(
-            "JUDGE_GATEWAY_URL", "http://localhost:8002/v1"
-        )
+        judge_url = os.environ.get("JUDGE_GATEWAY_URL", "http://ava:4000/v1")
         judge_key = os.environ.get("GATEWAY_API_KEY", api_key)
         config["judge"]["base_url"] = judge_url
         config["judge"]["api_key"] = judge_key
-        # Use local-fast (35B MoE) as default judge model
         if "JUDGE_MODEL" in os.environ:
             config["judge"]["model_id"] = os.environ["JUDGE_MODEL"]
+        elif "ava:4000" in judge_url or "localhost:4000" in judge_url:
+            config["judge"]["model_id"] = "protolabs/fast"
         elif "localhost:8002" in judge_url:
             config["judge"]["model_id"] = "local-fast"
 

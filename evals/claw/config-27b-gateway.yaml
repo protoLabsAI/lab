@@ -1,0 +1,23 @@
+# Claw-Eval config — 27B routed through LiteLLM gateway (ava:4000)
+# Mirrors config-27b-preserve-thinking.yaml but goes through the gateway,
+# which applies the thinking-normalizer post-call hook. This recovers the
+# answer text the vLLM reasoning-parser otherwise leaves in
+# reasoning_content, so the grader actually sees the model's output.
+
+model:
+  api_key: ${GATEWAY_API_KEY}
+  base_url: http://ava:4000/v1
+  model_id: protolabs/smart  # 27B with enable_thinking + preserve_thinking
+  # No extra_body — protolabs/smart's model config on the gateway already
+  # pins enable_thinking=true + preserve_thinking=true + Qwen sampling
+  # profile. Sending extra_body here would shadow the gateway defaults.
+
+judge:
+  api_key: ${GATEWAY_API_KEY}
+  base_url: http://ava:4000/v1
+  model_id: protolabs/fast  # 35B heretic via gateway — logit_bias baked in
+  enabled: true
+
+defaults:
+  trace_dir: ../results
+  tasks_dir: claw-eval/tasks
