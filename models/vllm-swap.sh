@@ -158,22 +158,29 @@ case "$1" in
         exit 0
         ;;
     qwen-36b-fast)
+        # Official Qwen3.6-35B-A3B-FP8 — non-thinking fast model. Mirrors
+        # the vllm-fast.service systemd unit. Heretic variant was retired
+        # 2026-04-29 after we found logit_bias on <think>/</think> tokens
+        # corrupted generation on prompts that engaged the model's thinking
+        # pathway (returned 1-token role-marker garbage). The official
+        # model respects enable_thinking:false directly with no hack.
         echo "Starting Qwen3.6-35B-A3B-FP8 NO-THINKING fast (GPU 1, port ${VOICE_PORT}, 131K)..."
         stop_vllm_voice
         (
             export CUDA_VISIBLE_DEVICES=1
-            exec $VLLM_BIN serve /mnt/models/quantized/Qwen3.6-35B-A3B-uncensored-heretic-FP8 \
-                $O3 \
+            exec $VLLM_BIN serve Qwen/Qwen3.6-35B-A3B-FP8 \
                 --host 0.0.0.0 --port $VOICE_PORT \
                 --served-model-name local-fast \
                 --max-model-len 131072 \
+                --max-num-seqs 512 \
                 --chat-template "$NONTHINKING_TEMPLATE" \
                 --enable-auto-tool-choice --tool-call-parser qwen3_xml \
-                --gpu-memory-utilization 0.85 \
+                --gpu-memory-utilization 0.73 \
                 --language-model-only \
                 --enable-chunked-prefill \
                 --async-scheduling \
                 --performance-mode interactivity \
+                --reasoning-parser qwen3 \
                 $PREFIX_FLAGS \
                 >> "${LOG_DIR}/vllm-voice.log" 2>&1
         ) &
