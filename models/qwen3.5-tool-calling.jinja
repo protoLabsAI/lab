@@ -32,12 +32,6 @@
 {%- if enable_thinking is not defined %}
   {%- set enable_thinking = true %}
 {%- endif %}
-{#- Fix 19: auto-disable thinking when tools are active -#}
-{%- if tools and tools is iterable and tools is not mapping and tools | length > 0 %}
-  {%- if enable_thinking is true %}
-    {%- set enable_thinking = false %}
-  {%- endif %}
-{%- endif %}
 {%- macro render_content(content, do_vision_count, is_system_content=false) %}
   {%- if content is string %}
     {{- content }}
