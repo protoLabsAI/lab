@@ -34,6 +34,9 @@
 #   cydonia-24b        — Mistral 24B creative/roleplay (no tool calling)
 #   llama-70b          — Llama 70B AWQ creative (38 tok/s)
 #   context-1          — Chroma Context-1 20B MoE retrieval agent (32K)
+#
+# === Mistral 3.5 (TP=2, VLM) ===
+#   mistral-medium-3.5 — Mistral-Medium-3.5 128B FP8 dense, 64K, vision+text
 set -euo pipefail
 PORT=8000
 VOICE_PORT=8002
@@ -133,6 +136,7 @@ wait_ready_voice() {
 case "$1" in
     qwen-36b-fast) ;; # fast only touches GPU 1 / :8002
     dual)            ;; # dual does stop_all itself
+    mistral-medium-3.5) ;; # TP=2, needs both GPUs — stops all itself
     *) stop_vllm ;;
 esac
 case "$1" in
@@ -158,17 +162,19 @@ case "$1" in
         exit 0
         ;;
     qwen-36b-fast)
-        # Official Qwen3.6-35B-A3B-FP8 — non-thinking fast model. Mirrors
-        # the vllm-fast.service systemd unit. Heretic variant was retired
-        # 2026-04-29 after we found logit_bias on <think>/</think> tokens
-        # corrupted generation on prompts that engaged the model's thinking
-        # pathway (returned 1-token role-marker garbage). The official
-        # model respects enable_thinking:false directly with no hack.
-        echo "Starting Qwen3.6-35B-A3B-FP8 NO-THINKING fast (GPU 1, port ${VOICE_PORT}, 131K)..."
+        # Heretic FP8 — uncensored 35B-A3B for protolabs/fast. Mirrors the
+        # vllm-fast.service systemd unit. Heretic was originally retired
+        # 2026-04-29 after the model card's recommended logit_bias on
+        # <think>/</think> tokens corrupted generation (1-token role-marker
+        # garbage on thinking-engaging prompts). Un-retired 2026-05-01: the
+        # gateway _ThinkStripper handles <think>...</think> post-emit, so we
+        # don't need any sample-time suppression. No logit_bias and no
+        # --reasoning-parser qwen3 — model emits markup, gateway strips it.
+        echo "Starting heretic FP8 (GPU 1, port ${VOICE_PORT}, 131K)..."
         stop_vllm_voice
         (
             export CUDA_VISIBLE_DEVICES=1
-            exec $VLLM_BIN serve Qwen/Qwen3.6-35B-A3B-FP8 \
+            exec $VLLM_BIN serve /mnt/models/quantized/Qwen3.6-35B-A3B-uncensored-heretic-FP8 \
                 --host 0.0.0.0 --port $VOICE_PORT \
                 --served-model-name local-fast \
                 --max-model-len 131072 \
@@ -180,7 +186,6 @@ case "$1" in
                 --enable-chunked-prefill \
                 --async-scheduling \
                 --performance-mode interactivity \
-                --reasoning-parser qwen3 \
                 $PREFIX_FLAGS \
                 >> "${LOG_DIR}/vllm-voice.log" 2>&1
         ) &
@@ -495,6 +500,26 @@ case "$1" in
             --enable-chunked-prefill \
             --disable-custom-all-reduce \
             $PREFIX_FLAGS \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+    mistral-medium-3.5)
+        echo "=== Mistral-Medium-3.5 128B FP8 (TP=2, 64K, VLM) ==="
+        stop_all
+        NCCL_P2P_DISABLE=1 \
+        NCCL_ALGO=Ring NCCL_PROTO=Simple \
+        NCCL_MIN_NCHANNELS=4 NCCL_MAX_NCHANNELS=8 \
+        $VLLM_BIN serve mistralai/Mistral-Medium-3.5-128B \
+            --host 0.0.0.0 --port $PORT \
+            --served-model-name local \
+            --tensor-parallel-size 2 \
+            --max-model-len 65536 \
+            --max-num-seqs 64 \
+            --enable-auto-tool-choice --tool-call-parser mistral \
+            --reasoning-parser mistral \
+            --gpu-memory-utilization 0.90 \
+            --disable-custom-all-reduce \
+            --enable-chunked-prefill \
+            --enable-prefix-caching \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     gemma4-31b-tp2)
