@@ -17,23 +17,35 @@ The heavy rig is the **forge** — used to load, swap, and (in follow-on experim
 
 ## Models (≤9 B, sorted by params)
 
-| Rank | Model | Params | Quant | On disk? | Notes |
-|---|---|---|---|---|---|
-| 1 | SmolLM2-135M | 135 M | bf16 | no — pull | Hugging Face SmolLM2 floor |
-| 2 | function-gemma-270m | 270 M | bf16 | no — pull | Gemma 3 base, fine-tuned for function calling |
-| 3 | SmolLM2-360M | 360 M | bf16 | no — pull | |
-| 4 | Qwen3.6-0.8B-Base | 800 M | bf16 | yes | Already inventoried |
-| 5 | Gemma 4 E2B | ~2 B | bf16 + on-the-fly FP8 | check | The talk's headline edge model |
-| 6 | Qwen3.6-2B-Base | 2 B | bf16 | yes | Training-experiments inventory |
-| 7 | Llama-3.2-1B | 1 B | bf16 | no — pull | Standard reference |
-| 8 | Llama-3.2-3B | 3 B | bf16 | no — pull | |
-| 9 | Phi-3-mini | 3.8 B | bf16 + on-the-fly FP8 | no — pull | Microsoft's reference small |
-| 10 | OLMo-1B | 1.2 B | bf16 | no — pull | AI2's open model |
-| 11 | Qwen3.6-4B | 4 B | INT4 + bf16 + on-the-fly FP8 | yes | Existing inventory |
-| 12 | Gemma 4 E4B | ~4 B | bf16 + on-the-fly FP8 | check | The talk's upper edge model |
-| 13 | Qwen3.6-9B | 9 B | FP8 + bf16 | yes | Upper bound of "tiny" per user spec |
+Expanded 2026-05-22 after due-diligence sweep of the 2026 SLM/TLM landscape. Sources: Hugging Face state-of-OS spring 2026, awesomeagents Edge LLM leaderboard, promptquorum mobile LLM bench, BentoML SLM survey, Google AI Edge talk references.
 
-Quantization variants run only where they meaningfully change the deploy story (INT4 for serving, on-the-fly FP8 for inference). bf16 always present as the baseline.
+| Tier | Model | Params | HF repo | Quant | On disk? | Headline why |
+|---|---|---|---|---|---|---|
+| **Sub-1B** | SmolLM2-135M-Instruct | 135 M | `HuggingFaceTB/SmolLM2-135M-Instruct` | bf16 | no — pull | Reference floor |
+| | SmolLM2-360M-Instruct | 360 M | `HuggingFaceTB/SmolLM2-360M-Instruct` | bf16 | no — pull | Step on the ladder |
+| | functiongemma-270m-it | 270 M | `google/functiongemma-270m-it` | bf16 | no — pull (gated) | Function-calling base, Gemma 3 lineage. Compare base vs fine-tuned variant below. |
+| | functiongemma-270m-ft-mobile-actions | 270 M | `litert-community/functiongemma-270m-ft-mobile-actions` | bf16 | no — pull | The 46 % → 90 % delta from the talk; lets us measure the fine-tune gap directly |
+| | Llama-3.2-1B-Instruct | 1.2 B | `meta-llama/Llama-3.2-1B-Instruct` | bf16 | no — pull (gated) | Standard reference, tool-call support |
+| | Gemma 3 1B-it | 1 B | `google/gemma-3-1b-it` | bf16 | no — pull (gated) | 2026 mobile tok/s monster (~2,500 tok/s on mobile GPU per HF report) |
+| | Qwen3.6-0.8B-Base | 0.8 B | local | bf16 | **yes** | Existing inventory, multimodal at sub-1 B per HF |
+| **1–3B** | SmolLM2-1.7B-Instruct | 1.7 B | `HuggingFaceTB/SmolLM2-1.7B-Instruct` | bf16 | no — pull | HF flagship small |
+| | Qwen3.6-2B-Base | 2 B | local | bf16 | **yes** | Existing inventory |
+| | Gemma 3 4B-it | 4 B | `google/gemma-3-4b-it` | bf16 + on-the-fly FP8 | no — pull (gated) | "Best all-around edge" per 2026 bench (MMLU 43.6, IFEval best-in-class) |
+| | Gemma 4 E2B-it | 2.3 B eff / 5.1 B loaded | `google/gemma-4-E2B-it` | bf16 + on-the-fly FP8 | check disk | Apache 2.0; AI Core's edge default per the talk |
+| | Llama-3.2-3B-Instruct | 3.2 B | `meta-llama/Llama-3.2-3B-Instruct` | bf16 | no — pull (gated) | "Best tool-call support" per 2026 mobile bench |
+| | Phi-4-Mini-Instruct | 3.8 B | `microsoft/Phi-4-mini-instruct` | bf16 + on-the-fly FP8 | no — pull | Leading reasoning at this size (GSM8K 88.6 %, ARC-C 83.7 %) + function calling |
+| | OLMoE-1B-7B-0125-Instruct | 1.3 B active / 6.9 B total MoE | `allenai/OLMoE-1B-7B-0125-Instruct` | bf16 | no — pull | Tiny-MoE counter-test (does the MTP-MoE penalty story extend?) |
+| **3–9B** | Gemma 4 E4B-it | 4.5 B eff / 8 B loaded | `google/gemma-4-E4B-it` | bf16 + on-the-fly FP8 | check disk | Apache 2.0; AI Core's upper edge model |
+| | Qwen3.6-4B | 4 B | local | INT4 + bf16 + on-the-fly FP8 | **yes** | Existing inventory, 3 quant variants |
+| | IBM Granite 4.1-8B-Instruct | 8 B | `ibm-granite/granite-4.1-8b-instruct` | bf16 + on-the-fly FP8 | no — pull | New 2026 release; IBM claims it matches 32 B MoE on enterprise tasks |
+| | Qwen3.6-9B | 9 B | local | FP8 + bf16 | **yes** | Upper bound of "tiny" per user spec |
+| **Separate hardware** | BitNet b1.58 2B-4T | 2 B (1.58-bit) | `microsoft/BitNet-b1.58-2B-4T` | 1.58-bit native | no — pull | **CPU-only** via `bitnet.cpp`; doesn't run on GPU. Include as footnote table, not on vLLM. |
+
+Notes:
+- **(gated)** means the HF repo requires accepting the model's terms once (`huggingface-cli login` + visit the model page). Need to confirm we have accept on Google/Meta/Microsoft before pulls fire.
+- **Quant variants** run only when the deploy story changes (INT4 for serving, on-the-fly FP8 for inference); bf16 always present as baseline.
+- **BitNet** is the only model that won't serve via vLLM — it's pure-CPU via `bitnet.cpp`. Worth including for the 2026 capability map but on a different evaluation track.
+- **Dropped from earlier draft:** Phi-3-mini (superseded by Phi-4-Mini), OLMo-1B (lighter 2026 signal vs OLMoE-MoE), Gemma 3 12B (>9 B cap), Gemma 3 27B (>9 B cap).
 
 ## Suites
 
@@ -64,19 +76,46 @@ Local judge throughout (`protolabs/fast` = Gemma 4 26B MoE FP8). Zero cloud spen
 - *Won't* run an on-device latency claim without on-device hardware to back it up. Tok/s numbers in this experiment are *Blackwell tok/s* — the brand piece can note "Pixel 7 numbers exist in the Google AI Edge talk; we ran the same models on Blackwell to surface the upper-bound throughput."
 - *Won't* include fine-tuned variants of any model in this round. That's v2 (`tiny-models-finetune/`).
 
-## Run plan (overnight, single GPU)
+## protolabs/fast audit + proposed reduction (2026-05-22)
 
-GPU 0 cycles through swaps; GPU 1 keeps Gemma 4 26B MoE up as the judge. No TP=2 needed — every model fits in <20 GB.
+GPU 1 snapshot at planning time:
+
+| Process | VRAM | Port | Notes |
+|---|---|---|---|
+| `vllm-fast.service` (Gemma 4 26B MoE FP8) | 56.3 GB | 8002 | `--gpu-memory-utilization 0.72 --max-model-len 131072` |
+| Fish S2 Pro TTS (`tools.api_server`, --half --compile) | 19.8 GB | 8092 | up 2 d 9 h |
+| Qwen3-Embedding-0.6B | 2.0 GB | 8001 | rag-bench `serve_embed.py` |
+| **Used / Free** | **78.1 / 19.1 GB** | | of 96 GB |
+
+protolabs/fast is provisioned for general conversational use (131K ctx, ~26 GB KV pool budget). Judge calls don't need any of that — claw-eval rubrics top out at ~4K tokens, refusal classification <1K, structured-output grading 1–2K. Proposed unit edit, applied when we kick off the bench:
+
+```
+--gpu-memory-utilization 0.55   (was 0.72)   — frees ~16 GB
+--max-model-len 32768           (was 131072) — judge has 8× headroom over largest grader prompt
+```
+
+Net effect: GPU 1 free goes from 19 GB → ~35 GB. Enough headroom to load **any model in this experiment's inventory ≤9 B FP8** alongside Gemma 4 26B without a second GPU touch — meaning runs proceed without disturbing GPU 0's daily-driver smart alias. Revert post-bench.
+
+Restore command sequence:
+```
+sudo sed -i 's/--gpu-memory-utilization 0.55/--gpu-memory-utilization 0.72/;s/--max-model-len 32768/--max-model-len 131072/' /etc/systemd/system/vllm-fast.service
+sudo systemctl daemon-reload && sudo systemctl restart vllm-fast
+```
+
+## Run plan (overnight, GPU 1 alongside trimmed fast)
+
+GPU 1 hosts both Gemma 4 26B judge (trimmed) + the tiny model under test. GPU 0 left untouched: daily smart alias stays up around the clock. Most tiny models fit in <10 GB FP8; some 9 B configs need bf16 → ~18 GB. All inside the freed ~35 GB headroom.
 
 | Night | Models | Wall estimate |
 |---|---|---|
-| 1 | SmolLM2 (135M/360M) + function-gemma 270M + OLMo-1B + Llama-3.2-1B | ~3 hrs (pulls + runs) |
-| 2 | Qwen 0.8B Base + Qwen 2B Base + Llama-3.2-3B + Phi-3-mini | ~3 hrs |
-| 3 | Gemma 4 E2B (bf16 + on-the-fly FP8) + Gemma 4 E4B (bf16 + on-the-fly FP8) | ~3 hrs |
-| 4 | Qwen3.6-4B (INT4 + bf16 + on-the-fly FP8) + Qwen3.6-9B (FP8 + bf16) | ~3 hrs |
-| 5 | Re-run anything flaky + Tier-0 cross-checks + judge-variance sanity | ~2 hrs |
+| 1 | SmolLM2 (135M / 360M / 1.7B) + functiongemma 270M base + ft-mobile-actions | ~3 hrs |
+| 2 | Llama-3.2-1B + Llama-3.2-3B + Gemma 3 1B + Qwen 0.8B / 2B Base | ~3 hrs |
+| 3 | Gemma 3 4B (bf16 + FP8) + Gemma 4 E2B (bf16 + FP8) + Gemma 4 E4B (bf16 + FP8) | ~4 hrs |
+| 4 | Phi-4-Mini (bf16 + FP8) + Qwen3.6-4B (INT4 + bf16 + FP8) | ~3 hrs |
+| 5 | IBM Granite 4.1 8B (bf16 + FP8) + Qwen3.6-9B (FP8 + bf16) + OLMoE-1B-7B | ~3 hrs |
+| 6 | BitNet b1.58 2B (CPU via bitnet.cpp, separate track) + re-runs + Tier-0 + judge spot-check | ~3 hrs |
 
-Total wall: ~14 hours across 5 overnight slots. Daily-driver smart alias down on GPU 0 from ~22:00–05:00 each night. **No daytime disruption.**
+Total wall: **~19 hours across 6 overnight slots**. GPU 0 smart alias **never down**. Daytime evals against tiny models possible if we want them (GPU 1 has the room).
 
 ## Risks
 
@@ -98,18 +137,30 @@ Total wall: ~14 hours across 5 overnight slots. Daily-driver smart alias down on
 **Resolved by the redirect:**
 - ~~Cloud budget~~ — zero. Local judge only.
 - ~~TP=2 windows~~ — none needed.
-- **Pull list approval.** Need ~30–50 GB of new HF downloads (Phi-3-mini ~7 GB, Llama-3.2 1B+3B ~6 GB, SmolLM2 variants ~2 GB, function-gemma ~0.5 GB, Gemma 4 E2B/E4B if not on disk, OLMo-1B ~2 GB). All to `/mnt/models/huggingface/`, plenty of room. Go-ahead implicit unless flagged.
-- **Night 1 kickoff time.** Earliest sensible: tonight after 22:00 local. Drop the daily smart alias for ~3 hrs.
+- **Run-time impact** — none on smart alias (GPU 0 untouched per the audit reduction above).
+
+**Open:**
+
+- **HF gated-model access.** Several entries require accepting model terms once on Hugging Face from `artificial-citizen` (the HF account):
+  - `google/gemma-3-1b-it`, `google/gemma-3-4b-it`, `google/gemma-4-E2B-it`, `google/gemma-4-E4B-it`, `google/functiongemma-270m-it`
+  - `meta-llama/Llama-3.2-1B-Instruct`, `meta-llama/Llama-3.2-3B-Instruct`
+  - `ibm-granite/granite-4.1-8b-instruct` (may not require accept)
+
+  Ungated pulls fire immediately: SmolLM2 family, `litert-community/functiongemma-270m-ft-mobile-actions`, Phi-4-Mini, OLMoE, BitNet, `microsoft/Phi-4-mini-instruct`.
+
+- **Apply protolabs/fast trim before or after bench?** Recommendation: before, to free GPU 1 headroom. ~5 min downtime on fast alias during restart.
+
+- **Night 1 kickoff time.** No daytime constraint anymore. Can run during the day if pipeline smokes clean.
 
 ## Reproducibility
 
 Every score reproducible by:
 ```
-bash models/vllm-swap.sh <config_or_new_swap_entry>
+bash models/vllm-swap.sh <config>      # or a manual co-resident launch on GPU 1
 cd evals
 ./run.sh function-call --model local --all-suites
 ./run.sh custom --suite structured_output --model local --trials 3
 ./run.sh refusal --model local --dataset xstest,simple_safety
 ```
 
-New vllm-swap.sh entries needed for: SmolLM2 variants, function-gemma 270 M, OLMo-1B, Llama-3.2-1B/3B, Phi-3-mini, Gemma 4 E2B/E4B. Pattern follows existing `gemma4-e4b-fp8` config in `models/vllm-swap.sh`.
+New vllm-swap.sh entries needed for: SmolLM2 (3 sizes), functiongemma 270M (base + ft), Llama-3.2-1B / 3B, Gemma 3 1B / 4B, Gemma 4 E2B / E4B (check on-disk first), Phi-4-Mini, Granite 4.1 8B, OLMoE-1B-7B. Pattern follows existing `gemma4-e4b-fp8` config; CUDA_VISIBLE_DEVICES=1 + low gpu-memory-utilization (0.10–0.20) so the eval target co-resides with the trimmed Gemma 4 26B judge.
