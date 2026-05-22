@@ -159,8 +159,8 @@ case "$1" in
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
     qwen-0.8b-base)
-        echo "Qwen3.6-0.8B-Base (800M, bf16 — base model, no chat template)"
-        $VLLM_BIN serve Qwen/Qwen3.6-0.8B-Base \
+        echo "Qwen3.5-0.8B (800M, bf16, chat-tuned, 262K ctx, multimodal native)"
+        $VLLM_BIN serve Qwen/Qwen3.5-0.8B \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
             --max-model-len 16384 --dtype bfloat16 \
             --gpu-memory-utilization 0.06 \
@@ -177,8 +177,8 @@ case "$1" in
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
     qwen-2b-base)
-        echo "Qwen3.6-2B-Base (2B, bf16 — base model)"
-        $VLLM_BIN serve Qwen/Qwen3.6-2B-Base \
+        echo "Qwen3.5-2B (2B, bf16, chat-tuned, 262K ctx)"
+        $VLLM_BIN serve Qwen/Qwen3.5-2B \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
             --max-model-len 16384 --dtype bfloat16 \
             --gpu-memory-utilization 0.10 \
@@ -280,8 +280,8 @@ case "$1" in
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
     qwen-4b)
-        echo "Qwen3.6-4B (4B, bf16)"
-        $VLLM_BIN serve Qwen/Qwen3.6-4B \
+        echo "Qwen3.5-4B (4B, bf16, chat-tuned, 262K ctx)"
+        $VLLM_BIN serve Qwen/Qwen3.5-4B \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
             --max-model-len 16384 --dtype bfloat16 \
             --reasoning-parser qwen3 \
@@ -290,8 +290,8 @@ case "$1" in
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
     qwen-4b-fp8)
-        echo "Qwen3.6-4B + on-the-fly FP8"
-        $VLLM_BIN serve Qwen/Qwen3.6-4B \
+        echo "Qwen3.5-4B + on-the-fly FP8"
+        $VLLM_BIN serve Qwen/Qwen3.5-4B \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
             --max-model-len 16384 --dtype bfloat16 --quantization fp8 \
             --reasoning-parser qwen3 \
@@ -300,8 +300,8 @@ case "$1" in
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
     qwen-4b-int4)
-        echo "Qwen3.6-4B-Instruct-2507-AWQ-Int4 (4B INT4)"
-        $VLLM_BIN serve Qwen/Qwen3.6-4B-Instruct-2507-AWQ-Int4 \
+        echo "Qwen3.5-4B-Instruct-AWQ (4B INT4)"
+        $VLLM_BIN serve Qwen/Qwen3.5-4B-Instruct-AWQ \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
             --max-model-len 16384 \
             --reasoning-parser qwen3 \
@@ -319,8 +319,8 @@ case "$1" in
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
     qwen-9b)
-        echo "Qwen3.6-9B (9B, bf16)  — NOTE: needs protolabs/fast trim for headroom"
-        $VLLM_BIN serve Qwen/Qwen3.6-9B \
+        echo "Qwen3.5-9B (9B, bf16, 262K ctx)  — NOTE: needs protolabs/fast trim for headroom"
+        $VLLM_BIN serve Qwen/Qwen3.5-9B \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
             --max-model-len 16384 --dtype bfloat16 \
             --reasoning-parser qwen3 \
@@ -329,8 +329,8 @@ case "$1" in
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
     qwen-9b-fp8)
-        echo "Qwen3.6-9B + on-the-fly FP8"
-        $VLLM_BIN serve Qwen/Qwen3.6-9B \
+        echo "Qwen3.5-9B + on-the-fly FP8"
+        $VLLM_BIN serve Qwen/Qwen3.5-9B \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
             --max-model-len 16384 --dtype bfloat16 --quantization fp8 \
             --reasoning-parser qwen3 \
