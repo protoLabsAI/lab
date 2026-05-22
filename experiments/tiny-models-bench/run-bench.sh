@@ -13,10 +13,15 @@
 #   smoke   refusal(simple_safety, n=20)                    — pipeline smoke
 #   core    refusal(simple_safety) + function_call + structured_output
 #                                                            — fastest useful pass
-#   tier1   function_call + claw-eval(6 tasks, 3 trials)    — agentic
+#   tier1   function_call(trials=3) + claw-eval                 — agentic
 #   tier2   coding + reasoning + structured_output + summarization
 #           + instruction_following + refusal(xstest + simple_safety)
 #   all     tier1 + tier2 + creative_writing + roleplay + svg_generation + research
+#
+# Claw-eval task scope is controlled via CLAW_TASKS env var:
+#   CLAW_TASKS=""               — default 6-task EN sample (T02,T04,T06,T08,T10,T12)
+#   CLAW_TASKS="all"            — full 52-task pass^3 run (~80 min/model)
+#   CLAW_TASKS="T02,T16,T28"    — explicit task list (even numbers = English)
 
 set -euo pipefail
 MODEL_KEY="${1:?usage: $0 <model_key> [tier]}"
@@ -26,6 +31,10 @@ REPO="$HOME/dev/lab"
 BENCH_DIR="$REPO/experiments/tiny-models-bench"
 EVAL_DIR="$REPO/evals"
 SERVE_SH="$BENCH_DIR/serve.sh"
+# Source venv so PATH includes .venv/bin (claw-eval is a console-script
+# entry point that subprocess.run("claw-eval", ...) looks up via PATH).
+# shellcheck source=/dev/null
+source "$REPO/.venv/bin/activate"
 PY="$REPO/.venv/bin/python"
 
 GATEWAY_URL="http://localhost:8003/v1"
@@ -96,8 +105,20 @@ case "$TIER" in
         $PY -m runners.run_function_call --model local-bench \
             --gateway-url "$GATEWAY_URL" \
             --all-suites --trials 3 || log "function_call FAILED"
-        # claw-eval invocation TBD — wraps a docker run + may not slot the same way
-        log "[tier1/2] claw-eval — not wired yet, run via evals/run.sh separately"
+
+        # English claw tasks are even-numbered (T01zh/T03zh/T05zh are Chinese variants)
+        CLAW_TASKS="${CLAW_TASKS:-T02,T04,T06,T08,T10,T12}"
+        if [ "$CLAW_TASKS" = "all" ]; then
+            log "[tier1/2] claw: --all-tasks, trials=3 (~80 min)"
+            $PY -m runners.run_claw --model local-bench \
+                --gateway-url "$GATEWAY_URL" \
+                --all-tasks --trials 3 --port-offset 200 || log "claw FAILED"
+        else
+            log "[tier1/2] claw: tasks=$CLAW_TASKS, trials=3"
+            $PY -m runners.run_claw --model local-bench \
+                --gateway-url "$GATEWAY_URL" \
+                --tasks "$CLAW_TASKS" --trials 3 --port-offset 200 || log "claw FAILED"
+        fi
         ;;
 
     tier2)
@@ -114,8 +135,8 @@ case "$TIER" in
         ;;
 
     all)
-        # Reuse core + tier2 + appendix.
-        "$0" "$MODEL_KEY" core
+        # Reuse tier1 + tier2 + appendix (skip core which overlaps function_call).
+        "$0" "$MODEL_KEY" tier1
         "$0" "$MODEL_KEY" tier2
         for suite in creative_writing roleplay svg_generation research; do
             log "[app] custom: $suite, trials=1"
