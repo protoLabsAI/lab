@@ -122,7 +122,7 @@ case "$1" in
         $VLLM_BIN serve HuggingFaceTB/SmolLM2-360M-Instruct \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
             --max-model-len 8192 --dtype bfloat16 \
-            --gpu-memory-utilization 0.06 \
+            --gpu-memory-utilization 0.10 \
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
     functiongemma-270m)
@@ -130,7 +130,7 @@ case "$1" in
         $VLLM_BIN serve google/functiongemma-270m-it \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
             --max-model-len 8192 --dtype bfloat16 \
-            --gpu-memory-utilization 0.06 \
+            --gpu-memory-utilization 0.10 \
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
     functiongemma-ft)
@@ -138,7 +138,7 @@ case "$1" in
         $VLLM_BIN serve litert-community/functiongemma-270m-ft-mobile-actions \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
             --max-model-len 8192 --dtype bfloat16 \
-            --gpu-memory-utilization 0.06 \
+            --gpu-memory-utilization 0.10 \
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
     llama-3.2-1b)
@@ -163,7 +163,8 @@ case "$1" in
         $VLLM_BIN serve Qwen/Qwen3.5-0.8B \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
             --max-model-len 16384 --dtype bfloat16 \
-            --gpu-memory-utilization 0.06 \
+            --language-model-only \
+            --gpu-memory-utilization 0.10 \
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
 
@@ -181,7 +182,8 @@ case "$1" in
         $VLLM_BIN serve Qwen/Qwen3.5-2B \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
             --max-model-len 16384 --dtype bfloat16 \
-            --gpu-memory-utilization 0.10 \
+            --language-model-only \
+            --gpu-memory-utilization 0.14 \
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
     gemma-3-4b)
@@ -284,9 +286,10 @@ case "$1" in
         $VLLM_BIN serve Qwen/Qwen3.5-4B \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
             --max-model-len 16384 --dtype bfloat16 \
+            --language-model-only \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
-            --gpu-memory-utilization 0.14 \
+            --gpu-memory-utilization 0.18 \
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
     qwen-4b-fp8)
@@ -294,9 +297,10 @@ case "$1" in
         $VLLM_BIN serve Qwen/Qwen3.5-4B \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
             --max-model-len 16384 --dtype bfloat16 --quantization fp8 \
+            --language-model-only \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
-            --gpu-memory-utilization 0.12 \
+            --gpu-memory-utilization 0.14 \
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
     qwen-4b-int4)
@@ -323,9 +327,10 @@ case "$1" in
         $VLLM_BIN serve Qwen/Qwen3.5-9B \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
             --max-model-len 16384 --dtype bfloat16 \
+            --language-model-only \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
-            --gpu-memory-utilization 0.22 \
+            --gpu-memory-utilization 0.28 \
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
     qwen-9b-fp8)
@@ -333,9 +338,10 @@ case "$1" in
         $VLLM_BIN serve Qwen/Qwen3.5-9B \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
             --max-model-len 16384 --dtype bfloat16 --quantization fp8 \
+            --language-model-only \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
-            --gpu-memory-utilization 0.14 \
+            --gpu-memory-utilization 0.18 \
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
 
