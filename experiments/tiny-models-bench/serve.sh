@@ -191,7 +191,7 @@ case "$1" in
         $VLLM_BIN serve google/gemma-3-4b-it \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
             --max-model-len 16384 --dtype bfloat16 \
-            --gpu-memory-utilization 0.12 \
+            --gpu-memory-utilization 0.20 \
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
     gemma-3-4b-fp8)
@@ -199,7 +199,7 @@ case "$1" in
         $VLLM_BIN serve google/gemma-3-4b-it \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
             --max-model-len 16384 --dtype bfloat16 --quantization fp8 \
-            --gpu-memory-utilization 0.10 \
+            --gpu-memory-utilization 0.16 \
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
     gemma-4-e2b)
@@ -208,7 +208,7 @@ case "$1" in
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
             --max-model-len 16384 --dtype bfloat16 \
             --language-model-only \
-            --gpu-memory-utilization 0.10 \
+            --gpu-memory-utilization 0.16 \
             --enable-auto-tool-choice --tool-call-parser gemma4 \
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
@@ -218,7 +218,7 @@ case "$1" in
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
             --max-model-len 16384 --dtype bfloat16 --quantization fp8 \
             --language-model-only \
-            --gpu-memory-utilization 0.08 \
+            --gpu-memory-utilization 0.16 \
             --enable-auto-tool-choice --tool-call-parser gemma4 \
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
@@ -267,7 +267,7 @@ case "$1" in
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
             --max-model-len 16384 --dtype bfloat16 \
             --language-model-only \
-            --gpu-memory-utilization 0.14 \
+            --gpu-memory-utilization 0.22 \
             --enable-auto-tool-choice --tool-call-parser gemma4 \
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
@@ -277,7 +277,7 @@ case "$1" in
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
             --max-model-len 16384 --dtype bfloat16 --quantization fp8 \
             --language-model-only \
-            --gpu-memory-utilization 0.12 \
+            --gpu-memory-utilization 0.20 \
             --enable-auto-tool-choice --tool-call-parser gemma4 \
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
