@@ -19,6 +19,7 @@
 #   all     tier1 + tier2 + creative_writing + roleplay + svg_generation + research
 #
 # Claw-eval task scope is controlled via CLAW_TASKS env var:
+#   CUSTOM_MAX_TOKENS=4096      — max output tokens for custom suite (default fits 8K ctx)
 #   CLAW_TASKS=""               — default 6-task EN sample (T02,T04,T06,T08,T10,T12)
 #   CLAW_TASKS="all"            — full 52-task pass^3 run (~80 min/model)
 #   CLAW_TASKS="T02,T16,T28"    — explicit task list (even numbers = English)
@@ -97,6 +98,7 @@ case "$TIER" in
         log "[core/3] custom: structured_output, trials=1"
         $PY -m runners.run_custom --model local-bench \
             --gateway-url "$GATEWAY_URL" \
+            --max-tokens "${CUSTOM_MAX_TOKENS:-4096}" \
             --suite structured_output --trials 1 || log "structured_output FAILED"
         ;;
 

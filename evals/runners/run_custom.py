@@ -50,7 +50,7 @@ def load_task(task_path: Path) -> dict:
         return yaml.safe_load(f)
 
 
-def run_agent(client: OpenAI, model: str, task: dict, max_turns: int = 20) -> dict:
+def run_agent(client: OpenAI, model: str, task: dict, max_turns: int = 20, max_tokens: int = 32768) -> dict:
     """Execute a task by sending prompts to an agent via the gateway.
 
     Returns the full conversation trace and final output.
@@ -82,7 +82,7 @@ def run_agent(client: OpenAI, model: str, task: dict, max_turns: int = 20) -> di
             "messages": messages,
             "temperature": 0.6 if is_thinking else 0.7,
             "top_p": 0.95 if is_thinking else 0.8,
-            "max_tokens": 32768,
+            "max_tokens": max_tokens,
         }
         if tools:
             kwargs["tools"] = tools
@@ -170,7 +170,8 @@ def grade_task(task: dict, output: dict, gateway_url: str = "http://ava:4000/v1"
 @click.option("--submit-langfuse", is_flag=True, help="Submit scores to Langfuse")
 @click.option("--thinking", is_flag=True, help="Enable thinking/reasoning mode (Gemma 4, etc.)")
 @click.option("--output-dir", type=click.Path(), default=None, help="Directory to write result JSON")
-def main(task_path, suite, model, trials, gateway_url, api_key, submit_langfuse, thinking, output_dir):
+@click.option("--max-tokens", default=32768, type=int, help="Max output tokens per turn. Lower (4096) for tiny models with 8K context.")
+def main(task_path, suite, model, trials, gateway_url, api_key, submit_langfuse, thinking, output_dir, max_tokens):
     """Run custom eval tasks and grade results."""
     client = OpenAI(base_url=gateway_url, api_key=api_key)
     scorer = LangfuseScorer() if submit_langfuse else None
@@ -229,7 +230,7 @@ def main(task_path, suite, model, trials, gateway_url, api_key, submit_langfuse,
             trial_results = []
             trial_records: list[dict] = []
             for trial in range(1, trials + 1):
-                output = run_agent(client, model, task)
+                output = run_agent(client, model, task, max_tokens=max_tokens)
                 judge_gateway = os.environ.get("JUDGE_GATEWAY_URL", "http://ava:4000/v1")
                 grades = grade_task(task, output, gateway_url=gateway_url, api_key=api_key, judge_url=judge_gateway)
 
