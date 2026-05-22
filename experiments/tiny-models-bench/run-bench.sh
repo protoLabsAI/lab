@@ -128,6 +128,7 @@ case "$TIER" in
             log "[tier2] custom: $suite, trials=1"
             $PY -m runners.run_custom --model local-bench \
                 --gateway-url "$GATEWAY_URL" \
+                --max-tokens "${CUSTOM_MAX_TOKENS:-4096}" \
                 --suite "$suite" --trials 1 || log "$suite FAILED"
         done
         log "[tier2] refusal: xstest + simple_safety"
@@ -144,6 +145,7 @@ case "$TIER" in
             log "[app] custom: $suite, trials=1"
             $PY -m runners.run_custom --model local-bench \
                 --gateway-url "$GATEWAY_URL" \
+                --max-tokens "${CUSTOM_MAX_TOKENS:-4096}" \
                 --suite "$suite" --trials 1 || log "$suite FAILED"
         done
         ;;
