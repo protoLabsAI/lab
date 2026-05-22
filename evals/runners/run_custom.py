@@ -133,14 +133,20 @@ def grade_task(task: dict, output: dict, gateway_url: str = "http://ava:4000/v1"
     grades = []
     grader_configs = task.get("graders", [])
 
+    # Default judge to local fast model (free, no cloud costs)
+    default_judge_url = judge_url or os.environ.get(
+        "JUDGE_GATEWAY_URL", "http://localhost:8002/v1"
+    )
+    default_judge_model = os.environ.get("JUDGE_MODEL", "local-fast")
+
     for gc in grader_configs:
         if gc["type"] == "llm_judge":
             rubric = gc.get("rubric") or DIMENSION_RUBRICS.get(gc["dimension"])
             grader = LLMJudge(
                 dimension=gc["dimension"],
                 rubric=rubric,
-                model=gc.get("model", "claude-sonnet-4-6"),
-                base_url=judge_url or gateway_url,
+                model=gc.get("model", default_judge_model),
+                base_url=default_judge_url,
                 api_key=api_key,
             )
             # Pass clean output to judge — just the text, not the full trace
