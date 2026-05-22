@@ -9,6 +9,7 @@ from runners.run_function_call import main as function_call_cmd
 from runners.run_rag import main as rag_cmd
 from runners.run_profile import main as profile_cmd
 from runners.run_wildbench import main as wildbench_cmd
+from runners.run_refusal import cmd_refusal
 
 
 @click.group()
@@ -25,6 +26,7 @@ main.add_command(function_call_cmd, "function-call")
 main.add_command(rag_cmd, "rag")
 main.add_command(profile_cmd, "profile")
 main.add_command(wildbench_cmd, "wildbench")
+main.add_command(cmd_refusal, "refusal")
 
 # Optional suites (lazy import — don't break CLI if deps missing)
 try:

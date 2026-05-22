@@ -11,6 +11,8 @@
 #   ./run.sh profile --name quick --model protolabs/fast       # test a different model
 #   ./run.sh wildbench infer                                   # generate responses (1,024 tasks)
 #   ./run.sh wildbench judge --results X --judge gpt-5.4       # score with cloud judge (~$5)
+#   ./run.sh refusal --model local --dataset xstest            # refusal eval (single dataset)
+#   ./run.sh refusal --model local --dataset all --sample 50   # all datasets, 50 samples each
 #   ./run.sh compare results/model_a results/model_b
 #   ./run.sh --setup       # configure machine identity (first time)
 #   ./run.sh --local ...   # use local .env instead of Infisical

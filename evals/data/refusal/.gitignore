@@ -1,0 +1,3 @@
+# Dataset files — downloaded from HuggingFace, not committed
+*.json
+!README.md
