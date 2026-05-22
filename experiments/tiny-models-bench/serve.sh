@@ -10,7 +10,7 @@
 #
 # Pre-requisite (when running 9 B FP8 or larger): trim protolabs/fast
 # via:
-#   sudo sed -i 's/--gpu-memory-utilization 0.72/--gpu-memory-utilization 0.55/;s/--max-model-len 131072/--max-model-len 32768/' /etc/systemd/system/vllm-fast.service
+#   sudo sed -i 's/--gpu-memory-utilization 0.72/--gpu-memory-utilization 0.55/;s/--max-model-len 131072/--max-model-len 16384/' /etc/systemd/system/vllm-fast.service
 #   sudo systemctl daemon-reload && sudo systemctl restart vllm-fast
 # Revert post-bench.
 #
@@ -33,15 +33,24 @@ export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
 
 stop_bench() {
     echo "Stopping bench server on :${BENCH_PORT}..."
+    # Kill the API server (listening on port) AND any EngineCore worker
+    # children — vLLM forks the engine into a separate process that survives
+    # a port kill.
+    pkill -f -- '--served-model-name local-bench' 2>/dev/null || true
     fuser -k "${BENCH_PORT}/tcp" 2>/dev/null || true
     for i in $(seq 1 30); do
-        if ! ss -tlnp | grep -q ":${BENCH_PORT} "; then
-            echo "Port ${BENCH_PORT} released."
+        if ! ss -tlnp | grep -q ":${BENCH_PORT} " \
+           && ! pgrep -f -- '--served-model-name local-bench' >/dev/null; then
+            echo "Port ${BENCH_PORT} released, bench processes cleared."
+            sleep 2  # let VRAM reaper catch up before next launch
             return
         fi
         sleep 1
     done
+    echo "Force-killing remaining bench processes..."
+    pkill -9 -f -- '--served-model-name local-bench' 2>/dev/null || true
     fuser -k -9 "${BENCH_PORT}/tcp" 2>/dev/null || true
+    sleep 3
 }
 
 wait_ready() {
@@ -139,7 +148,7 @@ case "$1" in
         echo "Gemma 3 1B-it (1B, bf16)"
         $VLLM_BIN serve google/gemma-3-1b-it \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
-            --max-model-len 32768 --dtype bfloat16 \
+            --max-model-len 16384 --dtype bfloat16 \
             --gpu-memory-utilization 0.08 \
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
@@ -173,7 +182,7 @@ case "$1" in
         echo "Gemma 3 4B-it (4B, bf16, language-model-only)"
         $VLLM_BIN serve google/gemma-3-4b-it \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
-            --max-model-len 32768 --dtype bfloat16 \
+            --max-model-len 16384 --dtype bfloat16 \
             --gpu-memory-utilization 0.12 \
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
@@ -181,7 +190,7 @@ case "$1" in
         echo "Gemma 3 4B-it + on-the-fly FP8 (4B, dynamic FP8)"
         $VLLM_BIN serve google/gemma-3-4b-it \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
-            --max-model-len 32768 --dtype bfloat16 --quantization fp8 \
+            --max-model-len 16384 --dtype bfloat16 --quantization fp8 \
             --gpu-memory-utilization 0.10 \
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
@@ -189,7 +198,7 @@ case "$1" in
         echo "Gemma 4 E2B-it (2.3B effective, bf16)"
         $VLLM_BIN serve google/gemma-4-E2B-it \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
-            --max-model-len 32768 --dtype bfloat16 \
+            --max-model-len 16384 --dtype bfloat16 \
             --language-model-only \
             --gpu-memory-utilization 0.10 \
             --enable-auto-tool-choice --tool-call-parser gemma4 \
@@ -199,7 +208,7 @@ case "$1" in
         echo "Gemma 4 E2B-it + on-the-fly FP8"
         $VLLM_BIN serve google/gemma-4-E2B-it \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
-            --max-model-len 32768 --dtype bfloat16 --quantization fp8 \
+            --max-model-len 16384 --dtype bfloat16 --quantization fp8 \
             --language-model-only \
             --gpu-memory-utilization 0.08 \
             --enable-auto-tool-choice --tool-call-parser gemma4 \
@@ -209,7 +218,7 @@ case "$1" in
         echo "Llama-3.2-3B-Instruct (3.2B, bf16)"
         $VLLM_BIN serve meta-llama/Llama-3.2-3B-Instruct \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
-            --max-model-len 32768 --dtype bfloat16 \
+            --max-model-len 16384 --dtype bfloat16 \
             --gpu-memory-utilization 0.12 \
             --enable-auto-tool-choice --tool-call-parser llama3_json \
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
@@ -218,7 +227,7 @@ case "$1" in
         echo "Phi-4-Mini-Instruct (3.8B, bf16)"
         $VLLM_BIN serve microsoft/Phi-4-mini-instruct \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
-            --max-model-len 32768 --dtype bfloat16 \
+            --max-model-len 16384 --dtype bfloat16 \
             --gpu-memory-utilization 0.14 \
             --enable-auto-tool-choice --tool-call-parser phi4_mini_json \
             --trust-remote-code \
@@ -228,7 +237,7 @@ case "$1" in
         echo "Phi-4-Mini-Instruct + on-the-fly FP8"
         $VLLM_BIN serve microsoft/Phi-4-mini-instruct \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
-            --max-model-len 32768 --dtype bfloat16 --quantization fp8 \
+            --max-model-len 16384 --dtype bfloat16 --quantization fp8 \
             --gpu-memory-utilization 0.10 \
             --enable-auto-tool-choice --tool-call-parser phi4_mini_json \
             --trust-remote-code \
@@ -248,7 +257,7 @@ case "$1" in
         echo "Gemma 4 E4B-it (4.5B effective, bf16)"
         $VLLM_BIN serve google/gemma-4-E4B-it \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
-            --max-model-len 32768 --dtype bfloat16 \
+            --max-model-len 16384 --dtype bfloat16 \
             --language-model-only \
             --gpu-memory-utilization 0.14 \
             --enable-auto-tool-choice --tool-call-parser gemma4 \
@@ -258,7 +267,7 @@ case "$1" in
         echo "Gemma 4 E4B-it + on-the-fly FP8"
         $VLLM_BIN serve google/gemma-4-E4B-it \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
-            --max-model-len 32768 --dtype bfloat16 --quantization fp8 \
+            --max-model-len 16384 --dtype bfloat16 --quantization fp8 \
             --language-model-only \
             --gpu-memory-utilization 0.12 \
             --enable-auto-tool-choice --tool-call-parser gemma4 \
@@ -268,7 +277,7 @@ case "$1" in
         echo "Qwen3.6-4B (4B, bf16)"
         $VLLM_BIN serve Qwen/Qwen3.6-4B \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
-            --max-model-len 32768 --dtype bfloat16 \
+            --max-model-len 16384 --dtype bfloat16 \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.14 \
@@ -278,7 +287,7 @@ case "$1" in
         echo "Qwen3.6-4B + on-the-fly FP8"
         $VLLM_BIN serve Qwen/Qwen3.6-4B \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
-            --max-model-len 32768 --dtype bfloat16 --quantization fp8 \
+            --max-model-len 16384 --dtype bfloat16 --quantization fp8 \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.12 \
@@ -288,7 +297,7 @@ case "$1" in
         echo "Qwen3.6-4B-Instruct-2507-AWQ-Int4 (4B INT4)"
         $VLLM_BIN serve Qwen/Qwen3.6-4B-Instruct-2507-AWQ-Int4 \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
-            --max-model-len 32768 \
+            --max-model-len 16384 \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.10 \
@@ -298,7 +307,7 @@ case "$1" in
         echo "IBM Granite 4.1 8B FP8 (8B native FP8)"
         $VLLM_BIN serve ibm-granite/granite-4.1-8b-fp8 \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
-            --max-model-len 32768 \
+            --max-model-len 16384 \
             --gpu-memory-utilization 0.18 \
             --enable-auto-tool-choice --tool-call-parser granite \
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
@@ -307,7 +316,7 @@ case "$1" in
         echo "Qwen3.6-9B (9B, bf16)  — NOTE: needs protolabs/fast trim for headroom"
         $VLLM_BIN serve Qwen/Qwen3.6-9B \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
-            --max-model-len 32768 --dtype bfloat16 \
+            --max-model-len 16384 --dtype bfloat16 \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.22 \
@@ -317,7 +326,7 @@ case "$1" in
         echo "Qwen3.6-9B + on-the-fly FP8"
         $VLLM_BIN serve Qwen/Qwen3.6-9B \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
-            --max-model-len 32768 --dtype bfloat16 --quantization fp8 \
+            --max-model-len 16384 --dtype bfloat16 --quantization fp8 \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.14 \
