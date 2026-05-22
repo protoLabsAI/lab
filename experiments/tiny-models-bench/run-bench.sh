@@ -99,6 +99,7 @@ case "$TIER" in
         $PY -m runners.run_custom --model local-bench \
             --gateway-url "$GATEWAY_URL" \
             --max-tokens "${CUSTOM_MAX_TOKENS:-4096}" \
+            --output-dir "$BENCH_RESULTS_DIR/custom" \
             --suite structured_output --trials 1 || log "structured_output FAILED"
         ;;
 
@@ -129,6 +130,7 @@ case "$TIER" in
             $PY -m runners.run_custom --model local-bench \
                 --gateway-url "$GATEWAY_URL" \
                 --max-tokens "${CUSTOM_MAX_TOKENS:-4096}" \
+                --output-dir "$BENCH_RESULTS_DIR/custom" \
                 --suite "$suite" --trials 1 || log "$suite FAILED"
         done
         log "[tier2] refusal: xstest + simple_safety"
@@ -146,6 +148,7 @@ case "$TIER" in
             $PY -m runners.run_custom --model local-bench \
                 --gateway-url "$GATEWAY_URL" \
                 --max-tokens "${CUSTOM_MAX_TOKENS:-4096}" \
+                --output-dir "$BENCH_RESULTS_DIR/custom" \
                 --suite "$suite" --trials 1 || log "$suite FAILED"
         done
         ;;

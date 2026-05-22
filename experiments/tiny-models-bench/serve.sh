@@ -31,6 +31,12 @@ export HF_HOME="/mnt/models/huggingface"
 export CUDA_VISIBLE_DEVICES=1
 export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
 
+# vLLM doesn't always read ~/.cache/huggingface/token for gated repos at
+# serve time. Surface it as HF_TOKEN explicitly.
+if [ -f "$HOME/.cache/huggingface/token" ]; then
+    export HF_TOKEN="$(cat "$HOME/.cache/huggingface/token")"
+fi
+
 stop_bench() {
     echo "Stopping bench server on :${BENCH_PORT}..."
     # Kill the API server (listening on port) AND any EngineCore worker
