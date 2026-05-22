@@ -19,28 +19,20 @@
 #   qwen-36b-tp2       — Qwen3.6-35B-A3B MoE bf16 (TP=2, 250K)
 #   qwen36-27b-fp8-tp2 — Qwen3.6-27B FP8 official (TP=2, 131K)
 #
-# === Qwen3-Coder ===
+# === Qwen3-Coder (parked — coding-agent work out of scope, see brand pivot) ===
 #   qwen3-coder-30b    — Qwen3-Coder-30B-A3B FP8 (single GPU, 131K)
-#   qwen3-coder-next   — Qwen3-Coder-Next FP8 (TP=2, 131K)
 #
 # === Gemma 4 (text-only via --language-model-only) ===
 #   gemma4-moe         — 26B-A4B MoE bf16, 128K (single GPU)
 #   gemma4-moe-fp8     — 26B-A4B MoE on-the-fly FP8 (175 tok/s, 128K)
-#   gemma4-31b         — 31B dense bf16, 65K FP8 KV (single GPU)
-#   gemma4-31b-fp8     — 31B dense on-the-fly FP8 (42 tok/s, 131K)
-#   gemma4-31b-fp8-mtp — 31B dense FP8 + MTP drafter 0.5B (4 spec tokens, 131K)
 #   gemma4-e4b         — E4B edge bf16, 128K (single GPU)
 #   gemma4-e4b-fp8     — E4B edge on-the-fly FP8 (128K)
 #   gemma4-moe-tp2     — Gemma 4 26B-A4B MoE FP8 TP=2 (131K, both GPUs)
-#   gemma4-31b-tp2     — Gemma 4 31B dense bf16 TP=2 (128K, FP8 KV)
 #
 # === Creative / Experimental ===
 #   cydonia-24b        — Mistral 24B creative/roleplay (no tool calling)
 #   llama-70b          — Llama 70B AWQ creative (38 tok/s)
 #   context-1          — Chroma Context-1 20B MoE retrieval agent (32K)
-#
-# === Mistral 3.5 (TP=2, VLM) ===
-#   mistral-medium-3.5 — Mistral-Medium-3.5 128B FP8 dense, 64K, vision+text
 set -euo pipefail
 PORT=8000
 VOICE_PORT=8002
@@ -59,20 +51,20 @@ usage() {
     echo "Qwen 3.6 (single GPU):"
     echo "  $0 {qwen-36b-fp8|qwen-36b-bf16|qwen-36b-voice|qwen36-27b-fp8|qwen36-27b-fp8-mtp}"
     echo ""
-    echo "Qwen3-Coder:"
-    echo "  $0 {qwen3-coder-30b|qwen3-coder-next}"
+    echo "Qwen3-Coder (parked, kept for reference):"
+    echo "  $0 {qwen3-coder-30b}"
     echo ""
     echo "Gemma 4:"
-    echo "  $0 {gemma4-moe|gemma4-moe-fp8|gemma4-31b|gemma4-31b-fp8|gemma4-31b-fp8-mtp|gemma4-e4b|gemma4-e4b-fp8}"
+    echo "  $0 {gemma4-moe|gemma4-moe-fp8|gemma4-e4b|gemma4-e4b-fp8}"
     echo ""
     echo "Creative / Experimental:"
     echo "  $0 {cydonia-24b|cydonia-24b-mtp|llama-70b|llama-8b|hermes-70b|context-1|context-1-gpu1}"
     echo ""
     echo "Dual GPU (one model per GPU):"
-    echo "  $0 dual                — 27B thinking (GPU 0) + 35B fast no-thinking (GPU 1)"
+    echo "  $0 dual                — 27B thinking (GPU 0) + Gemma 4 26B MoE fast (GPU 1)"
     echo ""
     echo "TP=2 (both GPUs):"
-    echo "  $0 {qwen-36b-tp2|qwen36-27b-fp8-tp2|gemma4-31b-tp2}"
+    echo "  $0 {qwen-36b-tp2|qwen36-27b-fp8-tp2|gemma4-moe-tp2}"
     exit 1
 }
 stop_vllm() {
@@ -141,7 +133,6 @@ case "$1" in
     qwen-36b-fast)    ;; # fast only touches GPU 1 / :8002
     gemma4-moe-fast)  ;; # fast only touches GPU 1 / :8002
     dual)            ;; # dual does stop_all itself
-    mistral-medium-3.5) ;; # TP=2, needs both GPUs — stops all itself
     *) stop_vllm ;;
 esac
 case "$1" in
@@ -355,65 +346,6 @@ case "$1" in
             --reasoning-parser gemma4 \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
-    gemma4-31b)
-        echo "Starting Gemma 4 31B dense bf16 (GPU 0, 65K, FP8 KV)..."
-        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve google/gemma-4-31B-it \
-            $O3 \
-            --host 0.0.0.0 --port $PORT \
-            --served-model-name local \
-            --max-model-len 65536 \
-            --dtype bfloat16 \
-            --kv-cache-dtype fp8 \
-            --gpu-memory-utilization 0.92 \
-            --language-model-only \
-            --enable-chunked-prefill \
-            --enable-prefix-caching \
-            --async-scheduling \
-            --generation-config auto \
-            --enable-auto-tool-choice --tool-call-parser gemma4 \
-            --reasoning-parser gemma4 \
-            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
-        ;;
-    gemma4-31b-fp8)
-        echo "Starting Gemma 4 31B + on-the-fly FP8 (GPU 0, 131K, 42 tok/s)..."
-        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve google/gemma-4-31B-it \
-            $O3 \
-            --host 0.0.0.0 --port $PORT \
-            --served-model-name local \
-            --max-model-len 131072 \
-            --dtype bfloat16 \
-            --quantization fp8 \
-            --kv-cache-dtype fp8 \
-            --gpu-memory-utilization 0.92 \
-            --language-model-only \
-            --enable-chunked-prefill \
-            --enable-prefix-caching \
-            --async-scheduling \
-            --generation-config auto \
-            --enable-auto-tool-choice --tool-call-parser gemma4 \
-            --reasoning-parser gemma4 \
-            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
-        ;;
-    gemma4-31b-fp8-mtp)
-        echo "Starting Gemma 4 31B + on-the-fly FP8 + MTP drafter (GPU 0, 131K, 4 spec tokens)..."
-        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve google/gemma-4-31B-it \
-            $O3 \
-            --host 0.0.0.0 --port $PORT \
-            --served-model-name local \
-            --max-model-len 131072 \
-            --dtype bfloat16 \
-            --quantization fp8 \
-            --gpu-memory-utilization 0.92 \
-            --language-model-only \
-            --enable-chunked-prefill \
-            --enable-prefix-caching \
-            --async-scheduling \
-            --generation-config auto \
-            --enable-auto-tool-choice --tool-call-parser gemma4 \
-            --reasoning-parser gemma4 \
-            --speculative-config '{"model": "google/gemma-4-31B-it-assistant", "num_speculative_tokens": 4}' \
-            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
-        ;;
     gemma4-e4b)
         echo "Starting Gemma 4 E4B dense bf16 (GPU 0, 128K)..."
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve google/gemma-4-E4B-it \
@@ -485,22 +417,6 @@ case "$1" in
             --trust-remote-code \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
-    qwen3-coder-next)
-        echo "Starting Qwen3-Coder-Next FP8 (TP=2, 131K)..."
-        NCCL_P2P_DISABLE=1 \
-        NCCL_CUMEM_ENABLE=0 \
-        $VLLM_BIN serve Qwen/Qwen3-Coder-Next-FP8 \
-            --host 0.0.0.0 --port $PORT \
-            --served-model-name local \
-            --tensor-parallel-size 2 \
-            --max-model-len 131072 \
-            --enable-auto-tool-choice --tool-call-parser qwen3_coder \
-            --gpu-memory-utilization 0.90 \
-            --disable-custom-all-reduce \
-            --async-scheduling \
-            --trust-remote-code \
-            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
-        ;;
     # ─── Experimental MTP configs (no tool calling) ─────────────────
     cydonia-24b-mtp)
         echo "Starting Cydonia-24B + MTP (GPU 0, 32K, NO TOOLS)..."
@@ -568,26 +484,6 @@ case "$1" in
             $PREFIX_FLAGS \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
-    mistral-medium-3.5)
-        echo "=== Mistral-Medium-3.5 128B FP8 (TP=2, 64K, VLM) ==="
-        stop_all
-        NCCL_P2P_DISABLE=1 \
-        NCCL_ALGO=Ring NCCL_PROTO=Simple \
-        NCCL_MIN_NCHANNELS=4 NCCL_MAX_NCHANNELS=8 \
-        $VLLM_BIN serve mistralai/Mistral-Medium-3.5-128B \
-            --host 0.0.0.0 --port $PORT \
-            --served-model-name local \
-            --tensor-parallel-size 2 \
-            --max-model-len 65536 \
-            --max-num-seqs 64 \
-            --enable-auto-tool-choice --tool-call-parser mistral \
-            --reasoning-parser mistral \
-            --gpu-memory-utilization 0.90 \
-            --disable-custom-all-reduce \
-            --enable-chunked-prefill \
-            --enable-prefix-caching \
-            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
-        ;;
     gemma4-moe-tp2)
         echo "Starting Gemma 4 26B-A4B MoE FP8 (TP=2, 131K, both GPUs)..."
         NCCL_P2P_DISABLE=1 \
@@ -599,29 +495,6 @@ case "$1" in
             --max-model-len 131072 \
             --dtype bfloat16 \
             --quantization fp8 \
-            --gpu-memory-utilization 0.90 \
-            --language-model-only \
-            --enable-chunked-prefill \
-            --enable-prefix-caching \
-            --async-scheduling \
-            --generation-config auto \
-            --disable-custom-all-reduce \
-            --enable-auto-tool-choice --tool-call-parser gemma4 \
-            --reasoning-parser gemma4 \
-            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
-        ;;
-    gemma4-31b-tp2)
-        echo "Starting Gemma 4 31B dense bf16 (TP=2, 128K, FP8 KV)..."
-        NCCL_P2P_DISABLE=1 \
-        NCCL_CUMEM_ENABLE=0 \
-        $VLLM_BIN serve google/gemma-4-31B-it \
-            $O3 \
-            --host 0.0.0.0 --port $PORT \
-            --served-model-name local \
-            --tensor-parallel-size 2 \
-            --max-model-len 131072 \
-            --dtype bfloat16 \
-            --kv-cache-dtype fp8 \
             --gpu-memory-utilization 0.90 \
             --language-model-only \
             --enable-chunked-prefill \
