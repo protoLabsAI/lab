@@ -4,14 +4,16 @@
 #
 # === Qwen 3.6 Dual-GPU Production Setup ===
 #   dual                              — start both models at once (recommended)
-#   GPU 0 (:8000) — qwen36-27b-fp8   — 27B FP8, thinking+planning, 256K
-#   GPU 1 (:8002) — qwen-36b-fast    — 35B FP8, NO thinking, fast execution, 131K
+#   GPU 0 (:8000) — qwen36-27b-fp8   — 27B FP8, thinking+planning, 225K (no MTP)
+#   GPU 1 (:8002) — gemma4-moe-fast  — Gemma 4 26B-A4B MoE FP8, instruct, 131K
 #
 # === Qwen 3.6 (Single GPU) ===
 #   qwen-36b-fp8       — Qwen3.6-35B-A3B MoE + on-the-fly FP8 (single GPU, 262K)
 #   qwen-36b-fast      — Qwen3.6-35B-A3B MoE FP8, NO thinking, fast execution (GPU 1, :8002, 131K)
+#   gemma4-moe-fast    — Gemma 4 26B-A4B MoE FP8, instruct mode (GPU 1, :8002, 131K, local-fast)
 #   qwen-36b-bf16      — Qwen3.6-35B-A3B MoE bf16 (single GPU, 64K)
 #   qwen36-27b-fp8     — Qwen3.6-27B FP8 official (single GPU, 256K)
+#   qwen36-27b-fp8-mtp — Qwen3.6-27B FP8 + MTP speculative decoding (single GPU, 131K)
 #
 # === Qwen 3.6 (TP=2) ===
 #   qwen-36b-tp2       — Qwen3.6-35B-A3B MoE bf16 (TP=2, 250K)
@@ -26,8 +28,10 @@
 #   gemma4-moe-fp8     — 26B-A4B MoE on-the-fly FP8 (175 tok/s, 128K)
 #   gemma4-31b         — 31B dense bf16, 65K FP8 KV (single GPU)
 #   gemma4-31b-fp8     — 31B dense on-the-fly FP8 (42 tok/s, 131K)
+#   gemma4-31b-fp8-mtp — 31B dense FP8 + MTP drafter 0.5B (4 spec tokens, 131K)
 #   gemma4-e4b         — E4B edge bf16, 128K (single GPU)
 #   gemma4-e4b-fp8     — E4B edge on-the-fly FP8 (128K)
+#   gemma4-moe-tp2     — Gemma 4 26B-A4B MoE FP8 TP=2 (131K, both GPUs)
 #   gemma4-31b-tp2     — Gemma 4 31B dense bf16 TP=2 (128K, FP8 KV)
 #
 # === Creative / Experimental ===
@@ -53,13 +57,13 @@ PREFIX_FLAGS="--enable-prefix-caching --mamba-cache-mode align --mamba-block-siz
 O3="-O3"
 usage() {
     echo "Qwen 3.6 (single GPU):"
-    echo "  $0 {qwen-36b-fp8|qwen-36b-bf16|qwen-36b-voice|qwen36-27b-fp8}"
+    echo "  $0 {qwen-36b-fp8|qwen-36b-bf16|qwen-36b-voice|qwen36-27b-fp8|qwen36-27b-fp8-mtp}"
     echo ""
     echo "Qwen3-Coder:"
     echo "  $0 {qwen3-coder-30b|qwen3-coder-next}"
     echo ""
     echo "Gemma 4:"
-    echo "  $0 {gemma4-moe|gemma4-moe-fp8|gemma4-31b|gemma4-31b-fp8|gemma4-e4b|gemma4-e4b-fp8}"
+    echo "  $0 {gemma4-moe|gemma4-moe-fp8|gemma4-31b|gemma4-31b-fp8|gemma4-31b-fp8-mtp|gemma4-e4b|gemma4-e4b-fp8}"
     echo ""
     echo "Creative / Experimental:"
     echo "  $0 {cydonia-24b|cydonia-24b-mtp|llama-70b|llama-8b|hermes-70b|context-1|context-1-gpu1}"
@@ -134,7 +138,8 @@ wait_ready_voice() {
 [[ $# -lt 1 ]] && usage
 # Voice/dual configs manage their own stop — don't kill blindly
 case "$1" in
-    qwen-36b-fast) ;; # fast only touches GPU 1 / :8002
+    qwen-36b-fast)    ;; # fast only touches GPU 1 / :8002
+    gemma4-moe-fast)  ;; # fast only touches GPU 1 / :8002
     dual)            ;; # dual does stop_all itself
     mistral-medium-3.5) ;; # TP=2, needs both GPUs — stops all itself
     *) stop_vllm ;;
@@ -151,14 +156,14 @@ case "$1" in
         wait_ready
 
         echo ""
-        echo "Starting vllm-fast.service (35B MoE FP8, GPU 1, port ${VOICE_PORT})..."
+        echo "Starting vllm-fast.service (Gemma 4 26B MoE FP8, GPU 1, port ${VOICE_PORT})..."
         sudo systemctl start vllm-fast
         wait_ready_voice
 
         echo ""
         echo "=== Both models ready ==="
         echo "  GPU 0 :${PORT}        — local       (27B FP8, thinking)"
-        echo "  GPU 1 :${VOICE_PORT}  — local-fast   (35B MoE FP8, no thinking)"
+        echo "  GPU 1 :${VOICE_PORT}  — local-fast   (Gemma 4 26B MoE FP8, instruct)"
         exit 0
         ;;
     qwen-36b-fast)
@@ -187,6 +192,31 @@ case "$1" in
                 --async-scheduling \
                 --performance-mode interactivity \
                 $PREFIX_FLAGS \
+                >> "${LOG_DIR}/vllm-voice.log" 2>&1
+        ) &
+        wait_ready_voice
+        exit 0
+        ;;
+    gemma4-moe-fast)
+        echo "Starting Gemma 4 26B-A4B MoE FP8 (GPU 1, port ${VOICE_PORT}, 131K, local-fast)..."
+        stop_vllm_voice
+        (
+            export CUDA_VISIBLE_DEVICES=1
+            exec $VLLM_BIN serve google/gemma-4-26B-A4B-it \
+                $O3 \
+                --host 0.0.0.0 --port $VOICE_PORT \
+                --served-model-name local-fast \
+                --max-model-len 131072 \
+                --dtype bfloat16 \
+                --quantization fp8 \
+                --gpu-memory-utilization 0.72 \
+                --language-model-only \
+                --enable-chunked-prefill \
+                --enable-prefix-caching \
+                --async-scheduling \
+                --generation-config auto \
+                --enable-auto-tool-choice --tool-call-parser gemma4 \
+                --reasoning-parser gemma4 \
                 >> "${LOG_DIR}/vllm-voice.log" 2>&1
         ) &
         wait_ready_voice
@@ -364,6 +394,26 @@ case "$1" in
             --reasoning-parser gemma4 \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
+    gemma4-31b-fp8-mtp)
+        echo "Starting Gemma 4 31B + on-the-fly FP8 + MTP drafter (GPU 0, 131K, 4 spec tokens)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve google/gemma-4-31B-it \
+            $O3 \
+            --host 0.0.0.0 --port $PORT \
+            --served-model-name local \
+            --max-model-len 131072 \
+            --dtype bfloat16 \
+            --quantization fp8 \
+            --gpu-memory-utilization 0.92 \
+            --language-model-only \
+            --enable-chunked-prefill \
+            --enable-prefix-caching \
+            --async-scheduling \
+            --generation-config auto \
+            --enable-auto-tool-choice --tool-call-parser gemma4 \
+            --reasoning-parser gemma4 \
+            --speculative-config '{"model": "google/gemma-4-31B-it-assistant", "num_speculative_tokens": 4}' \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
     gemma4-e4b)
         echo "Starting Gemma 4 E4B dense bf16 (GPU 0, 128K)..."
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve google/gemma-4-E4B-it \
@@ -479,6 +529,22 @@ case "$1" in
             $PREFIX_FLAGS \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
+    qwen36-27b-fp8-mtp)
+        echo "Starting Qwen3.6-27B FP8 + MTP (GPU 0, 131K, thinking/planning)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.6-27B-FP8 \
+            $O3 \
+            --host 0.0.0.0 --port $PORT \
+            --served-model-name local \
+            --max-model-len 131072 \
+            --max-num-seqs 512 \
+            --reasoning-parser qwen3 \
+            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
+            --gpu-memory-utilization 0.90 \
+            --enable-chunked-prefill \
+            $PREFIX_FLAGS \
+            --speculative-config '{"method": "mtp", "num_speculative_tokens": 1}' \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
     # ─── Dual GPU configs (TP=2) ───────────────────────────────────
     # NCCL_P2P_DISABLE=1 required for stable CUDA graphs on Blackwell PCIe
     # (ACS on PCIe bridges corrupts P2P during graph replay)
@@ -520,6 +586,28 @@ case "$1" in
             --disable-custom-all-reduce \
             --enable-chunked-prefill \
             --enable-prefix-caching \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+    gemma4-moe-tp2)
+        echo "Starting Gemma 4 26B-A4B MoE FP8 (TP=2, 131K, both GPUs)..."
+        NCCL_P2P_DISABLE=1 \
+        NCCL_CUMEM_ENABLE=0 \
+        $VLLM_BIN serve google/gemma-4-26B-A4B-it \
+            --host 0.0.0.0 --port $PORT \
+            --served-model-name local-fast \
+            --tensor-parallel-size 2 \
+            --max-model-len 131072 \
+            --dtype bfloat16 \
+            --quantization fp8 \
+            --gpu-memory-utilization 0.90 \
+            --language-model-only \
+            --enable-chunked-prefill \
+            --enable-prefix-caching \
+            --async-scheduling \
+            --generation-config auto \
+            --disable-custom-all-reduce \
+            --enable-auto-tool-choice --tool-call-parser gemma4 \
+            --reasoning-parser gemma4 \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
     gemma4-31b-tp2)
