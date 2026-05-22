@@ -53,3 +53,7 @@ unsloth_compiled_cache/
 
 # Claude Code harness transient state
 .claude/scheduled_tasks.lock
+
+# Local agent state — never commit
+.proto/
+.beads/
