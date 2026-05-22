@@ -159,11 +159,13 @@ case "$1" in
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
     qwen-0.8b-base)
-        echo "Qwen3.5-0.8B (800M, bf16, chat-tuned, 262K ctx, multimodal native)"
+        echo "Qwen3.5-0.8B (800M, bf16, chat-tuned, 262K ctx, multimodal native, hybrid Mamba)"
         $VLLM_BIN serve Qwen/Qwen3.5-0.8B \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
             --max-model-len 16384 --dtype bfloat16 \
             --language-model-only \
+            --max-num-seqs 256 \
+            --enable-prefix-caching --mamba-cache-mode align --mamba-block-size 8 \
             --gpu-memory-utilization 0.10 \
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
@@ -178,11 +180,13 @@ case "$1" in
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
     qwen-2b-base)
-        echo "Qwen3.5-2B (2B, bf16, chat-tuned, 262K ctx)"
+        echo "Qwen3.5-2B (2B, bf16, chat-tuned, 262K ctx, hybrid Mamba)"
         $VLLM_BIN serve Qwen/Qwen3.5-2B \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
             --max-model-len 16384 --dtype bfloat16 \
             --language-model-only \
+            --max-num-seqs 256 \
+            --enable-prefix-caching --mamba-cache-mode align --mamba-block-size 8 \
             --gpu-memory-utilization 0.14 \
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
@@ -282,32 +286,38 @@ case "$1" in
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
     qwen-4b)
-        echo "Qwen3.5-4B (4B, bf16, chat-tuned, 262K ctx)"
+        echo "Qwen3.5-4B (4B, bf16, chat-tuned, 262K ctx, hybrid Mamba)"
         $VLLM_BIN serve Qwen/Qwen3.5-4B \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
             --max-model-len 16384 --dtype bfloat16 \
             --language-model-only \
+            --max-num-seqs 256 \
+            --enable-prefix-caching --mamba-cache-mode align --mamba-block-size 8 \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.18 \
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
     qwen-4b-fp8)
-        echo "Qwen3.5-4B + on-the-fly FP8"
+        echo "Qwen3.5-4B + on-the-fly FP8 (hybrid Mamba)"
         $VLLM_BIN serve Qwen/Qwen3.5-4B \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
             --max-model-len 16384 --dtype bfloat16 --quantization fp8 \
             --language-model-only \
+            --max-num-seqs 256 \
+            --enable-prefix-caching --mamba-cache-mode align --mamba-block-size 8 \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.14 \
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
     qwen-4b-int4)
-        echo "Qwen3.5-4B-Instruct-AWQ (4B INT4)"
+        echo "Qwen3.5-4B-Instruct-AWQ (4B INT4, hybrid Mamba)"
         $VLLM_BIN serve Qwen/Qwen3.5-4B-Instruct-AWQ \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
             --max-model-len 16384 \
+            --max-num-seqs 256 \
+            --enable-prefix-caching --mamba-cache-mode align --mamba-block-size 8 \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.10 \
@@ -323,22 +333,26 @@ case "$1" in
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
     qwen-9b)
-        echo "Qwen3.5-9B (9B, bf16, 262K ctx)  — NOTE: needs protolabs/fast trim for headroom"
+        echo "Qwen3.5-9B (9B, bf16, 262K ctx, hybrid Mamba) — NOTE: needs protolabs/fast trim"
         $VLLM_BIN serve Qwen/Qwen3.5-9B \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
             --max-model-len 16384 --dtype bfloat16 \
             --language-model-only \
+            --max-num-seqs 256 \
+            --enable-prefix-caching --mamba-cache-mode align --mamba-block-size 8 \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.28 \
             >> "${LOG_DIR}/bench-serve.log" 2>&1 &
         ;;
     qwen-9b-fp8)
-        echo "Qwen3.5-9B + on-the-fly FP8"
+        echo "Qwen3.5-9B + on-the-fly FP8 (hybrid Mamba)"
         $VLLM_BIN serve Qwen/Qwen3.5-9B \
             --host 0.0.0.0 --port $BENCH_PORT --served-model-name local-bench \
             --max-model-len 16384 --dtype bfloat16 --quantization fp8 \
             --language-model-only \
+            --max-num-seqs 256 \
+            --enable-prefix-caching --mamba-cache-mode align --mamba-block-size 8 \
             --reasoning-parser qwen3 \
             --enable-auto-tool-choice --tool-call-parser qwen3_xml \
             --gpu-memory-utilization 0.18 \
