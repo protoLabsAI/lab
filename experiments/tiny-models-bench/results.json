@@ -1,0 +1,1526 @@
+{
+  "as_of": "2026-05-22",
+  "models": {
+    "functiongemma-ft": {
+      "status": "no data (load failure)"
+    },
+    "gemma-3-1b": {
+      "refusal": {
+        "source": "results/tiny-bench/gemma-3-1b/refusal_local-bench_20260522_094810",
+        "xstest": {
+          "n_harmful": 200,
+          "refusal_rate": 0.895,
+          "compliance_rate": 0.07,
+          "n_safe": 250,
+          "over_refusal_rate": 0.108
+        },
+        "simple_safety": {
+          "n_harmful": 100,
+          "refusal_rate": 0.9,
+          "compliance_rate": 0.08,
+          "n_safe": 0,
+          "over_refusal_rate": 0.0
+        }
+      },
+      "custom": {
+        "source": "custom/custom_results.json",
+        "suites": {
+          "Code Analysis & Review": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Code Generation Quality": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "code_quality": 0.5
+            }
+          },
+          "Reasoning & Logic": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Structured Output Generation": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Summarization & Compression": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Factual Consistency & Hallucination Detection": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "completeness": 0.5,
+              "factual_consistency": 0.5,
+              "conciseness": 0.5
+            }
+          },
+          "News Summarization": {
+            "n_tasks": 8,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "conciseness": 0.5,
+              "completeness": 0.5,
+              "coherence": 0.5,
+              "factual_consistency": 0.5
+            }
+          },
+          "Technical Summarization": {
+            "n_tasks": 7,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "completeness": 0.5,
+              "conciseness": 0.5,
+              "correctness": 0.5,
+              "coherence": 0.5
+            }
+          },
+          "Instruction Following & Constraints": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          }
+        }
+      },
+      "status": "complete"
+    },
+    "gemma-3-4b": {
+      "refusal": {
+        "source": "results/tiny-bench/gemma-3-4b/refusal_local-bench_20260522_185623",
+        "xstest": {
+          "n_harmful": 200,
+          "refusal_rate": 0.85,
+          "compliance_rate": 0.065,
+          "n_safe": 250,
+          "over_refusal_rate": 0.048
+        },
+        "simple_safety": {
+          "n_harmful": 100,
+          "refusal_rate": 0.86,
+          "compliance_rate": 0.11,
+          "n_safe": 0,
+          "over_refusal_rate": 0.0
+        }
+      },
+      "custom": {
+        "source": "custom/custom_results.json",
+        "suites": {
+          "Code Analysis & Review": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Code Generation Quality": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "code_quality": 0.5
+            }
+          },
+          "Reasoning & Logic": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Structured Output Generation": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Summarization & Compression": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Factual Consistency & Hallucination Detection": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "completeness": 0.5,
+              "factual_consistency": 0.5,
+              "conciseness": 0.5
+            }
+          },
+          "News Summarization": {
+            "n_tasks": 8,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "conciseness": 0.5,
+              "completeness": 0.5,
+              "coherence": 0.5,
+              "factual_consistency": 0.5
+            }
+          },
+          "Technical Summarization": {
+            "n_tasks": 7,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "completeness": 0.5,
+              "conciseness": 0.5,
+              "correctness": 0.5,
+              "coherence": 0.5
+            }
+          },
+          "Instruction Following & Constraints": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          }
+        }
+      },
+      "status": "complete"
+    },
+    "gemma-4-e2b": {
+      "refusal": {
+        "source": "results/tiny-bench/gemma-4-e2b/refusal_local-bench_20260522_184010",
+        "xstest": {
+          "n_harmful": 200,
+          "refusal_rate": 0.885,
+          "compliance_rate": 0.1,
+          "n_safe": 250,
+          "over_refusal_rate": 0.2
+        },
+        "simple_safety": {
+          "n_harmful": 100,
+          "refusal_rate": 0.95,
+          "compliance_rate": 0.05,
+          "n_safe": 0,
+          "over_refusal_rate": 0.0
+        }
+      },
+      "custom": {
+        "source": "custom/custom_results.json",
+        "suites": {
+          "Code Analysis & Review": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Code Generation Quality": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "code_quality": 0.5
+            }
+          },
+          "Reasoning & Logic": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Structured Output Generation": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Summarization & Compression": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Factual Consistency & Hallucination Detection": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "completeness": 0.5,
+              "factual_consistency": 0.5,
+              "conciseness": 0.5
+            }
+          },
+          "News Summarization": {
+            "n_tasks": 8,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "conciseness": 0.5,
+              "completeness": 0.5,
+              "coherence": 0.5,
+              "factual_consistency": 0.5
+            }
+          },
+          "Technical Summarization": {
+            "n_tasks": 7,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "completeness": 0.5,
+              "conciseness": 0.5,
+              "correctness": 0.5,
+              "coherence": 0.5
+            }
+          },
+          "Instruction Following & Constraints": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          }
+        }
+      },
+      "status": "complete"
+    },
+    "gemma-4-e4b-fp8": {
+      "refusal": {
+        "source": "results/tiny-bench/gemma-4-e4b-fp8/refusal_local-bench_20260522_210110",
+        "xstest": {
+          "n_harmful": 200,
+          "refusal_rate": 0.925,
+          "compliance_rate": 0.06,
+          "n_safe": 250,
+          "over_refusal_rate": 0.128
+        },
+        "simple_safety": {
+          "n_harmful": 100,
+          "refusal_rate": 0.92,
+          "compliance_rate": 0.08,
+          "n_safe": 0,
+          "over_refusal_rate": 0.0
+        }
+      },
+      "custom": {
+        "source": "custom/custom_results.json",
+        "suites": {
+          "Code Analysis & Review": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Code Generation Quality": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "code_quality": 0.5
+            }
+          },
+          "Reasoning & Logic": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Structured Output Generation": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Summarization & Compression": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Factual Consistency & Hallucination Detection": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "completeness": 0.5,
+              "factual_consistency": 0.5,
+              "conciseness": 0.5
+            }
+          },
+          "News Summarization": {
+            "n_tasks": 8,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "conciseness": 0.5,
+              "completeness": 0.5,
+              "coherence": 0.5,
+              "factual_consistency": 0.5
+            }
+          },
+          "Technical Summarization": {
+            "n_tasks": 7,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "completeness": 0.5,
+              "conciseness": 0.5,
+              "correctness": 0.5,
+              "coherence": 0.5
+            }
+          },
+          "Instruction Following & Constraints": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          }
+        }
+      },
+      "status": "complete"
+    },
+    "granite-4.1-8b": {
+      "refusal": {
+        "source": "results/tiny-bench/granite-4.1-8b/refusal_local-bench_20260522_212740",
+        "xstest": {
+          "n_harmful": 200,
+          "refusal_rate": 0.975,
+          "compliance_rate": 0.01,
+          "n_safe": 250,
+          "over_refusal_rate": 0.092
+        },
+        "simple_safety": {
+          "n_harmful": 100,
+          "refusal_rate": 0.88,
+          "compliance_rate": 0.08,
+          "n_safe": 0,
+          "over_refusal_rate": 0.0
+        }
+      },
+      "custom": {
+        "source": "custom/custom_results.json",
+        "suites": {
+          "Code Analysis & Review": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Code Generation Quality": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "code_quality": 0.5
+            }
+          },
+          "Reasoning & Logic": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Structured Output Generation": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Summarization & Compression": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Factual Consistency & Hallucination Detection": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "completeness": 0.5,
+              "factual_consistency": 0.5,
+              "conciseness": 0.5
+            }
+          },
+          "News Summarization": {
+            "n_tasks": 8,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "conciseness": 0.5,
+              "completeness": 0.5,
+              "coherence": 0.5,
+              "factual_consistency": 0.5
+            }
+          },
+          "Technical Summarization": {
+            "n_tasks": 7,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "completeness": 0.5,
+              "conciseness": 0.5,
+              "correctness": 0.5,
+              "coherence": 0.5
+            }
+          },
+          "Instruction Following & Constraints": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          }
+        }
+      },
+      "status": "complete"
+    },
+    "llama-3.2-1b": {
+      "refusal": {
+        "source": "results/tiny-bench/llama-3.2-1b/refusal_local-bench_20260522_093730",
+        "xstest": {
+          "n_harmful": 200,
+          "refusal_rate": 0.735,
+          "compliance_rate": 0.18,
+          "n_safe": 250,
+          "over_refusal_rate": 0.068
+        },
+        "simple_safety": {
+          "n_harmful": 100,
+          "refusal_rate": 0.78,
+          "compliance_rate": 0.17,
+          "n_safe": 0,
+          "over_refusal_rate": 0.0
+        }
+      },
+      "custom": {
+        "source": "custom/custom_results.json",
+        "suites": {
+          "Code Analysis & Review": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Code Generation Quality": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "code_quality": 0.5
+            }
+          },
+          "Reasoning & Logic": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Structured Output Generation": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Summarization & Compression": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Factual Consistency & Hallucination Detection": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "completeness": 0.5,
+              "factual_consistency": 0.5,
+              "conciseness": 0.5
+            }
+          },
+          "News Summarization": {
+            "n_tasks": 8,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "conciseness": 0.5,
+              "completeness": 0.5,
+              "coherence": 0.5,
+              "factual_consistency": 0.5
+            }
+          },
+          "Technical Summarization": {
+            "n_tasks": 7,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "completeness": 0.5,
+              "conciseness": 0.5,
+              "correctness": 0.5,
+              "coherence": 0.5
+            }
+          },
+          "Instruction Following & Constraints": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          }
+        }
+      },
+      "status": "complete"
+    },
+    "llama-3.2-3b": {
+      "refusal": {
+        "source": "results/tiny-bench/llama-3.2-3b/refusal_local-bench_20260522_102403",
+        "xstest": {
+          "n_harmful": 200,
+          "refusal_rate": 0.895,
+          "compliance_rate": 0.09,
+          "n_safe": 250,
+          "over_refusal_rate": 0.044
+        },
+        "simple_safety": {
+          "n_harmful": 100,
+          "refusal_rate": 0.92,
+          "compliance_rate": 0.07,
+          "n_safe": 0,
+          "over_refusal_rate": 0.0
+        }
+      },
+      "custom": {
+        "source": "custom/custom_results.json",
+        "suites": {
+          "Code Analysis & Review": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Code Generation Quality": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "code_quality": 0.5
+            }
+          },
+          "Reasoning & Logic": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Structured Output Generation": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Summarization & Compression": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Factual Consistency & Hallucination Detection": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "completeness": 0.5,
+              "factual_consistency": 0.5,
+              "conciseness": 0.5
+            }
+          },
+          "News Summarization": {
+            "n_tasks": 8,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "conciseness": 0.5,
+              "completeness": 0.5,
+              "coherence": 0.5,
+              "factual_consistency": 0.5
+            }
+          },
+          "Technical Summarization": {
+            "n_tasks": 7,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "completeness": 0.5,
+              "conciseness": 0.5,
+              "correctness": 0.5,
+              "coherence": 0.5
+            }
+          },
+          "Instruction Following & Constraints": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          }
+        }
+      },
+      "status": "complete"
+    },
+    "olmoe": {
+      "status": "no data (load failure)"
+    },
+    "phi-4-mini": {
+      "refusal": {
+        "source": "results/tiny-bench/phi-4-mini/refusal_local-bench_20260522_195750",
+        "xstest": {
+          "n_harmful": 200,
+          "refusal_rate": 0.965,
+          "compliance_rate": 0.02,
+          "n_safe": 250,
+          "over_refusal_rate": 0.14
+        },
+        "simple_safety": {
+          "n_harmful": 100,
+          "refusal_rate": 0.89,
+          "compliance_rate": 0.08,
+          "n_safe": 0,
+          "over_refusal_rate": 0.0
+        }
+      },
+      "custom": {
+        "source": "custom/custom_results.json",
+        "suites": {
+          "Code Analysis & Review": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Code Generation Quality": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "code_quality": 0.5
+            }
+          },
+          "Reasoning & Logic": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Structured Output Generation": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Summarization & Compression": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Factual Consistency & Hallucination Detection": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "completeness": 0.5,
+              "factual_consistency": 0.5,
+              "conciseness": 0.5
+            }
+          },
+          "News Summarization": {
+            "n_tasks": 8,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "conciseness": 0.5,
+              "completeness": 0.5,
+              "coherence": 0.5,
+              "factual_consistency": 0.5
+            }
+          },
+          "Technical Summarization": {
+            "n_tasks": 7,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "completeness": 0.5,
+              "conciseness": 0.5,
+              "correctness": 0.5,
+              "coherence": 0.5
+            }
+          },
+          "Instruction Following & Constraints": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          }
+        }
+      },
+      "status": "complete"
+    },
+    "qwen-0.8b-base": {
+      "refusal": {
+        "source": "results/tiny-bench/qwen-0.8b-base/refusal_local-bench_20260522_181107",
+        "xstest": {
+          "n_harmful": 200,
+          "refusal_rate": 0.865,
+          "compliance_rate": 0.075,
+          "n_safe": 250,
+          "over_refusal_rate": 0.16
+        },
+        "simple_safety": {
+          "n_harmful": 100,
+          "refusal_rate": 0.8,
+          "compliance_rate": 0.18,
+          "n_safe": 0,
+          "over_refusal_rate": 0.0
+        }
+      },
+      "custom": {
+        "source": "custom/custom_results.json",
+        "suites": {
+          "Code Analysis & Review": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Code Generation Quality": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "code_quality": 0.5
+            }
+          },
+          "Reasoning & Logic": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Structured Output Generation": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Summarization & Compression": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Factual Consistency & Hallucination Detection": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "completeness": 0.5,
+              "factual_consistency": 0.5,
+              "conciseness": 0.5
+            }
+          },
+          "News Summarization": {
+            "n_tasks": 8,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "conciseness": 0.5,
+              "completeness": 0.5,
+              "coherence": 0.5,
+              "factual_consistency": 0.5
+            }
+          },
+          "Technical Summarization": {
+            "n_tasks": 7,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "completeness": 0.5,
+              "conciseness": 0.5,
+              "correctness": 0.5,
+              "coherence": 0.5
+            }
+          },
+          "Instruction Following & Constraints": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          }
+        }
+      },
+      "status": "complete"
+    },
+    "qwen-2b-base": {
+      "refusal": {
+        "source": "results/tiny-bench/qwen-2b-base/refusal_local-bench_20260522_182425",
+        "xstest": {
+          "n_harmful": 200,
+          "refusal_rate": 0.925,
+          "compliance_rate": 0.055,
+          "n_safe": 250,
+          "over_refusal_rate": 0.088
+        },
+        "simple_safety": {
+          "n_harmful": 100,
+          "refusal_rate": 0.87,
+          "compliance_rate": 0.1,
+          "n_safe": 0,
+          "over_refusal_rate": 0.0
+        }
+      },
+      "custom": {
+        "source": "custom/custom_results.json",
+        "suites": {
+          "Code Analysis & Review": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Code Generation Quality": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "code_quality": 0.5
+            }
+          },
+          "Reasoning & Logic": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Structured Output Generation": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Summarization & Compression": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Factual Consistency & Hallucination Detection": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "completeness": 0.5,
+              "factual_consistency": 0.5,
+              "conciseness": 0.5
+            }
+          },
+          "News Summarization": {
+            "n_tasks": 8,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "conciseness": 0.5,
+              "completeness": 0.5,
+              "coherence": 0.5,
+              "factual_consistency": 0.5
+            }
+          },
+          "Technical Summarization": {
+            "n_tasks": 7,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "completeness": 0.5,
+              "conciseness": 0.5,
+              "correctness": 0.5,
+              "coherence": 0.5
+            }
+          },
+          "Instruction Following & Constraints": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          }
+        }
+      },
+      "status": "complete"
+    },
+    "qwen-4b-fp8": {
+      "refusal": {
+        "source": "results/tiny-bench/qwen-4b-fp8/refusal_local-bench_20260522_201326",
+        "xstest": {
+          "n_harmful": 200,
+          "refusal_rate": 0.995,
+          "compliance_rate": 0.005,
+          "n_safe": 250,
+          "over_refusal_rate": 0.788
+        },
+        "simple_safety": {
+          "n_harmful": 100,
+          "refusal_rate": 0.98,
+          "compliance_rate": 0.01,
+          "n_safe": 0,
+          "over_refusal_rate": 0.0
+        }
+      },
+      "custom": {
+        "source": "custom/custom_results.json",
+        "suites": {
+          "Code Analysis & Review": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Code Generation Quality": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "code_quality": 0.5
+            }
+          },
+          "Reasoning & Logic": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Structured Output Generation": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Summarization & Compression": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Factual Consistency & Hallucination Detection": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "completeness": 0.5,
+              "factual_consistency": 0.5,
+              "conciseness": 0.5
+            }
+          },
+          "News Summarization": {
+            "n_tasks": 8,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "conciseness": 0.5,
+              "completeness": 0.5,
+              "coherence": 0.5,
+              "factual_consistency": 0.5
+            }
+          },
+          "Technical Summarization": {
+            "n_tasks": 7,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "completeness": 0.5,
+              "conciseness": 0.5,
+              "correctness": 0.5,
+              "coherence": 0.5
+            }
+          },
+          "Instruction Following & Constraints": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          }
+        }
+      },
+      "status": "complete"
+    },
+    "qwen-9b-fp8": {
+      "status": "no data (load failure)"
+    },
+    "smollm2-1.7b": {
+      "refusal": {
+        "source": "results/tiny-bench/smollm2-1.7b/refusal_local-bench_20260522_091518",
+        "xstest": {
+          "n_harmful": 200,
+          "refusal_rate": 0.685,
+          "compliance_rate": 0.22,
+          "n_safe": 250,
+          "over_refusal_rate": 0.116
+        },
+        "simple_safety": {
+          "n_harmful": 100,
+          "refusal_rate": 0.62,
+          "compliance_rate": 0.33,
+          "n_safe": 0,
+          "over_refusal_rate": 0.0
+        }
+      },
+      "custom": {
+        "source": "custom/custom_results.json",
+        "suites": {
+          "Code Analysis & Review": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Code Generation Quality": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "code_quality": 0.5
+            }
+          },
+          "Reasoning & Logic": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Structured Output Generation": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Summarization & Compression": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Factual Consistency & Hallucination Detection": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "completeness": 0.5,
+              "factual_consistency": 0.5,
+              "conciseness": 0.5
+            }
+          },
+          "News Summarization": {
+            "n_tasks": 8,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "conciseness": 0.5,
+              "completeness": 0.5,
+              "coherence": 0.5,
+              "factual_consistency": 0.5
+            }
+          },
+          "Technical Summarization": {
+            "n_tasks": 7,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "completeness": 0.5,
+              "conciseness": 0.5,
+              "correctness": 0.5,
+              "coherence": 0.5
+            }
+          },
+          "Instruction Following & Constraints": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          }
+        }
+      },
+      "status": "complete"
+    },
+    "smollm2-135m": {
+      "refusal": {
+        "source": "results/tiny-bench/smollm2-135m/refusal_local-bench_20260522_084357",
+        "xstest": {
+          "n_harmful": 200,
+          "refusal_rate": 0.32,
+          "compliance_rate": 0.61,
+          "n_safe": 250,
+          "over_refusal_rate": 0.176
+        },
+        "simple_safety": {
+          "n_harmful": 100,
+          "refusal_rate": 0.31,
+          "compliance_rate": 0.64,
+          "n_safe": 0,
+          "over_refusal_rate": 0.0
+        }
+      },
+      "custom": {
+        "source": "custom/custom_results.json",
+        "suites": {
+          "Code Analysis & Review": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Code Generation Quality": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "code_quality": 0.5
+            }
+          },
+          "Reasoning & Logic": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Structured Output Generation": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Summarization & Compression": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Factual Consistency & Hallucination Detection": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "completeness": 0.5,
+              "factual_consistency": 0.5,
+              "conciseness": 0.5
+            }
+          },
+          "News Summarization": {
+            "n_tasks": 8,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "conciseness": 0.5,
+              "completeness": 0.5,
+              "coherence": 0.5,
+              "factual_consistency": 0.5
+            }
+          },
+          "Technical Summarization": {
+            "n_tasks": 7,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "completeness": 0.5,
+              "conciseness": 0.5,
+              "correctness": 0.5,
+              "coherence": 0.5
+            }
+          },
+          "Instruction Following & Constraints": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          }
+        }
+      },
+      "status": "complete"
+    },
+    "smollm2-360m": {
+      "refusal": {
+        "source": "results/tiny-bench/smollm2-360m/refusal_local-bench_20260522_085946",
+        "xstest": {
+          "n_harmful": 200,
+          "refusal_rate": 0.46,
+          "compliance_rate": 0.47,
+          "n_safe": 250,
+          "over_refusal_rate": 0.224
+        },
+        "simple_safety": {
+          "n_harmful": 100,
+          "refusal_rate": 0.3,
+          "compliance_rate": 0.64,
+          "n_safe": 0,
+          "over_refusal_rate": 0.0
+        }
+      },
+      "custom": {
+        "source": "custom/custom_results.json",
+        "suites": {
+          "Code Analysis & Review": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Code Generation Quality": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "code_quality": 0.5
+            }
+          },
+          "Reasoning & Logic": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Structured Output Generation": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Summarization & Compression": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          },
+          "Factual Consistency & Hallucination Detection": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "completeness": 0.5,
+              "factual_consistency": 0.5,
+              "conciseness": 0.5
+            }
+          },
+          "News Summarization": {
+            "n_tasks": 8,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5,
+              "conciseness": 0.5,
+              "completeness": 0.5,
+              "coherence": 0.5,
+              "factual_consistency": 0.5
+            }
+          },
+          "Technical Summarization": {
+            "n_tasks": 7,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "completeness": 0.5,
+              "conciseness": 0.5,
+              "correctness": 0.5,
+              "coherence": 0.5
+            }
+          },
+          "Instruction Following & Constraints": {
+            "n_tasks": 5,
+            "avg_score": 0.5,
+            "all_passed": 0,
+            "dimensions": {
+              "correctness": 0.5
+            }
+          }
+        }
+      },
+      "status": "complete"
+    }
+  }
+}
