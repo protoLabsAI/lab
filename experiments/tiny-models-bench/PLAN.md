@@ -37,7 +37,7 @@ Expanded 2026-05-22 after due-diligence sweep of the 2026 SLM/TLM landscape. Sou
 | | OLMoE-1B-7B-0125-Instruct | 1.3 B active / 6.9 B total MoE | `allenai/OLMoE-1B-7B-0125-Instruct` | bf16 | no — pull | Tiny-MoE counter-test (does the MTP-MoE penalty story extend?) |
 | **3–9B** | Gemma 4 E4B-it | 4.5 B eff / 8 B loaded | `google/gemma-4-E4B-it` | bf16 + on-the-fly FP8 | check disk | Apache 2.0; AI Core's upper edge model |
 | | Qwen3.6-4B | 4 B | local | INT4 + bf16 + on-the-fly FP8 | **yes** | Existing inventory, 3 quant variants |
-| | IBM Granite 4.1-8B-Instruct | 8 B | `ibm-granite/granite-4.1-8b-instruct` | bf16 + on-the-fly FP8 | no — pull | New 2026 release; IBM claims it matches 32 B MoE on enterprise tasks |
+| | IBM Granite 4.1 8B (FP8) | 8 B | `ibm-granite/granite-4.1-8b-fp8` | native FP8 | no — pull | New 2026 release; IBM claims it matches Granite 4.0-H-Small (32B-A9B MoE) on enterprise tasks |
 | | Qwen3.6-9B | 9 B | local | FP8 + bf16 | **yes** | Upper bound of "tiny" per user spec |
 | **Separate hardware** | BitNet b1.58 2B-4T | 2 B (1.58-bit) | `microsoft/BitNet-b1.58-2B-4T` | 1.58-bit native | no — pull | **CPU-only** via `bitnet.cpp`; doesn't run on GPU. Include as footnote table, not on vLLM. |
 
