@@ -66,13 +66,13 @@ Both vLLMs run as systemd services and auto-start on boot:
 | GPU | Service | Model | Port | Mode | tok/s |
 |-----|---------|-------|------|------|-------|
 | 0 | `vllm.service` | Qwen3.6-27B-FP8 | :8000 | thinking, 225K | ~50 (no MTP), ~73.6 (+MTP) |
-| 1 | `vllm-fast.service` | Qwen3.6-35B-A3B-uncensored-heretic-FP8 | :8002 | instruct, 262K | 199 |
+| 1 | `vllm-fast.service` | Gemma 4 26B-A4B MoE FP8 | :8002 | instruct, 131K | 199 |
 
-Gateway aliases: `protolabs/smart` → 27B (thinking + preserve_thinking), `protolabs/fast` → heretic 35B MoE (instruct).
+Gateway aliases: `protolabs/smart` → 27B (thinking + preserve_thinking), `protolabs/fast` → Gemma 4 26B MoE (instruct). The eval suite's LLM judges now route through `protolabs/fast` by default — no cloud spend on routine judge calls.
 
-vllm-fast lives alone on GPU 1 as of 2026-05-03 — ComfyUI was disabled when image-gen work moved to avaLab. KV pool **32.66 GiB** at `--gpu-memory-utilization 0.72 --max-model-len 262144` (max concurrency at full 256K: **6.36×**). Fish TTS (~19 GB) + qwen3-embed (~2 GB) co-resident; ~5 GB free cushion. KV math on this card: `pool = (96 × util) − 36`. Util floor before single-request OOM is ~0.40; util above 0.75 starts encroaching on Fish/embed headroom.
+vllm-fast lives alone on GPU 1 as of 2026-05-03 — ComfyUI was disabled when image-gen work moved to avaLab. Gemma 4 26B MoE FP8 at `--gpu-memory-utilization 0.72 --max-model-len 131072`. Fish TTS (~19 GB) + qwen3-embed (~2 GB) co-resident; ~5 GB free cushion. KV math on this card: roughly `pool = (96 × util) − model_size − overhead`. Util above ~0.75 starts encroaching on Fish/embed headroom.
 
-Heretic un-retired 2026-05-01. The HF model card recommends `logit_bias: {<think>:-100, </think>:-100}` to suppress thinking — that clamp causes 1-token role-marker garbage on prompts that engage the thinking pathway. Don't use it. The gateway's `_ThinkStripper` removes `<think>...</think>` post-emit (homelab-iac #26/#32/#35); no sample-time suppression needed. The HF README still recommends the broken workaround; update it before pointing others at this config.
+Fast-lane history (preserved for context): originally Qwen 35B MoE FP8 official → heretic-FP8 (un-retired briefly for uncensored prose, see [memory](file:///home/ava/.claude/projects/-home-ava-dev-lab/memory/project_brand_pivot.md)) → Gemma 4 26B MoE. The heretic HF card recommended a `logit_bias: {<think>:-100, </think>:-100}` clamp that corrupts generation — don't use, and ignore the HF README's workaround if you ever load that model. Gateway's `_ThinkStripper` (homelab-iac #26/#32/#35) handles `<think>...</think>` post-emit for any thinking-tagged model.
 
 Tuned MoE kernels in `models/moe-configs/` symlink into vLLM's `fused_moe/configs/` via `bash models/install-moe-configs.sh` (run after fresh vLLM installs / upgrades).
 
