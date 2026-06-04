@@ -1,6 +1,11 @@
-# protolabs fleet eval — function call channel reliability
-# Tests whether tool calls land in the tool_calls field (structured)
+# protoLabs fleet eval — function call channel reliability
+# Tests whether tool calls land in the structured tool_calls field
 # vs being emitted as text in content (the gina issue #1 failure mode).
+#
+# Graded DETERMINISTICALLY (graders/tool_channel.py): an LLM judge reading
+# serialized output cannot tell a structured tool_call from text and mislabels
+# correct tool-sourced answers as hallucinations. The channel is a property of
+# the trace (finish_reason / message.tool_calls), so we check it directly.
 
 id: fc_channel
 name: "Function Call Channel Reliability"
@@ -25,15 +30,11 @@ tests:
             properties: {}
     mock_tool_responses:
       current_time: '{"datetime": "2026-04-27T10:30:00-05:00", "timezone": "America/Chicago"}'
+    expected:
+      tools: [current_time]
     graders:
-      - type: llm_judge
+      - type: tool_channel
         dimension: channel_correctness
-        rubric: |
-          The model should call current_time via the structured tool_calls field.
-          Check the response format — did it use a proper function call or write XML/JSON in content?
-          1.0 = Used structured tool call (tool_calls field), got the time, reported it clearly
-          0.5 = Got the right answer but emitted the tool call as text (XML tags, JSON in content, or <tool_code>)
-          0.0 = Didn't call the tool at all, or hallucinated the time
 
   - id: pfc_002_tool_with_args
     prompt: "Search the web for 'vLLM Blackwell GPU support'"
@@ -51,14 +52,14 @@ tests:
             required: ["query"]
     mock_tool_responses:
       web_search: '{"results": [{"title": "vLLM 0.8.0 adds Blackwell support", "url": "https://blog.vllm.ai", "snippet": "Full CUDA 12.8 support for RTX PRO 6000 Blackwell GPUs"}]}'
+    expected:
+      tools: [web_search]
+      args:
+        web_search:
+          query: "blackwell"
     graders:
-      - type: llm_judge
+      - type: tool_channel
         dimension: channel_correctness
-        rubric: |
-          The model should call web_search with the query via structured tool_calls.
-          1.0 = Structured tool call with appropriate query argument, summarized results
-          0.5 = Emitted tool call as text/XML in content instead of tool_calls field
-          0.0 = Didn't search, or hallucinated results
 
   - id: pfc_003_multi_tool_selection
     prompt: "What's 234 * 567 and what time is it?"
@@ -93,14 +94,11 @@ tests:
     mock_tool_responses:
       calculator: '{"result": 132678}'
       current_time: '{"datetime": "2026-04-27T10:30:00-05:00"}'
+    expected:
+      tools: [calculator, current_time]
     graders:
-      - type: llm_judge
+      - type: tool_channel
         dimension: channel_correctness
-        rubric: |
-          Two tools needed (calculator + current_time), both via structured tool_calls.
-          1.0 = Both called via structured tool_calls, correct results reported
-          0.5 = One structured + one as text, or only one tool called
-          0.0 = Both as text in content, or neither called
 
   - id: pfc_004_tool_with_complex_args
     prompt: "Send an email to sarah@company.com about the GPU benchmark results. Subject: 'Benchmark Complete'. Body should mention 27B won quality and 35B won speed."
@@ -138,14 +136,16 @@ tests:
             required: ["to", "subject", "body"]
     mock_tool_responses:
       gmail_send_message: '{"status": "sent", "message_id": "msg_abc123"}'
+    expected:
+      tools: [gmail_send_message]
+      forbidden_tools: [gmail_draft]
+      args:
+        gmail_send_message:
+          to: "sarah@company.com"
+          body: ["27B", "35B"]
     graders:
-      - type: llm_judge
+      - type: tool_channel
         dimension: channel_correctness
-        rubric: |
-          Model should call gmail_send_message with all three args populated correctly.
-          1.0 = Structured tool call with to=sarah@company.com, subject about benchmark, body mentioning 27B/35B results
-          0.5 = Structured call but missing/wrong args, or emitted as text
-          0.0 = Didn't call the tool, or used gmail_draft instead of gmail_send_message
 
   - id: pfc_005_no_tool_needed
     prompt: "Thanks, that's all I needed!"
@@ -177,11 +177,8 @@ tests:
               query:
                 type: string
             required: ["query"]
+    expected:
+      no_tool: true
     graders:
-      - type: llm_judge
+      - type: tool_channel
         dimension: channel_correctness
-        rubric: |
-          The user is saying goodbye — no tool should be called.
-          1.0 = Friendly sign-off with NO tool calls
-          0.5 = Friendly sign-off but unnecessarily called a tool
-          0.0 = Ignored the farewell and called multiple tools
