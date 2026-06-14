@@ -15,6 +15,10 @@ import time
 import os
 
 os.environ.setdefault("HF_HOME", "/mnt/models/huggingface")
+# Use the expandable allocator so transient activation peaks (big embed batches) are
+# returned to the driver instead of being held as fragmented reserve. Must be set
+# before torch is imported. (2026-06-14: paired with MAX_BATCH to stop ~6 GB creep.)
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
 import numpy as np
 import torch
@@ -30,6 +34,13 @@ _model = None
 _tokenizer = None
 _model_name = None
 _device = None
+
+# Cap the internal forward-pass batch. Attention activations scale ~batch*seqlen^2;
+# an uncapped large request (e.g. 32 x 2048 tok) spikes several GB that PyTorch's
+# caching allocator then reserves forever. Chunking bounds the peak; empty_cache()
+# after each request returns the transient reserve to the driver (2026-06-14:
+# this was leaving ~6.4 GB resident for a 0.6 B model and starving the GPU-1 fast lane).
+MAX_BATCH = 8
 
 
 class EmbedRequest(BaseModel):
@@ -57,37 +68,43 @@ class RerankResponse(BaseModel):
 
 
 def _encode(texts: list[str], max_length: int = 2048) -> np.ndarray:
-    """Encode texts to normalized embeddings."""
-    inputs = _tokenizer(
-        texts, padding=True, truncation=True, max_length=max_length,
-        return_tensors="pt",
-    ).to(_device)
-
-    with torch.no_grad():
-        outputs = _model(**inputs)
-        # Use last hidden state at EOS token position
-        embeddings = outputs.last_hidden_state[:, -1, :]
-
-    # Normalize
-    embeddings = torch.nn.functional.normalize(embeddings, p=2, dim=1)
-    return embeddings.cpu().float().numpy()
+    """Encode texts to normalized embeddings (batched to bound activation peak)."""
+    out = []
+    for i in range(0, len(texts), MAX_BATCH):
+        chunk = texts[i:i + MAX_BATCH]
+        inputs = _tokenizer(
+            chunk, padding=True, truncation=True, max_length=max_length,
+            return_tensors="pt",
+        ).to(_device)
+        with torch.no_grad():
+            outputs = _model(**inputs)
+            # Use last hidden state at EOS token position
+            embeddings = outputs.last_hidden_state[:, -1, :]
+        embeddings = torch.nn.functional.normalize(embeddings, p=2, dim=1)
+        out.append(embeddings.cpu().float().numpy())
+    if _device == "cuda":
+        torch.cuda.empty_cache()
+    return np.concatenate(out, axis=0) if out else np.empty((0, _model.config.hidden_size))
 
 
 def _rerank_score(query: str, documents: list[str]) -> list[float]:
     """Score query-document pairs for reranking."""
     pairs = [[query, doc] for doc in documents]
-    # Tokenize as pairs
-    inputs = _tokenizer(
-        pairs, padding=True, truncation=True, max_length=2048,
-        return_tensors="pt",
-    ).to(_device)
-
-    with torch.no_grad():
-        outputs = _model(**inputs)
-        # Use CLS/last token logit as relevance score
-        scores = outputs.last_hidden_state[:, -1, 0]  # First dim of last token
-
-    return scores.cpu().float().tolist()
+    scores = []
+    for i in range(0, len(pairs), MAX_BATCH):
+        chunk = pairs[i:i + MAX_BATCH]
+        inputs = _tokenizer(
+            chunk, padding=True, truncation=True, max_length=2048,
+            return_tensors="pt",
+        ).to(_device)
+        with torch.no_grad():
+            outputs = _model(**inputs)
+            # Use CLS/last token logit as relevance score
+            s = outputs.last_hidden_state[:, -1, 0]  # First dim of last token
+        scores.extend(s.cpu().float().tolist())
+    if _device == "cuda":
+        torch.cuda.empty_cache()
+    return scores
 
 
 @app.post("/v1/embeddings")

@@ -1,0 +1,4 @@
+# reproducible via fetch_refs.py (Reddit WritingPrompts) — don't vendor the human corpus
+data/
+# serve/fetch logs
+out/*.log
