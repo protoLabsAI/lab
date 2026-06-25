@@ -144,6 +144,28 @@ fix. (3) claw stage hung on judging — use `--skip-claw` for a fast custom+FC q
 Draft captured as **[protoContent#332](https://github.com/protoLabsAI/protoContent/issues/332)**
 ("A +51% speed win that vanished under load") — `blog` label, status draft.
 
+## REVERTED to MTP (2026-06-25 21:57) — live traffic settled it
+
+After shipping dFlash, characterized the smart lane's *actual* traffic via Prometheus on ava
+(`100.101.189.45:9090`): `vllm:num_requests_running{model="local"}` + LiteLLM gateway metrics
+(`litellm_*`, per-deployment / user_agent attribution).
+
+- **30-day distribution:** lane idle 90.6% of wall time, but **of busy time, 65% is concurrent (≥2)**,
+  49% ≥4, peak 47. Identical excluding the test day (not an artifact of our load).
+- **Gateway attribution:** real smart-tier demand is low-volume (~2k req: `protolabs/smart` 318 +
+  `protolabs/reasoning` 1706), nearly all one key (`studio-gw`), driven by real agents — langchainjs,
+  protoAgent, Jon, QwenCode. Little's-law avg concurrency for that gateway traffic ~0.02.
+- **The decider — live capture during a real QwenCode + parallel-agent run:** smart lane sat at
+  **running 4–8, waiting 18–24** sustained, single-stream <5% of samples. The "parallel agents in the
+  back" = N simultaneous in-flight requests = vLLM continuous batching = concurrency 6–8. This is
+  dFlash's worst regime (plateaus ~458–540 while MTP does ~545–984 at C8–16). When the lane is
+  actually working hard, it's concurrent; the single-stream case dFlash optimizes barely occurs.
+
+**Conclusion:** dFlash optimizes the rare case and penalizes the common one (parallel-agent fan-out).
+Reverted `vllm.service` to MTP (restored backup unit → daemon-reload → restart; drained the lane to
+~0 first to avoid killing in-flight agent requests). MTP verified up: coherence + tool-call clean.
+**dFlash kept as a one-command swap-in** for any genuinely single-stream lane (draft cached).
+
 ## Repro
 
 ```bash
