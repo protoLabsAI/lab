@@ -39,11 +39,16 @@ validate.sh     serve + acceptance + tok/s + eval    (off-gateway; lossless chec
 
 ## Results so far
 
-First run (**Ornith-1.0-9B**, 2026-06-27): the **graft alone wins** — Qwen3.5-9B's head
-transfers at **0.763 acceptance / ~111 tok/s (+49%), lossless**, overturning the
-"transplant collapses" assumption (Ornith is a light fine-tune). Distillation v1 *regressed*
-it (0.721) — next iteration gated on `eval_head.py` forward-parity diagnosis. Full honest
-writeup + numbers: [`runs/ornith-9b/RESULTS.md`](runs/ornith-9b/RESULTS.md),
+First run (**Ornith-1.0-9B**, 2026-06-27):
+- **Graft (free, zero training)**: Qwen3.5-9B's head transfers at **0.74–0.76 acceptance /
+  ~117 tok/s (+49–57%), lossless** — overturning the "transplant collapses" assumption
+  (Ornith is a light fine-tune). Ship this as the floor.
+- **Distill, hard CE**: *regressed* (0.69) — wrong objective (over-sharpens argmax, hurts
+  calibration; acceptance is rejection-sampling, which rewards distribution match).
+- **Distill, KL distribution-match** (`loss: kl`): **beats the graft — 0.762/0.765, ~121
+  tok/s**. The shippable head. Lesson: match the target's distribution, don't fit its tokens.
+
+Full writeup + numbers: [`runs/ornith-9b/RESULTS.md`](runs/ornith-9b/RESULTS.md),
 draft post: [`runs/ornith-9b/BLOG.md`](runs/ornith-9b/BLOG.md).
 
 Per-target settings live in `configs/<name>.yaml`; outputs/results in `runs/<name>/`.

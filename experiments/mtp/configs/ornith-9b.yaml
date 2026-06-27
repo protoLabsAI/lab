@@ -39,6 +39,8 @@ distill:
   epochs: 1
   lr: 5.0e-5
   warmup_ratio: 0.05
+  loss: kl          # v2: distribution-match to the target (v1 hard-CE regressed the graft)
+  kl_temp: 1.0      # KD temperature; try 0.7 to match serving sampling temp
   batch_tokens: 16384                        # tokens per step (grad-accum to hit this)
   max_seq_len: 2048
   weight_decay: 0.0

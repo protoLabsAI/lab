@@ -63,14 +63,39 @@ The practical upshot: **for any light fine-tune of a base that ships an MTP head
 graft first.** It's free, it's lossless, and here it captured ~97% of the native
 acceptance with no data and no training.
 
-## What didn't work (yet)
+## Distilling to beat it: the objective is everything
 
-We also distilled the grafted head on Ornith's own generations (self-distillation — no
-external data) to try to beat the graft. It *regressed* it (0.763 → 0.721), despite training
-loss dropping cleanly. Optimizing our training-time forward moved the head away from a
-strong initialization — a sign the training objective and vLLM's serving forward aren't
-yet bit-for-bit aligned. When your initialization is already this good, "just fine-tune it"
-is a way to make it worse. That's the next iteration; the graft ships as-is.
+We then distilled the grafted head on Ornith's own generations (self-distillation — no
+external data) to push past the graft. The first attempt **made it worse** — 0.74 → 0.69 —
+even though the training loss dropped cleanly.
+
+The diagnostics were the interesting part. We ruled out the usual suspects by testing each:
+not a rope position offset (uniform shifts cancel), not the hidden-state choice (post-norm
+beat pre-norm), not precision (bf16 == fp32), not prompt distribution (it regressed
+in-distribution too). An offline greedy proxy told the story: the distilled head's *argmax*
+accuracy shot **up** (0.71 → 0.87) while its served acceptance went **down**.
+
+That gap is the whole lesson. We trained with hard cross-entropy on the model's sampled
+tokens, which sharpens the head's argmax — but speculative-decode acceptance is **rejection
+sampling against the target's distribution**. It rewards a draft distribution that *matches
+the target*, not a confident top-1. Hard CE over-sharpened a head that was already well
+calibrated, and calibration is what acceptance pays for.
+
+So we changed one thing: the loss. Train the head with **KL divergence to the target's own
+next-token distribution** (its prediction of the next-next token — literally what the
+verifier compares against), not the hard token. Same data, same steps, same learning rate.
+
+| Head | Accept (coding) | Accept (corpus) | tok/s |
+|---|:---:|:---:|:---:|
+| Graft (free) | 0.763 | 0.742 | ~117 |
+| Distill, hard CE | 0.721 | 0.691 | ~98 |
+| **Distill, KL** | **0.765** | **0.762** | **~121** |
+
+KL distillation recovers the regression and edges past the graft on both distributions. The
+gain over the (already excellent) graft is modest — we're near the native Qwen3.5-9B+MTP
+ceiling of ~0.79 — but the **direction** is the reusable result: for re-aligning an MTP head,
+match the target's distribution, don't fit its tokens. The wrong objective doesn't just fail
+to help; it actively hurts.
 
 ## Reproduce
 

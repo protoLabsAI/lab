@@ -195,6 +195,8 @@ def main() -> int:
     d = cfg["distill"]
     device = "cuda"
     head_dtype = getattr(torch, d.get("head_dtype", "bfloat16"))
+    loss_type = d.get("loss", "ce")            # "kl" = distribution-match to target (recommended)
+    kl_temp = float(d.get("kl_temp", 1.0))     # KD temperature (try 0.7 to match serving temp)
 
     print(f"[distill] base={d['base_ckpt']}  out={d['out']}")
     config = AutoConfig.from_pretrained(d["base_ckpt"])
@@ -261,9 +263,23 @@ def main() -> int:
 
             out = head(text_model, next_ids, hid.to(torch.float32), mask)
             logits = F.linear(out, lm_head.weight.to(out.dtype))
-            loss = F.cross_entropy(
-                logits.reshape(-1, logits.size(-1)), labels.reshape(-1), ignore_index=-100
-            )
+
+            if loss_type == "kl":
+                # Distribution-matching: teacher = base's next-token dist at position t+shift
+                # (its prediction of tok_{t+shift+1}) -- exactly what vLLM's verifier compares
+                # the draft against. Maximizing acceptance == matching this distribution, NOT
+                # the hard sampled token (which over-sharpens; see runs/ornith-9b/RESULTS.md).
+                with torch.no_grad():
+                    teacher_logits = F.linear(
+                        base_hidden[:, shift : T - 1, :].to(out.dtype), lm_head.weight.to(out.dtype)
+                    )
+                s = F.log_softmax(logits[comp_mask] / kl_temp, dim=-1)
+                t = F.softmax(teacher_logits[comp_mask] / kl_temp, dim=-1)
+                loss = F.kl_div(s, t, reduction="batchmean") * (kl_temp * kl_temp)
+            else:
+                loss = F.cross_entropy(
+                    logits.reshape(-1, logits.size(-1)), labels.reshape(-1), ignore_index=-100
+                )
             (loss / accum).backward()
             running += loss.item()
             micro += 1

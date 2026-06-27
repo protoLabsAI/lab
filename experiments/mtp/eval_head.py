@@ -39,6 +39,12 @@ def main() -> int:
     ap.add_argument("--config", required=True)
     ap.add_argument("--ckpt", required=True, help="checkpoint whose mtp.* head to evaluate")
     ap.add_argument("--n", type=int, default=200, help="number of corpus samples to score")
+    ap.add_argument("--hidden", choices=["post", "pre"], default="post",
+                    help="which base hidden to feed the head: post-final-norm (model return) "
+                         "or pre-final-norm residual stream (captured before model.norm). "
+                         "Whichever gives the GRAFT head a higher proxy is what vLLM serves.")
+    ap.add_argument("--proxy-dtype", choices=["float32", "bfloat16"], default="float32",
+                    help="run the head + lm_head at this precision (bfloat16 mirrors vLLM serving)")
     args = ap.parse_args()
 
     cfg = yaml.safe_load(open(args.config))
@@ -56,19 +62,28 @@ def main() -> int:
         p.requires_grad_(False)
     text_model, lm_head = find_base_parts(base)
 
-    head = MTPHead(config, d["full_attention_layer_idx"]).to(device=device, dtype=torch.float32).eval()
+    pdtype = getattr(torch, args.proxy_dtype)
+    head = MTPHead(config, d["full_attention_layer_idx"]).to(device=device, dtype=pdtype).eval()
     load_head_init(head, args.ckpt)  # the head under test (graft init or distilled)
 
     exs = build_examples(cfg["corpus"]["out"], tokenizer, d["max_seq_len"], limit=args.n)
     shift = d.get("position_shift", 1)
     print(f"[eval_head] ckpt={args.ckpt}  scoring {len(exs)} samples (shift={shift})")
 
+    # optional pre-final-norm capture (the residual stream feeding model.norm)
+    cap = {}
+    hook = None
+    if args.hidden == "pre":
+        hook = text_model.norm.register_forward_pre_hook(
+            lambda m, a: cap.__setitem__("h", a[0])
+        )
+
     match = total = 0
     with torch.no_grad():
         for i in range(len(exs)):
             input_ids, attn, comp_start = collate(exs[i:i+1], pad_id, device)
-            base_hidden = text_model(input_ids=input_ids, attention_mask=attn,
-                                     use_cache=False).last_hidden_state
+            out_obj = text_model(input_ids=input_ids, attention_mask=attn, use_cache=False)
+            base_hidden = cap["h"] if args.hidden == "pre" else out_obj.last_hidden_state
             B, T, H = base_hidden.shape
             hid = base_hidden[:, : T - (shift + 1), :]
             next_ids = input_ids[:, shift : T - 1]
@@ -77,7 +92,7 @@ def main() -> int:
             col = torch.arange(T - (shift + 1), device=device).unsqueeze(0)
             comp_mask = (col >= (comp_start.unsqueeze(1) - shift)) & (mask.bool())
 
-            out = head(text_model, next_ids, hid.to(torch.float32), mask)
+            out = head(text_model, next_ids, hid.to(pdtype), mask)
             logits = F.linear(out, lm_head.weight.to(out.dtype))
             pred = logits.argmax(-1)
             m = comp_mask
