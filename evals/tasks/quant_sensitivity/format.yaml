@@ -1,0 +1,39 @@
+id: quant_format
+name: "Quant-sensitivity — format precision"
+difficulty: easy
+category: quant_sensitivity
+# Precise structured output. Quant degradation tends to break exact structure (missing
+# brace, wrong key, dropped delimiter) before it breaks fluent prose. all_of gives partial
+# credit per required fragment so a near-miss reads as a partial drop, not a binary fail.
+
+tests:
+  - id: qf_json_001
+    prompt: |
+      Output a single JSON object with exactly two keys: "status" set to the string "ok",
+      and "code" set to the number 200. Output only the JSON, no prose, no code fence.
+    graders:
+      - type: match
+        dimension: format
+        mode: all_of
+        expected: ['"status"', '"ok"', '"code"', '200']
+
+  - id: qf_csv_001
+    prompt: |
+      Output exactly three comma-separated key=value pairs in this order and format:
+      a=1,b=2,c=3
+      Output only that line.
+    graders:
+      - type: match
+        dimension: format
+        mode: contains
+        expected: "a=1,b=2,c=3"
+
+  - id: qf_delim_001
+    prompt: |
+      Output exactly two lines: the first line is the word BEGIN, the second line is the
+      word END. Nothing else.
+    graders:
+      - type: match
+        dimension: format
+        mode: regex
+        expected: "(?s)BEGIN\\s*\\n\\s*END"
