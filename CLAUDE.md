@@ -59,16 +59,21 @@ Each phase has an exit criterion; don't move on until current phase is done.
 
 Default to publishing publicly via `protoLabsAI/` on HuggingFace and protolabs.studio for the writeup. Privacy is a drafting state, not a target. **Every shipped experiment produces a blog draft in `experiments/<name>/BLOG.md` before the next experiment starts.** audio-tags is the template.
 
-## Daily setup (dual GPU)
+## Daily setup (dual GPU) — Ornith-35B-FP8 replicas (2026-06-27)
 
-Both vLLMs run as systemd services and auto-start on boot:
+All services run as systemd and auto-start on boot. **Daily driver = 2× our `Ornith-1.0-35B-FP8` replicas** (one per GPU, gateway round-robin). North star in [`FOCUS.md`](FOCUS.md); model published at [`protoLabsAI/Ornith-1.0-35B-FP8`](https://huggingface.co/protoLabsAI/Ornith-1.0-35B-FP8) (our quant — upstream FP8 was broken; SSM kept bf16, 92.9% truly-fp8, parity-verified).
 
-| GPU | Service | Model | Port | Mode | tok/s |
-|-----|---------|-------|------|------|-------|
-| 0 | `vllm.service` | Qwen3.6-27B-FP8 | :8000 | thinking, 225K, **+MTP** | **~74** single / scales to ~1471 @ C32 (MTP; dFlash tried + reverted — see below) |
-| 1 | `vllm-fast.service` | **AR Gemma 4 26B-A4B FP8-Dynamic** (RedHat quant + tuned MoE kernel) | :8002 | instruct, 256K | **~211** (single-stream) |
+| GPU | Service | Model | Port | Notes |
+|-----|---------|-------|------|-------|
+| 0 | `vllm.service` | Ornith-1.0-35B-FP8 | :8000 | replica A, util 0.90, 256K, vision, `local` |
+| 1 | `vllm-replica-b.service` | Ornith-1.0-35B-FP8 | :8003 | replica B, util 0.72 (Fish+embed co-resident), 256K, vision, `local` |
+| 0 | `embed-b.service` | Qwen3-Embedding-0.6B | :8004 | embed B (doubled) |
+| 1 | `embed-server.service` | Qwen3-Embedding-0.6B | :8001 | embed A |
+| 1 | `protovoice-stack.service` | Fish S2-Pro TTS | :8092 | ~20GB, lazy-load |
 
-Gateway aliases: `protolabs/smart` → 27B (thinking + preserve_thinking), `protolabs/fast` → **AR Gemma 4 26B-A4B FP8-Dynamic** (instruct). Eval judges route through the smart lane (`local` / :8000) by default (`evals/runners/*.py`) — fine, though AR Gemma 4 *can* guided-decode (unlike the DiffusionGemma it replaced), so the fast lane is now eligible for guided/structured work too.
+`vllm-fast.service` (retired Gemma fast lane) is **disabled**. Gateway: `protolabs/smart` round-robins (`least-busy`) across :8000+:8003, embedding alias balances :8001+:8004 ([homelab-iac#174](https://github.com/protoLabsAI/homelab-iac/issues/174)). ~207 tok/s/request, ~6500 tok/s aggregate. **Replicas beat DP+EP/TP=2 on PCIe** — never shard a model that fits one card (benchmarked C32: DP+EP 3830 · single 3990 · 2 replicas ~6500). Eval judges target a replica (`local` :8000/:8003) now the Gemma lane is gone. WAN upload is ~100 Mbps (a 100BASE-TX choke, [homelab-iac#176](https://github.com/protoLabsAI/homelab-iac/issues/176)) — publish big models via per-file commits or cloud-quantize.
+
+> **Everything below this line is HISTORICAL** — dFlash, DiffusionGemma, AR-Gemma fast lane, 27B-MTP smart lane — all **superseded by the Ornith replica setup above**. Kept for breakdown material + the GPU/util/Fish-TTS budget math.
 
 **2026-06-25: smart lane tried dFlash spec-decode, then REVERTED to MTP (see tradeoff note below).** For ~2.5h ran z-lab's block-diffusion **dFlash** draft (`z-lab/Qwen3.6-27B-DFlash`, 2B bf16, drafts for Qwen3.6-27B). Serves on **stock vLLM 0.22.1 — no bump, no PR, no `speculators` pip** (0.22.1 already ships `qwen3_dflash.py`/`DFlashQwen3ForCausalLM` + `v1/spec_decode/dflash.py`; the model card's "needs PR #40898 for interleaved SWA" note is stale for our build). Measured **74.6 → 106.9 decode tok/s (+43%)** single-stream in the live prod config (`-O3`, 225K, 512 seqs); tool-calling (`qwen3_xml`) + thinking verified clean, lossless (target verifies every accepted token). Only the `--speculative-config` line changed (MTP → `{"method":"dflash","model":"z-lab/Qwen3.6-27B-DFlash","num_speculative_tokens":10}`); `num_speculative_tokens=10` is the tuned peak (sweep 3/6/10/16 → 96.8/114.3/116.9/106.2 tok/s on a leaner GPU1 config). Backup unit at `~/dev/.vllm-bump-review/unit-backups/vllm.service.pre-dflash-*` — rollback to MTP = restore + `daemon-reload` + restart. Full work in `experiments/dflash/` (README/RESULTS/sweep.sh/run-dflash.sh/bench.sh/conc_bench.py/conc-driver.sh).
 
