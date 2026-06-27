@@ -18,9 +18,9 @@ The current harness produces noise we reverse-engineer. Fixing, in priority orde
 
 1. ~~**No silent failures.**~~ ✅ **FIXED (2026-06-27).** Root cause: the `X-Health-Check` probe POSTed an empty body to validating endpoints (`/kb/search`, `/contacts/search`) → FastAPI 422 → harness marked the service permanently unhealthy → every kb/contacts task (~10/run) silently failed. Fix: health probe short-circuits to a 200 liveness response (claw-eval `mock_services/_base.py`). Verified: kb/contacts tasks now run + score. **Next**: make the runner *report* harness-errored tasks distinctly from model-scored ones (so a run says "33 scored, 2 harness-errored", never a silent average).
 2. **One metric per suite.** Kill the `passed` vs `task_score` vs `pass^3` ambiguity — pick one primary number (claw: mean task_score; FC: pass rate; coding: avg_score) and report it consistently.
-3. **Standing baselines.** Keep the current daily driver's numbers in `evals/baselines/`, re-run on every methodology change (thinking flip, judge swap). "How does X stack up?" must always be answerable.
+3. **Standing baselines.** 🔶 IN PROGRESS — home + methodology locked in `evals/baselines/README.md`; first Ornith-35B-FP8 baseline running (cloud judge). Re-run on every methodology change.
 4. **Consolidate runners.** Core 3: `claw`, `custom`, `function-call`. Archive `wildbench`/`inspect`/`refusal`/`rag`/`general` unless actively used.
-5. **Pinned judge.** One consistent judge; the silent-0.5 fallback is now hardened (`llm_judge.py`) — keep it loud.
+5. ~~**Pinned judge.**~~ ✅ DECIDED (2026-06-27): **`protolabs/reasoning`** (independent cloud reasoning model via gateway) for **baselines**; local judge OK for everyday/relative runs. Never self-judge a baseline. Silent-0.5 fallback hardened in `llm_judge.py`.
 
 ## Current production (see [memory] / CLAUDE.md)
 
