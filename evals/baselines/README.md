@@ -28,6 +28,8 @@ cd evals
 
 **2026-06-27 detail** — claw: non-coding (30) **0.751**, coding-agentic T100–104 (5, **sandbox**) **0.68** (3/5 passed: T100/T102/T103 = 1.00; T101/T104 = 0.20). All 35 tasks scored (kb/contacts health-probe fix), 0 grader crashes (reasoning-judge token fix), 0 harness errors. Coding-agentic run via Docker sandbox + 1800s task timeout (see below). _Note:_ an earlier no-sandbox run floored coding-agentic at 0.20 (overall 0.672) — the sandbox is what makes that metric real.
 
+**FC nuance (93% is conservative):** of the 4 FC misses, 2 (`gina_019`/`gina_021`) are the model *correctly* calling `current_time` to ground a relative date ("today"/"Thursday") before the calendar query — the single-call exact-match grader can't credit that. Real FC ≈ **96% (52/54)**. The other 2 (`gina_chain_001` multi-step chain, `gina_disc_001` proactive trigger) are genuine gaps. FC runner now logs `actual_tool_calls`+`expected` (pass `--output-dir`) so misses are self-debuggable.
+
 ## Coding-agentic (sandbox) — T100–104
 
 These are **terminal tasks**: the agent must work in a `/workspace` container (shell+file tools), and a verifier grades the result. They score a **0.20 floor without the sandbox** (no tools). Enabled 2026-06-27. Setup:
