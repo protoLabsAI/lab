@@ -48,7 +48,7 @@ def generate_answer(client: OpenAI, model: str, question: str, context: str) -> 
 
 @click.command()
 @click.option("--model", default="local", help="Gateway model name to generate answers")
-@click.option("--judge-model", default="local-fast", help="Model for LLM-as-judge scoring")
+@click.option("--judge-model", default="local", help="Model for LLM-as-judge scoring (smart lane; fast lane is now DiffusionGemma, no guided decode)")
 @click.option("--test-file", type=click.Path(exists=True), help="YAML file with test cases")
 @click.option("--gateway-url", default="http://ava:4000/v1")
 @click.option("--api-key", envvar=["GATEWAY_API_KEY", "LITELLM_API_KEY"], default="not-needed")

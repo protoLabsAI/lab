@@ -52,7 +52,7 @@ def build_result_row(results_dir: Path, model_meta: dict | None = None) -> dict:
         # Eval config
         "eval_profile": data.get("profile", ""),
         "trials": data.get("trials", 1),
-        "judge_model": data.get("judge_model", "local-fast"),
+        "judge_model": data.get("judge_model", "local"),
         "lab_git_hash": data.get("lab_git_hash", ""),
         # Aggregate scores
         "suites_run": summary.get("suites_run", 0),

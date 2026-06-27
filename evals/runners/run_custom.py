@@ -157,11 +157,12 @@ def grade_task(task: dict, output: dict, gateway_url: str = "http://ava:4000/v1"
     grades = []
     grader_configs = task.get("graders", [])
 
-    # Default judge to local fast model (free, no cloud costs)
+    # Default judge to the smart lane (:8000 / local, Qwen 27B+MTP). The fast lane (:8002)
+    # is now DiffusionGemma, which can't guided-decode (HTTP 500) — judges must not route there.
     default_judge_url = judge_url or os.environ.get(
-        "JUDGE_GATEWAY_URL", "http://localhost:8002/v1"
+        "JUDGE_GATEWAY_URL", "http://localhost:8000/v1"
     )
-    default_judge_model = os.environ.get("JUDGE_MODEL", "protolabs/fast")
+    default_judge_model = os.environ.get("JUDGE_MODEL", "local")
 
     for gc in grader_configs:
         if gc["type"] == "tool_channel":

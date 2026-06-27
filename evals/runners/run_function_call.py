@@ -58,7 +58,8 @@ def run_function_call_test(client: OpenAI, model: str, test: dict) -> dict:
             tools=tools,
             temperature=0.7,
             top_p=0.8,
-            max_tokens=1000,
+            max_tokens=8000,  # raised from 1000: thinking models (Ornith etc.) need
+                              # room to close <think> before the tool call (no-thinking-off policy)
             **kwargs,
         )
         choice = response.choices[0]

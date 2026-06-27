@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import sys
 from typing import Any
 
 from openai import OpenAI
@@ -92,25 +94,35 @@ class LLMJudge(Grader):
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.0,
                 max_tokens=500,
+                # Judge must return clean JSON — disable thinking on reasoning-model judges
+                # (a thinking model's wrapped output breaks json.loads -> silent 0.5 fallback).
+                extra_body={"chat_template_kwargs": {"enable_thinking": False}},
             )
-            content = response.choices[0].message.content
-            if content is None:
-                content = ""
-            content = content.strip()
+            content = (response.choices[0].message.content or "").strip()
 
-            # Parse JSON from response (handle markdown code blocks)
+            # Robust extraction: drop any leaked think block, strip code fences,
+            # then pull the first {...} object out of surrounding prose.
+            if "</think>" in content:
+                content = content.split("</think>")[-1].strip()
             if "```" in content:
                 content = content.split("```")[1]
                 if content.startswith("json"):
                     content = content[4:]
+            m = re.search(r"\{.*\}", content, re.S)
+            if m:
+                content = m.group(0)
             result = json.loads(content)
 
             score = float(result.get("score", 0.5))
             reasoning = result.get("reasoning", "")
 
         except Exception as e:
+            # Do NOT silently bury judge failures as 0.5 — surface them so a broken
+            # judge can't masquerade as a wall of 0.5 scores (the recurring footgun).
             score = 0.5
-            reasoning = f"Judge error: {e}"
+            reasoning = f"Judge error (FALLBACK 0.5): {e}"
+            print(f"[llm_judge] {self.dimension}: judge call/parse failed -> 0.5 fallback: {e}",
+                  file=sys.stderr)
 
         return GradeResult.from_threshold(
             dimension=self.dimension,
