@@ -47,7 +47,12 @@ SKIP_PATTERNS = [
     "visual", "mtp",
     "layernorm", "layer_norm", "norm",
     ".A_log", ".D", ".dt_bias",
-    "in_proj_a", "in_proj_b",  # Mamba/linear attention params — keep in bf16
+    # Keep the ENTIRE linear-attention / SSM path in bf16. The specific-name list
+    # (in_proj_a/b) historically MISSED in_proj_qkv, in_proj_z, and out_proj — 2D
+    # projections that would otherwise be FP8-quantized and corrupt the SSM
+    # (Ornith-35B / Qwen3.5-MoE hybrid). Upstream FP8 ignores all `linear_attn.*`.
+    "linear_attn",
+    "in_proj_a", "in_proj_b",  # (redundant with linear_attn; kept for non-prefixed models)
 ]
 
 

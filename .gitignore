@@ -57,3 +57,6 @@ unsloth_compiled_cache/
 # Local agent state — never commit
 .proto/
 .beads/
+
+# Local backup artifacts — never commit
+.env-backups/
