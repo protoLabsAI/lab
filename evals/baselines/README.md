@@ -34,14 +34,16 @@ cd evals
 
 The new daily driver benchmarked head-to-head against the prior **smart** lane (Qwen3.6-27B + MTP) and prior **fast** lane (Gemma 4 26B-A4B FP8), same harness/judge/methodology (thinking-on, `protolabs/reasoning`, `--sandbox`). Challengers served off-gateway on `:8005` (production untouched).
 
-| Metric | **Ornith-35B-FP8** (driver) | Qwen3.6-27B+MTP (prior smart) | Gemma4-26B-A4B (prior fast) |
-|---|:---:|:---:|:---:|
-| **claw overall (35)** | **0.741** 🏆 | 0.613 | 0.661 |
-| claw non-coding (30) | **0.751** 🏆 | 0.652 | 0.707 |
-| coding-agentic (5, sandbox) | **0.68** 🏆 | 0.38 | 0.384 |
-| custom coding (10) | 0.925 | **0.950** 🏆 | 0.875 |
-| function-call (54) | **93%** | **93%** | 87% |
-| speed (wall tok/s, single) | ~207 † | 69.9 | 148.7 |
+| Metric | **Ornith-35B-FP8** (driver) | Qwen3.6-27B+MTP (prior smart) | Gemma4-26B-A4B (prior fast) | Ornith-9B (bf16) |
+|---|:---:|:---:|:---:|:---:|
+| **claw overall (35)** | 0.741 | 0.613 | 0.661 | **0.776** ⚠️ |
+| claw non-coding (30) | 0.751 | 0.652 | 0.707 | **0.818** ⚠️ |
+| coding-agentic (5, sandbox) | **0.68** 🏆 | 0.38 | 0.384 | 0.524 |
+| custom coding (10) | **0.925** 🏆 | 0.950 | 0.875 | 0.700 |
+| function-call (54) | **93%** | 93% | 87% | **93%** |
+| speed (wall tok/s, single) | ~207 † | 69.9 | 148.7 | 75.0 |
+
+⚠️ **9B "beats" the 35B on claw is single-trial noise, read as "competitive," not "better."** The 9B's real signal: it's a genuinely *viable* small model — non-coding claw ~0.82, FC 93% (tied), holds its own on agentic. Where the capability cliff shows honestly is **custom coding 0.70 vs 0.925** and coding-agentic 0.52 vs 0.68 — the 35B is clearly stronger on hard generation/agentic-coding. But for an 18 GB model the agentic/FC numbers are strong enough to **clear the gate for the MTP experiment** ([[project_ornith_9b_mtp]]). Single-trial caveats apply across this whole table; treat as directional.
 
 † Ornith from the standing replica config (per CLAUDE.md); 27B/Gemma are this run's single-stream probe — not strictly comparable, but directionally: Gemma ~2× the 27B, Ornith fastest in production via replicas.
 
