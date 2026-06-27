@@ -55,7 +55,7 @@ uv run ruff check .                                    # lint
 | GPU | Service | Model | Port | tok/s |
 |-----|---------|-------|------|-------|
 | 0 | `vllm.service` | Qwen3.6-27B-FP8 (thinking, 225K) | :8000 | ~73.6 (+MTP) |
-| 1 | `vllm-fast.service` | Qwen3.6-35B-A3B-heretic-FP8 (instruct, 262K) | :8002 | 199 |
+| 1 | `vllm-fast.service` | Gemma 4 26B-A4B MoE FP8 (instruct, 256K) | :8002 | 183 |
 
 Gateway aliases via `infra/gateway/`: `protolabs/smart` → 27B, `protolabs/fast` → 35B MoE.
 

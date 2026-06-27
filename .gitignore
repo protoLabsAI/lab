@@ -57,3 +57,10 @@ unsloth_compiled_cache/
 # Local agent state — never commit
 .proto/
 .beads/
+
+# Local backup artifacts — never commit
+.env-backups/
+
+# Experiment data artifacts (keep on /mnt/data, not in repo)
+*.faiss
+experiments/**/large_corpus.*

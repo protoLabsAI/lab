@@ -99,7 +99,9 @@ def build_claw_config(model: str, gateway_url: str, api_key: str) -> Path:
 @click.option("--api-key", envvar=["GATEWAY_API_KEY", "LITELLM_API_KEY"], default="not-needed")
 @click.option("--workers", default=4, help="Parallel workers for batch mode")
 @click.option("--port-offset", default=200, help="Port offset for mock services. Default 200 dodges Prometheus node_exporter (:9100) and other monitoring services. Use different values for parallel runs.")
-def main(model, tasks, all_tasks, trials, gateway_url, api_key, workers, port_offset):
+@click.option("--sandbox", is_flag=True, help="Run in a Docker sandbox (image: claw-agent). Required for terminal/coding-agentic tasks T100-104 that need shell+file tools in /workspace.")
+@click.option("--sandbox-image", default="claw-agent", help="Docker image for the sandbox. Build: docker build -f Dockerfile.agent.local -t claw-agent . (in claw-eval dir)")
+def main(model, tasks, all_tasks, trials, gateway_url, api_key, workers, port_offset, sandbox, sandbox_image):
     """Run claw-eval tasks against a gateway model."""
     if not CLAW_DIR.exists():
         click.echo("Error: claw-eval submodule not initialized. Run: git submodule update --init")
@@ -118,6 +120,8 @@ def main(model, tasks, all_tasks, trials, gateway_url, api_key, workers, port_of
         for task_id in tasks.split(","):
             task_path = resolve_task(task_id.strip())
             task_cmd = cmd + ["run", "--task", task_path, "--trials", str(trials), "--config", str(config_path), "--port-offset", str(port_offset)]
+            if sandbox:
+                task_cmd += ["--sandbox", "--sandbox-image", sandbox_image]
             click.echo(f"\n{'='*60}")
             click.echo(f"Running {task_id.strip()} ({Path(task_path).parent.name})...")
             subprocess.run(task_cmd, cwd=str(CLAW_DIR))
@@ -130,6 +134,8 @@ def main(model, tasks, all_tasks, trials, gateway_url, api_key, workers, port_of
             "--parallel", str(workers),
             "--port-base-offset", str(port_offset),
         ]
+        if sandbox:
+            batch_cmd += ["--sandbox", "--sandbox-image", sandbox_image]
         click.echo(f"\nRunning batch eval with {workers} workers...")
         subprocess.run(batch_cmd, cwd=str(CLAW_DIR))
     else:

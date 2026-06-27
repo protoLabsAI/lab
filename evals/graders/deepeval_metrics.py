@@ -43,7 +43,7 @@ def _get_deepeval_model(model: str = "claude-sonnet-4-6"):
             resp = self.client.chat.completions.create(
                 model=self.model_name,
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=2000,
+                max_tokens=4096,  # reasoning-judge headroom (think block + answer)
                 temperature=0,
             )
             return resp.choices[0].message.content or ""
