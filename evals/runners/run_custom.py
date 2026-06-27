@@ -321,6 +321,20 @@ def main(task_path, suite, model, trials, gateway_url, api_key, submit_langfuse,
     click.echo(f"\n{'='*60}")
     click.echo(f"Results: {passed_tasks}/{total_tasks} tasks passed (pass^{trials})")
 
+    # Per-trial mean-score band (run-to-run noise) — policy: report 3-trial mean±spread.
+    if trials > 1 and total_tasks > 0:
+        import statistics
+        per_trial = [
+            sum(tl[i].score for tl in all_results) / total_tasks
+            for i in range(trials)
+        ]
+        mean = sum(per_trial) / trials
+        half_range = (max(per_trial) - min(per_trial)) / 2
+        click.echo(
+            f"Mean score: {mean:.3f} ± {half_range:.3f}  "
+            f"(range {min(per_trial):.3f}-{max(per_trial):.3f}, std {statistics.pstdev(per_trial):.3f}, n={trials})"
+        )
+
     # Write structured results (merge with existing file if present —
     # the profile runner calls us once per suite into the same output dir)
     if output_dir:
