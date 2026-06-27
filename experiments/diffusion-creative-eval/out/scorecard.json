@@ -1,0 +1,46 @@
+{
+  "n": 50,
+  "models": {
+    "dg": {
+      "MMD_vs_human": 0.0591,
+      "TokenL2_vs_human": 0.0662,
+      "JMQ": 1.92,
+      "winrate_vs_human": 0.96,
+      "slop": {
+        "em_dash": 57,
+        "not_x_y": 24,
+        "phrases": 19,
+        "total_per_1k": 6.1
+      },
+      "self_bleu": 0.0004,
+      "mean_tok_s": 381.5
+    },
+    "gemma4": {
+      "MMD_vs_human": 0.0516,
+      "TokenL2_vs_human": 0.063,
+      "JMQ": 1.96,
+      "winrate_vs_human": 0.98,
+      "slop": {
+        "em_dash": 62,
+        "not_x_y": 19,
+        "phrases": 15,
+        "total_per_1k": 5.64
+      },
+      "self_bleu": 0.0003,
+      "mean_tok_s": 196.8
+    }
+  },
+  "human_ref": {
+    "slop": {
+      "em_dash": 28,
+      "not_x_y": 1,
+      "phrases": 3,
+      "total_per_1k": 1.56
+    },
+    "self_bleu": 0.0001,
+    "TokenL2_self": 0.0
+  },
+  "head_to_head": {
+    "dg_vs_gemma4_winrate": 0.36
+  }
+}

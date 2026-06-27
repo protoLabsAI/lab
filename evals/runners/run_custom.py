@@ -31,6 +31,7 @@ from graders.creative import (
 )
 from graders.langfuse_scorer import LangfuseScorer
 from graders.llm_judge import LLMJudge
+from graders.tool_channel import ToolChannelGrader
 from openai import OpenAI
 
 # Dimension-specific rubrics — override the generic DEFAULT_RUBRIC when available
@@ -60,6 +61,7 @@ def run_agent(client: OpenAI, model: str, task: dict, max_turns: int = 20, max_t
 
     tools = task.get("tools", None)
     tool_calls_made = []
+    tool_calls_detail = []
     turns = 0
     start = time.time()
 
@@ -96,6 +98,12 @@ def run_agent(client: OpenAI, model: str, task: dict, max_turns: int = 20, max_t
             messages.append(choice.message)
             for tc in choice.message.tool_calls:
                 tool_calls_made.append(tc.function.name)
+                _args = tc.function.arguments
+                try:
+                    _args = json.loads(_args) if isinstance(_args, str) else _args
+                except Exception:
+                    pass
+                tool_calls_detail.append({"name": tc.function.name, "arguments": _args})
                 # Simulate tool response (custom tasks provide mock responses)
                 tool_response = task.get("mock_tool_responses", {}).get(tc.function.name, '{"status": "ok"}')
                 messages.append({
@@ -125,7 +133,23 @@ def run_agent(client: OpenAI, model: str, task: dict, max_turns: int = 20, max_t
         "turns": turns,
         "duration_s": round(elapsed, 2),
         "_tools_called": tool_calls_made,
+        "_tool_calls_detail": tool_calls_detail,
+        "_text_leaked_tool": _detect_tool_leak(final_content),
     }
+
+
+# Heuristic: did the model emit a tool call as TEXT in content instead of using
+# the structured tool_calls field? (the failure mode channel_correctness checks)
+_TOOL_LEAK_PATTERNS = [
+    r"<tool_call", r"</tool_call", r"<tool_code", r"```tool", r"<function",
+    r"\[TOOL_CALL\]", r"print\(default_api\.", r'"name"\s*:\s*".+?"\s*,\s*"arguments"',
+]
+
+
+def _detect_tool_leak(text: str) -> bool:
+    import re as _re
+    t = text or ""
+    return any(_re.search(p, t, _re.I) for p in _TOOL_LEAK_PATTERNS)
 
 
 def grade_task(task: dict, output: dict, gateway_url: str = "http://ava:4000/v1", api_key: str = "not-needed", judge_url: str | None = None) -> list[GradeResult]:
@@ -137,10 +161,19 @@ def grade_task(task: dict, output: dict, gateway_url: str = "http://ava:4000/v1"
     default_judge_url = judge_url or os.environ.get(
         "JUDGE_GATEWAY_URL", "http://localhost:8002/v1"
     )
-    default_judge_model = os.environ.get("JUDGE_MODEL", "local-fast")
+    default_judge_model = os.environ.get("JUDGE_MODEL", "protolabs/fast")
 
     for gc in grader_configs:
-        if gc["type"] == "llm_judge":
+        if gc["type"] == "tool_channel":
+            # Deterministic check of the tool-call channel — an LLM judge cannot
+            # distinguish a structured tool_call from text in serialized output.
+            grader = ToolChannelGrader(dimension=gc.get("dimension", "channel_correctness"))
+            grades.append(grader.grade(
+                task_input={"prompt": task["prompt"]},
+                task_output=output,  # full trace: _tool_calls_detail, _text_leaked_tool
+                expected=task.get("expected"),
+            ))
+        elif gc["type"] == "llm_judge":
             rubric = gc.get("rubric") or DIMENSION_RUBRICS.get(gc["dimension"])
             grader = LLMJudge(
                 dimension=gc["dimension"],
@@ -149,8 +182,13 @@ def grade_task(task: dict, output: dict, gateway_url: str = "http://ava:4000/v1"
                 base_url=default_judge_url,
                 api_key=api_key,
             )
-            # Pass clean output to judge — just the text, not the full trace
-            clean_output = {"output": output.get("output", "")}
+            # Pass clean output to judge — text plus the tools actually called
+            # via the structured tool_calls channel, so tool-aware dimensions
+            # (channel_correctness, tool_selection) can see what the model did.
+            clean_output = {
+                "output": output.get("output", ""),
+                "tools_called": output.get("_tools_called", []),
+            }
             grades.append(grader.grade(
                 task_input={"prompt": task["prompt"]},
                 task_output=clean_output,

@@ -188,9 +188,14 @@ def main(name, model, gateway_url, api_key, trials, claw_only, custom_only, skip
     run_custom = not claw_only
     run_fc = not claw_only and not skip_fc
 
-    # Build the run.sh base command
-    # We call run.sh so Infisical secrets get injected
+    # Build the run.sh base command.
+    # Normally we call run.sh so Infisical secrets get injected. But if a gateway
+    # key is already in the environment (GATEWAY_API_KEY/LITELLM_API_KEY), skip
+    # Infisical via --local — this is what lets the profile run when the machine
+    # identity is unavailable and the key was supplied directly.
     run_sh = str(EVALS_DIR / "run.sh")
+    have_key = bool(os.environ.get("GATEWAY_API_KEY") or os.environ.get("LITELLM_API_KEY"))
+    mode_args = ["--local"] if have_key else []
 
     # --- Claw-eval ---
     if run_claw and "claw" in profile:
@@ -198,7 +203,7 @@ def main(name, model, gateway_url, api_key, trials, claw_only, custom_only, skip
         tasks = claw.get("tasks", "T02,T04,T06,T08")
         port_offset = claw.get("port_offset", 200)
         cmd = [
-            "bash", run_sh, "claw",
+            "bash", run_sh, *mode_args, "claw",
             "--model", model,
             "--tasks", tasks,
             "--trials", str(trial_count),
@@ -214,7 +219,7 @@ def main(name, model, gateway_url, api_key, trials, claw_only, custom_only, skip
         for suite_cfg in profile["custom"]:
             suite_name = suite_cfg["suite"]
             cmd = [
-                "bash", run_sh, "custom",
+                "bash", run_sh, *mode_args, "custom",
                 "--suite", suite_name,
                 "--model", model,
                 "--trials", str(trial_count),
@@ -231,7 +236,7 @@ def main(name, model, gateway_url, api_key, trials, claw_only, custom_only, skip
         suites = fc.get("suites", [])
         if suites:
             cmd = [
-                "bash", run_sh, "function-call",
+                "bash", run_sh, *mode_args, "function-call",
                 "--model", model,
                 "--all-suites",
                 "--trials", str(trial_count),
