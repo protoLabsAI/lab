@@ -30,6 +30,27 @@ cd evals
 
 **FC nuance (93% is conservative):** of the 4 FC misses, 2 (`gina_019`/`gina_021`) are the model *correctly* calling `current_time` to ground a relative date ("today"/"Thursday") before the calendar query — the single-call exact-match grader can't credit that. Real FC ≈ **96% (52/54)**. The other 2 (`gina_chain_001` multi-step chain, `gina_disc_001` proactive trigger) are genuine gaps. FC runner now logs `actual_tool_calls`+`expected` (pass `--output-dir`) so misses are self-debuggable.
 
+## Challengers — vs the two lanes Ornith replaced (2026-06-27)
+
+The new daily driver benchmarked head-to-head against the prior **smart** lane (Qwen3.6-27B + MTP) and prior **fast** lane (Gemma 4 26B-A4B FP8), same harness/judge/methodology (thinking-on, `protolabs/reasoning`, `--sandbox`). Challengers served off-gateway on `:8005` (production untouched).
+
+| Metric | **Ornith-35B-FP8** (driver) | Qwen3.6-27B+MTP (prior smart) | Gemma4-26B-A4B (prior fast) |
+|---|:---:|:---:|:---:|
+| **claw overall (35)** | **0.741** 🏆 | 0.613 | 0.661 |
+| claw non-coding (30) | **0.751** 🏆 | 0.652 | 0.707 |
+| coding-agentic (5, sandbox) | **0.68** 🏆 | 0.38 | 0.384 |
+| custom coding (10) | 0.925 | **0.950** 🏆 | 0.875 |
+| function-call (54) | **93%** | **93%** | 87% |
+| speed (wall tok/s, single) | ~207 † | 69.9 | 148.7 |
+
+† Ornith from the standing replica config (per CLAUDE.md); 27B/Gemma are this run's single-stream probe — not strictly comparable, but directionally: Gemma ~2× the 27B, Ornith fastest in production via replicas.
+
+**Takeaways:**
+- **Ornith is the right daily-driver call.** It wins agentic decisively (claw 0.741 vs 0.613/0.661) — and *agentic* is what the daily driver is for. The coding-agentic sandbox gap (0.68 vs ~0.38) is the clearest separator: Ornith actually completes terminal tasks the other two abandon.
+- **27B+MTP's only win is one-shot coding** (custom 0.950 > 0.925) — but it's the slowest (70 tok/s) and weakest at multi-step agentic. A coder, not a driver.
+- **Gemma-fast earns its name** (149 tok/s, 2× the 27B) with respectable non-coding claw (0.707), but FC drops to 87% and coding-agentic collapses — fine as a latency lane, not as the primary.
+- **Caveats:** single-trial (coding-agentic is noisy — which specific T10x passed differs per model: 27B got T102, Gemma got T100, none cracked T101/T104); Gemma uses the `gemma4` reasoning parser, not Qwen-style `enable_thinking`, so "thinking-on" isn't perfectly apples-to-apples across the three. Run-dirs: `scratchpad/bench-{27b-mtp,gemma-fast}/`.
+
 ## Coding-agentic (sandbox) — T100–104
 
 These are **terminal tasks**: the agent must work in a `/workspace` container (shell+file tools), and a verifier grades the result. They score a **0.20 floor without the sandbox** (no tools). Enabled 2026-06-27. Setup:
