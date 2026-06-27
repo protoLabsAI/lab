@@ -93,7 +93,7 @@ class LLMJudge(Grader):
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.0,
-                max_tokens=500,
+                max_tokens=4096,  # reasoning-judge headroom (think block + answer); see FOCUS.md
                 # Judge must return clean JSON — disable thinking on reasoning-model judges
                 # (a thinking model's wrapped output breaks json.loads -> silent 0.5 fallback).
                 extra_body={"chat_template_kwargs": {"enable_thinking": False}},

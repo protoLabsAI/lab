@@ -104,7 +104,7 @@ class PairwiseJudge:
                 model=model,
                 messages=[{"role": "user", "content": judge_prompt}],
                 temperature=0.0,
-                max_tokens=500,
+                max_tokens=4096,  # reasoning-judge headroom (think block + answer); see FOCUS.md
             )
             content = response.choices[0].message.content or ""
             content = content.strip()
