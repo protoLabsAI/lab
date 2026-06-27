@@ -1,7 +1,0 @@
-# Training data (lives on /mnt/data, symlinked)
-data
-data/
-
-# Trained models (uploaded to HF, not committed)
-models/*.onnx
-models/*.tflite

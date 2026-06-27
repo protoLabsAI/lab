@@ -1,7 +1,0 @@
-gradio
-gradio_client
-modelscope_studio
-openai
-soundfile
-numpy
-scipy
