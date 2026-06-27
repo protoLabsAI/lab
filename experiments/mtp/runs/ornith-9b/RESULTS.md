@@ -36,12 +36,22 @@ speculative-decode acceptance rate?
    The shippable artifact is the graft: no training, no data.
 
 2. **Distillation v1 did NOT beat the graft — it regressed it** (0.763 → 0.721). Training on
-   Ornith's own outputs moved the head *away* from a good initialization. Most likely cause:
-   a **train/serve forward mismatch** in `distill.py` (prime suspect: rope **position-id
-   offset** for the shifted MTP sequence — I used `arange(T)` over the shifted window, while
-   vLLM feeds the true token positions; a phase mismatch degrades the trained head relative
-   to the well-aligned Qwen init). Secondary suspects: over-training from a strong init (lr
-   too high / no early stop), and the narrow no-think single-epoch corpus.
+   Ornith's own outputs moved the head *away* from a good initialization. Two real suspects
+   (the earlier "rope position offset" idea is ruled out — a *uniform* position shift cancels
+   in relative rope, so it can't matter):
+   - **Train/serve forward op-mismatch.** If `distill.py`'s forward isn't bit-aligned with
+     vLLM's MTP serving forward, lower training loss (measured under our forward) need not
+     mean higher acceptance (measured under vLLM's). Optimizing the wrong forward drifts a
+     good init downward. Candidates: SDPA-vs-vLLM-attention numerics, the `norm`/residual
+     fusion ordering, fp32-train/bf16-serve.
+   - **Over-training from a strong init.** lr 2e-4 × 492 steps on a 243M head, no early stop,
+     narrow no-think single-epoch corpus — easy to overshoot when the init is already 0.763.
+
+   **Diagnostic (run next window):** `eval_head.py` computes an offline acceptance *proxy*
+   (next-next-token argmax-match rate under our forward). If the **graft's** proxy ≈ 0.76
+   (matching its vLLM acceptance), our forward is parity-correct and the regression is pure
+   optimization → fix with low-lr + early-stop. If the graft's proxy ≠ 0.76, we have a
+   forward op-bug to fix before any training is meaningful.
 
 ## Next iteration (distillation, to beat the graft)
 

@@ -32,9 +32,13 @@ distill:
   base_ckpt: /mnt/data/checkpoints/ornith-9b-mtp-graft   # base loaded from here (HF ignores mtp.*)
   init_from: /mnt/data/checkpoints/ornith-9b-mtp-graft   # mtp.* init (grafted Qwen head)
   out: /mnt/data/checkpoints/ornith-9b-mtp                # final checkpoint (base + retuned head)
+  # v1 (lr 2e-4, 1 epoch) regressed the strong graft init 0.763->0.721. For v2, gate the
+  # real fix on eval_head.py: if the graft's offline proxy matches its 0.763 vLLM acceptance
+  # (forward is parity-correct), this lower lr + early-stop should let training only improve;
+  # if not, fix the forward first. Keep-best on a held-out acceptance proxy before shipping.
   epochs: 1
-  lr: 2.0e-4
-  warmup_ratio: 0.03
+  lr: 5.0e-5
+  warmup_ratio: 0.05
   batch_tokens: 16384                        # tokens per step (grad-accum to hit this)
   max_seq_len: 2048
   weight_decay: 0.0

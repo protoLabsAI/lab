@@ -33,8 +33,18 @@ hidden states.**
 graft.py        donor mtp.* ──▶ target checkpoint   (verbatim copy, +1 shard, offline/CPU)
 gen_corpus.py   served target ──▶ corpus.jsonl       (the model's OWN generations = teacher)
 distill.py      freeze base, train ONLY mtp.*        (re-align head to target hidden states; GPU)
+eval_head.py    offline acceptance proxy             (localize regressions w/o serving; GPU)
 validate.sh     serve + acceptance + tok/s + eval    (off-gateway; lossless check)
 ```
+
+## Results so far
+
+First run (**Ornith-1.0-9B**, 2026-06-27): the **graft alone wins** — Qwen3.5-9B's head
+transfers at **0.763 acceptance / ~111 tok/s (+49%), lossless**, overturning the
+"transplant collapses" assumption (Ornith is a light fine-tune). Distillation v1 *regressed*
+it (0.721) — next iteration gated on `eval_head.py` forward-parity diagnosis. Full honest
+writeup + numbers: [`runs/ornith-9b/RESULTS.md`](runs/ornith-9b/RESULTS.md),
+draft post: [`runs/ornith-9b/BLOG.md`](runs/ornith-9b/BLOG.md).
 
 Per-target settings live in `configs/<name>.yaml`; outputs/results in `runs/<name>/`.
 
