@@ -24,9 +24,9 @@ cd evals
 
 | Date | Daily driver | claw (mean) | coding | FC | Judge |
 |---|---|---|---|---|---|
-| 2026-06-27 | Ornith-1.0-35B-FP8 (2 replicas) | **0.672** (35/35, 0 errors) | **0.925** | **93%** (50/54) | protolabs/reasoning |
+| 2026-06-27 | Ornith-1.0-35B-FP8 (2 replicas) | **0.741** (35/35, 0 errors) | **0.925** | **93%** (50/54) | protolabs/reasoning |
 
-**2026-06-27 detail** — claw: non-coding (30) **0.751**, coding-agentic T100–104 (5) **0.200** (no-sandbox run — see below), full-pass 11/35. All 35 tasks scored (kb/contacts health-probe fix), 0 grader crashes (reasoning-judge token fix).
+**2026-06-27 detail** — claw: non-coding (30) **0.751**, coding-agentic T100–104 (5, **sandbox**) **0.68** (3/5 passed: T100/T102/T103 = 1.00; T101/T104 = 0.20). All 35 tasks scored (kb/contacts health-probe fix), 0 grader crashes (reasoning-judge token fix), 0 harness errors. Coding-agentic run via Docker sandbox + 1800s task timeout (see below). _Note:_ an earlier no-sandbox run floored coding-agentic at 0.20 (overall 0.672) — the sandbox is what makes that metric real.
 
 ## Coding-agentic (sandbox) — T100–104
 
