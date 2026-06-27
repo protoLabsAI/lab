@@ -52,6 +52,36 @@ cd evals
 
 **FC nuance (93% is conservative):** of the 4 FC misses, 2 (`gina_019`/`gina_021`) are the model *correctly* calling `current_time` to ground a relative date ("today"/"Thursday") before the calendar query — the single-call exact-match grader can't credit that. Real FC ≈ **96% (52/54)**. The other 2 (`gina_chain_001` multi-step chain, `gina_disc_001` proactive trigger) are genuine gaps. FC runner now logs `actual_tool_calls`+`expected` (pass `--output-dir`) so misses are self-debuggable.
 
+## 3× baseline — expanded coverage (2026-06-27)
+
+First run under the new policy (`bash baselines/run_3x.sh`). Sampled/judged suites: `mean ±
+half-range` over 3 trials. Deterministic suites (FC @ temp 0): point + ±0 band. Judge =
+`protolabs/reasoning`. 35B served `:8000` (daily driver); 9B served `:8005` (bf16, off-gateway).
+Run dirs: `baselines/runs/2026-06-27-{35b,9b}-3x/`.
+
+| Suite (metric) | Ornith-35B-FP8 (daily) | Ornith-1.0-9B (bf16) | read |
+|---|:---:|:---:|---|
+| function-call (pass, temp 0) | 91% ±0.0% | **93% ±0.0%** | 9B edges it; deterministic |
+| quant-sensitivity (mean) | 1.000 ±0.000 | 1.000 ±0.000 | both ace the full-precision ref |
+| context needle 4k–128k (recall) | 20/20 | 20/20 | both perfect long-context |
+| tool_reliability (mean) | 0.875 ±0.062 | **0.917 ±0.031** | 9B *better* under multi-tool load |
+| reasoning (mean) | **0.933 ±0.050** | 0.883 ±0.075 | modest gap |
+| coding (mean) | **0.962 ±0.033** | 0.797 ±0.095 | capability cliff |
+| structured_output (mean) | **0.967 ±0.050** | 0.817 ±0.075 | gap |
+| routing/alias_fitness (mean) | **0.967 ±0.050** | 0.700 ±0.100 | 9B weak (0/5 pass^3) |
+| claw (agentic) | _pending_ | _pending_ | long pole — batch run |
+
+**Read:** the 9B holds its own — and *beats* the 35B — on FC, tool-reliability-under-load,
+long-context recall, and the quant reference; the **capability cliff is real on harder
+generation/judgment**: coding (0.80 vs 0.96), structured output (0.82 vs 0.97), and especially
+**routing** (0.70 vs 0.97 — the 9B can't pick the right alias). The bands matter: 9B coding
+±0.095 is the widest, so treat its 0.80 as "low-0.7s to low-0.9s," still clearly below the 35B.
+
+**9B-MTP = the 9B row (lossless).** MTP is distribution-preserving, so its capability is
+*identical* to plain 9B by construction (greedy-verified earlier within noise) — no separate
+judged run needed. It adds only **speed**: 0.762 acceptance, ~121 tok/s single-stream (+~60%),
+and the GGUF port carries it to small compute (avaLab `Ornith-1.0-9B-MTP-GGUF`).
+
 ## Challengers — vs the two lanes Ornith replaced (2026-06-27)
 
 The new daily driver benchmarked head-to-head against the prior **smart** lane (Qwen3.6-27B + MTP) and prior **fast** lane (Gemma 4 26B-A4B FP8), same harness/judge/methodology (thinking-on, `protolabs/reasoning`, `--sandbox`). Challengers served off-gateway on `:8005` (production untouched).
