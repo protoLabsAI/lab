@@ -22,6 +22,8 @@ cd evals
 
 ## Current baseline
 
-| Date | Daily driver | claw (mean task_score) | coding | FC | Judge |
+| Date | Daily driver | claw (mean) | coding | FC | Judge |
 |---|---|---|---|---|---|
-| _2026-06-27_ | Ornith-1.0-35B-FP8 (2 replicas) | _(populating)_ | _(populating)_ | _(populating)_ | protolabs/reasoning |
+| 2026-06-27 | Ornith-1.0-35B-FP8 (2 replicas) | **0.672** (35/35, 0 errors) | **0.925** | **93%** (50/54) | protolabs/reasoning |
+
+**2026-06-27 detail** — claw: non-coding (30) **0.751**, coding-agentic T100–104 (5) **0.200**, full-pass 11/35. All 35 tasks scored (kb/contacts health-probe fix), 0 grader crashes (reasoning-judge token fix). _Caveat:_ the T100–104 ~0.20 floor is a **harness limit** — those coding-agentic tasks need code execution but run with `sandbox_tools=False`, so no model can complete them as-configured. Fix sandbox or drop them from the headline; don't read 0.20 as model weakness.
