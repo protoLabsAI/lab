@@ -26,4 +26,19 @@ cd evals
 |---|---|---|---|---|---|
 | 2026-06-27 | Ornith-1.0-35B-FP8 (2 replicas) | **0.672** (35/35, 0 errors) | **0.925** | **93%** (50/54) | protolabs/reasoning |
 
-**2026-06-27 detail** — claw: non-coding (30) **0.751**, coding-agentic T100–104 (5) **0.200**, full-pass 11/35. All 35 tasks scored (kb/contacts health-probe fix), 0 grader crashes (reasoning-judge token fix). _Caveat:_ the T100–104 ~0.20 floor is a **harness limit** — those coding-agentic tasks need code execution but run with `sandbox_tools=False`, so no model can complete them as-configured. Fix sandbox or drop them from the headline; don't read 0.20 as model weakness.
+**2026-06-27 detail** — claw: non-coding (30) **0.751**, coding-agentic T100–104 (5) **0.200** (no-sandbox run — see below), full-pass 11/35. All 35 tasks scored (kb/contacts health-probe fix), 0 grader crashes (reasoning-judge token fix).
+
+## Coding-agentic (sandbox) — T100–104
+
+These are **terminal tasks**: the agent must work in a `/workspace` container (shell+file tools), and a verifier grades the result. They score a **0.20 floor without the sandbox** (no tools). Enabled 2026-06-27. Setup:
+
+```bash
+# 1. docker pkg in the lab venv (where the claw-eval CLI runs)
+uv pip install --python ~/dev/lab/.venv/bin/python docker
+# 2. build the sandbox image (de-mirrored — no CN mirrors)
+cd evals/claw/claw-eval && docker build -f Dockerfile.agent.local -t claw-agent .
+# 3. run claw with --sandbox (passes through to `claw-eval run --sandbox`)
+./run.sh --local claw --model local --gateway-url http://localhost:8000/v1 --tasks T100_reverse_decoder --sandbox --trials 1
+```
+
+Verified: container starts (`claw-agent-<task>-trial0`), fixtures inject, `sandbox_tools=True`, the agent solves with real shell/file tools, container torn down cleanly. **Tuning note:** with thinking-on + the 35B reasoning model, turns are heavy (~2k tok each), so hard tasks can hit the per-task `timeout_seconds` (600s default in each task.yaml) — raise it for a fair coding-agentic baseline.
