@@ -10,14 +10,27 @@ Canonical eval numbers for the **current daily driver**, re-run on every methodo
 - **Caps**: claw 10k tok/turn, coding 16k, FC 8k (bound think-spirals).
 - **Harness**: kb/contacts health-probe fix in place (no silent service failures). Report harness-errored tasks distinctly from model-scored ones.
 
-### Trials policy (locked 2026-06-27) — **every entry is 3× with a ± band**
+### Trials policy (locked 2026-06-27) — **3× + band where the suite samples; temp 0 + point where it doesn't**
 
-- **Run 3 trials** for every model × suite. Report the **primary metric as `mean ± half-range`** over the 3 trials (keep the per-trial JSON). A single-trial number is not a baseline entry — the band is what lets a model-to-model delta be read against the noise floor instead of mistaking noise for signal.
-- **Temperature by suite type:**
-  - *Exact-match / structured* (function-call): **temp 0** — the right answer is the distribution's mode, not a sample. Band ≈ 0 (deterministic); report the point. (`run_function_call --temperature 0`, now the default.)
-  - *Open-ended / judged* (claw, custom coding): **serving temp, thinking-on** — the band captures real sampling + judge variance, the noise that actually matters.
-- **Runners emit the band**: `run_function_call` and `run_custom` print `mean ± half-range (range …, std …, n=3)`; for `claw`, compute it from the per-trial `task_score`s in the results JSON (the submodule owns trials).
-- Caveat to record per entry: greedy (temp 0) is **not** universally better — it helped 9B FC (+2 pts) but slightly hurt the 35B (greedy sticks on a couple external tasks). When temp-0 and the sampled band diverge, report both.
+The band only carries information when the suite actually samples. So the policy splits by
+suite type — don't waste 3× on a deterministic suite, and never report a sampled suite without a band.
+
+- **Sampled / judged suites** (claw, custom coding, reasoning, structured, tool_reliability,
+  routing, **and quant-sensitivity** — run thinking-**on**, so it samples): **3 trials, report
+  `mean ± half-range`** (keep per-trial JSON). The band is the point: it's the noise floor a
+  model-to-model delta must clear to be a finding rather than a coin flip.
+- **Deterministic suites** (exact-match at **temp 0** — function-call): the band is ≈0, so 3×
+  is redundant — **report the point** (1 trial suffices). Optionally run 3× once as a cheap
+  *determinism check*: temp 0 is not bitwise-deterministic on GPU (FP non-determinism flips
+  near-ties — observed: greedy MTP vs bf16 FC differed by 1 task across server instances), so a
+  ±0 band certifies the run was clean; a non-zero band flags a flaky tie. Don't pay for it every run.
+- **Runners emit the band**: `run_function_call` and `run_custom` print `mean ± half-range
+  (range …, std …, n=N)`; for `claw`, compute it from the per-trial `task_score`s in the results
+  JSON (the submodule owns trials).
+- **Temperature by suite type**: exact-match → temp 0; open-ended/judged → serving temp, thinking-on.
+  Caveat to record per entry: greedy (temp 0) is **not** universally better — it helped 9B FC
+  (+2 pts) but slightly hurt the 35B (greedy sticks on a couple external tasks). When temp-0 and
+  the sampled band diverge, report both.
 
 ## Re-run
 
