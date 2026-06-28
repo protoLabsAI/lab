@@ -82,7 +82,10 @@ def run_single(
             model=model,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.0,
-            max_tokens=50,
+            max_tokens=256,
+            # thinking-off: this is pure retrieval, and a thinking budget would consume the
+            # whole answer (the orphaned version used max_tokens=50 + thinking-on -> 0/15).
+            extra_body={"chat_template_kwargs": {"enable_thinking": False}},
         )
         answer = (response.choices[0].message.content or "").strip()
     except Exception as e:
@@ -141,7 +144,8 @@ def print_results(results: dict[tuple[int, float], tuple[bool, float]]) -> None:
     default="http://localhost:8000/v1",
     help="OpenAI-compatible API base URL.",
 )
-@click.option("--api-key", default="not-needed", help="API key if required.")
+@click.option("--api-key", envvar=["GATEWAY_API_KEY", "LITELLM_API_KEY"], default="not-needed",
+              help="API key (auto-reads GATEWAY_API_KEY/LITELLM_API_KEY; needed for the gateway).")
 def main(
     model: str,
     lengths: str,

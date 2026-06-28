@@ -1,0 +1,66 @@
+id: quant_arithmetic
+name: "Quant-sensitivity — arithmetic chains"
+difficulty: easy
+category: quant_sensitivity
+# Easy step-by-step arithmetic a full-precision model gets right every time. Quant drift
+# (FP8/INT4) shows up as an occasional flipped digit in the chain -> wrong final number.
+# Graded deterministically (number mode, exact) so the drift is the only signal.
+
+tests:
+  - id: qa_chain_001
+    prompt: |
+      Start with 100. Add 45. Multiply by 2. Subtract 30. Divide by 5.
+      Output only the final integer.
+    graders:
+      - type: match
+        dimension: arithmetic
+        mode: number
+        expected: 52
+        tolerance: 0
+
+  - id: qa_chain_002
+    prompt: |
+      Start at 7. Double it. Add 6. Double it. Subtract 4. Double it.
+      Output only the final integer.
+    graders:
+      - type: match
+        dimension: arithmetic
+        mode: number
+        expected: 72
+        tolerance: 0
+
+  - id: qa_mult_001
+    prompt: "Compute 144 × 12. Output only the number."
+    graders:
+      - type: match
+        dimension: arithmetic
+        mode: number
+        expected: 1728
+        tolerance: 0
+
+  - id: qa_units_001
+    prompt: "Convert 3.5 hours into seconds. Output only the integer."
+    graders:
+      - type: match
+        dimension: arithmetic
+        mode: number
+        expected: 12600
+        tolerance: 0
+
+  - id: qa_sum_001
+    prompt: "Sum all integers from 1 to 20 inclusive. Output only the number."
+    graders:
+      - type: match
+        dimension: arithmetic
+        mode: number
+        expected: 210
+        tolerance: 0
+
+  - id: qa_rate_001
+    prompt: "A train travels 60 km/h for 2.5 hours. How many kilometers does it cover? Output only the number."
+    graders:
+      - type: match
+        dimension: arithmetic
+        mode: number
+        expected: 150
+        tolerance: 0

@@ -36,8 +36,14 @@ def load_alias_tier(model: str) -> dict | None:
     return tiers.get("aliases", {}).get(model)
 
 
-def run_function_call_test(client: OpenAI, model: str, test: dict) -> dict:
-    """Send a prompt with tools and capture the model's tool calls."""
+def run_function_call_test(client: OpenAI, model: str, test: dict, temperature: float = 0.0) -> dict:
+    """Send a prompt with tools and capture the model's tool calls.
+
+    Function calling is an exact-match, structured task: the right answer is the mode of
+    the distribution (correct tool + args), not a sample. Default temperature is 0.0 —
+    high temp only adds noise and depresses scores on structured suites. Bump it only if
+    you specifically want to measure tool-call robustness under sampling.
+    """
     messages = [{"role": "user", "content": test["prompt"]}]
     tools = test.get("tools", [])
 
@@ -56,7 +62,7 @@ def run_function_call_test(client: OpenAI, model: str, test: dict) -> dict:
             model=model,
             messages=messages,
             tools=tools,
-            temperature=0.7,
+            temperature=temperature,
             top_p=0.8,
             max_tokens=8000,  # raised from 1000: thinking models (Ornith etc.) need
                               # room to close <think> before the tool call (no-thinking-off policy)
@@ -167,7 +173,9 @@ def evaluate_gates(
     help="Directory to write result JSON",
 )
 @click.option("--trials", default=1, type=int, help="Trials per test")
-def main(model, suite, all_suites, gateway_url, api_key, submit_langfuse, output_dir, trials):
+@click.option("--temperature", default=0.0, type=float,
+              help="Sampling temperature (default 0.0 — FC is exact-match; low temp is correct)")
+def main(model, suite, all_suites, gateway_url, api_key, submit_langfuse, output_dir, trials, temperature):
     """Run function calling accuracy evals."""
     client = OpenAI(base_url=gateway_url, api_key=api_key)
     grader = FunctionCallGrader()
@@ -208,7 +216,7 @@ def main(model, suite, all_suites, gateway_url, api_key, submit_langfuse, output
         for test in tests:
             trial_records = []
             for trial in range(1, trials + 1):
-                output = run_function_call_test(client, model, test)
+                output = run_function_call_test(client, model, test, temperature=temperature)
                 result = grader.grade(
                     task_input={"prompt": test["prompt"]},
                     task_output=output,
@@ -256,7 +264,24 @@ def main(model, suite, all_suites, gateway_url, api_key, submit_langfuse, output
 
     # --- Summary ---
     click.echo(f"\n{'=' * 60}")
-    click.echo(f"Results: {total_passed}/{total_tests} passed ({overall_rate:.0%})")
+    click.echo(f"Results: {total_passed}/{total_tests} passed^{trials} ({overall_rate:.0%})")
+
+    # Per-trial pass-rate mean ± spread (the run-to-run noise band). At temp 0 this is
+    # ~flat (deterministic ceiling); at temp>0 it quantifies sampling noise so a delta
+    # between models can be read against it instead of mistaking noise for signal.
+    if trials > 1 and total_tests > 0:
+        import statistics
+        per_trial = [
+            sum(1 for tr in test_results if tr["trials"][i]["passed"]) / total_tests
+            for i in range(trials)
+        ]
+        mean = sum(per_trial) / trials
+        half_range = (max(per_trial) - min(per_trial)) / 2
+        std = statistics.pstdev(per_trial)
+        click.echo(
+            f"Per-trial pass-rate: {mean:.1%} ± {half_range:.1%}  "
+            f"(range {min(per_trial):.0%}-{max(per_trial):.0%}, std {std:.1%}, n={trials})"
+        )
 
     # Print per-bucket breakdown
     for bucket, stats in sorted(bucket_stats.items(), key=lambda x: x[0] or ""):

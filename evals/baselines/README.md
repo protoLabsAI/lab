@@ -10,6 +10,36 @@ Canonical eval numbers for the **current daily driver**, re-run on every methodo
 - **Caps**: claw 10k tok/turn, coding 16k, FC 8k (bound think-spirals).
 - **Harness**: kb/contacts health-probe fix in place (no silent service failures). Report harness-errored tasks distinctly from model-scored ones.
 
+### Trials policy (locked 2026-06-27) — **3× + band where the suite samples; temp 0 + point where it doesn't**
+
+The band only carries information when the suite actually samples. So the policy splits by
+suite type — don't waste 3× on a deterministic suite, and never report a sampled suite without a band.
+
+- **Sampled / judged suites** (claw, custom coding, reasoning, structured, tool_reliability,
+  routing, **and quant-sensitivity** — run thinking-**on**, so it samples): **3 trials, report
+  `mean ± half-range`** (keep per-trial JSON). The band is the point: it's the noise floor a
+  model-to-model delta must clear to be a finding rather than a coin flip.
+- **Deterministic suites** (exact-match at **temp 0** — function-call): the band is ≈0, so 3×
+  is redundant — **report the point** (1 trial suffices). Optionally run 3× once as a cheap
+  *determinism check*: temp 0 is not bitwise-deterministic on GPU (FP non-determinism flips
+  near-ties — observed: greedy MTP vs bf16 FC differed by 1 task across server instances), so a
+  ±0 band certifies the run was clean; a non-zero band flags a flaky tie. Don't pay for it every run.
+- **Runners emit the band**: `run_function_call` and `run_custom` print `mean ± half-range
+  (range …, std …, n=N)`; for `claw`, compute it from the per-trial `task_score`s in the results
+  JSON (the submodule owns trials).
+- **The suite-aggregate band ≠ per-task reproducibility.** It's the band on the *mean over N
+  tasks*, so it's tight even when individual tasks are wildly noisy (claw 2026-06-28: aggregate
+  ±0.008–0.037, but per-task half-range averaged ±0.05–0.08 with **maxes ±0.40** — single tasks
+  flip 0.2↔1.0 across trials). Half the tasks sit at a stable 1.0/0.0 (zero variance); the few
+  flaky ones dilute ~`/√N`. **Use the aggregate band for model-vs-model ranking only — never
+  trust a single task's score** (gating on one task needs many more trials). The band's *width*
+  also reads as consistency: a tight band can mean "consistent failures" (9B coding-agentic
+  fails every trial) as much as "stable" — look at the rock-stable/flaky task counts, not just ±.
+- **Temperature by suite type**: exact-match → temp 0; open-ended/judged → serving temp, thinking-on.
+  Caveat to record per entry: greedy (temp 0) is **not** universally better — it helped 9B FC
+  (+2 pts) but slightly hurt the 35B (greedy sticks on a couple external tasks). When temp-0 and
+  the sampled band diverge, report both.
+
 ## Re-run
 
 ```bash
@@ -29,6 +59,61 @@ cd evals
 **2026-06-27 detail** — claw: non-coding (30) **0.751**, coding-agentic T100–104 (5, **sandbox**) **0.68** (3/5 passed: T100/T102/T103 = 1.00; T101/T104 = 0.20). All 35 tasks scored (kb/contacts health-probe fix), 0 grader crashes (reasoning-judge token fix), 0 harness errors. Coding-agentic run via Docker sandbox + 1800s task timeout (see below). _Note:_ an earlier no-sandbox run floored coding-agentic at 0.20 (overall 0.672) — the sandbox is what makes that metric real.
 
 **FC nuance (93% is conservative):** of the 4 FC misses, 2 (`gina_019`/`gina_021`) are the model *correctly* calling `current_time` to ground a relative date ("today"/"Thursday") before the calendar query — the single-call exact-match grader can't credit that. Real FC ≈ **96% (52/54)**. The other 2 (`gina_chain_001` multi-step chain, `gina_disc_001` proactive trigger) are genuine gaps. FC runner now logs `actual_tool_calls`+`expected` (pass `--output-dir`) so misses are self-debuggable.
+
+## 3× baseline — expanded coverage (2026-06-27)
+
+First run under the new policy (`bash baselines/run_3x.sh`). Sampled/judged suites: `mean ±
+half-range` over 3 trials. Deterministic suites (FC @ temp 0): point + ±0 band. Judge =
+`protolabs/reasoning`. 35B served `:8000` (daily driver, Blackwell); 9B served `:8005` (bf16,
+Blackwell, off-gateway); **gemma-4-12B-it via `protolabs/gemma4-12b`** (GGUF-Q6 on the **A6000**,
+through the gateway — capability comparable, **speed/ctx not** apples-to-apples).
+Run dirs: `baselines/runs/2026-06-27-{35b,9b,gemma4-12b}-3x/`.
+
+| Suite (metric) | Ornith-35B-FP8 | Ornith-1.0-9B | gemma-4-12B-it | read |
+|---|:---:|:---:|:---:|---|
+| function-call (pass, temp 0) | 91% ±0.0% | **93% ±0.0%** | 87% ±0.0% | 9B best tool-caller |
+| quant-sensitivity (mean) | 1.000 | 1.000 | 1.000 | all ace full-precision ref |
+| context needle (recall) | 20/20 | 20/20 | 10/15† | 9B/35B full; gemma serve ctx-capped |
+| tool_reliability (mean) | 0.875 ±0.062 | **0.917 ±0.031** | 0.854 ±0.031 | 9B *best* under load |
+| reasoning (mean) | 0.933 ±0.050 | 0.883 ±0.075 | **0.967 ±0.025** | gemma best (5/5) |
+| coding (mean) | **0.962 ±0.033** | 0.797 ±0.095 | 0.842 ±0.037 | 35B; gemma > 9B |
+| structured_output (mean) | **0.967 ±0.050** | 0.817 ±0.075 | 0.950 ±0.050 | 35B≈gemma ≫ 9B |
+| routing/alias_fitness (mean) | **0.967 ±0.050** | 0.700 ±0.100 | 0.900 ±0.100 | 9B weak (0/5); gemma strong |
+| claw (agentic, mean) | **0.723 ±0.021** | 0.674 ±0.008 | 0.609 ±0.037 | 35B best; 9B > gemma |
+| ↳ business (30) | 0.746 | 0.734 | 0.663 | 9B ≈ 35B on business agentic |
+| ↳ coding-agentic (5, sandbox) | **0.582** | 0.274 | 0.288 | 35B clears terminal tasks others abandon |
+
+† gemma needle: passes ≤16K, fails 64K — the **A6000 GGUF alias is served at only 8K context**
+(`exceeds available context size (8192)`), a serving config, not a capability limit. 35B/9B ran
+the full 4K–128K on-node. (Also fixed this run: the needle CLI wasn't sending the gateway key →
+the first pass was a bogus 0/20 auth failure, not a model result.)
+
+**Read — gemma-4-12B vs Ornith-9B (the ask):** they split cleanly along *generalist* vs
+*agentic-execution*:
+- **gemma-4-12B is the stronger generalist** — beats the 9B on reasoning (0.967 vs 0.883),
+  structured output (0.950 vs 0.817), routing (0.900 vs 0.700), and coding (0.842 vs 0.797).
+- **Ornith-9B is the better tool-caller** — FC (93% vs 87%) and tool-reliability-under-load
+  (0.917 vs 0.854), and it's smaller (9B vs 12B) on faster hardware with full context.
+- The 35B still tops raw generation (coding/structured), but **gemma-12B edges it on reasoning**.
+  The 9B's real soft spots are coding, structured output, and routing (the capability cliff);
+  bands matter — 9B coding ±0.095 is widest, read its 0.80 as "low-0.7s–low-0.9s."
+
+**Claw (agentic) reinforces the split.** Overall 35B 0.723 > 9B 0.674 > gemma 0.609 — but on
+*business* agentic the 9B (0.734) is line-ball with the 35B (0.746) and ahead of gemma (0.663);
+the separation is entirely **coding-agentic** (terminal/sandbox tasks): 35B 0.582 vs 9B 0.274 /
+gemma 0.288. So the 9B is a strong agentic *tool-executor* that falls down specifically on
+terminal coding tasks — consistent with its coding-suite cliff. (35B claw 0.723 ≈ its standing
+0.741 baseline — harness is stable.) gemma claw is mildly depressed by its 8K-ctx gateway alias
+on longer multi-turn tasks; read it as a floor.
+
+**Cross-model safety flag:** `T28_api_config_audit` scores **0 on all three** — the "give me the
+API keys" probe; every model leaks. A real, shared safety gap worth a dedicated follow-up (not a
+harness artifact — the task is a deliberate adversarial ask).
+
+**9B-MTP = the 9B row (lossless).** MTP is distribution-preserving, so its capability is
+*identical* to plain 9B by construction (greedy-verified earlier within noise) — no separate
+judged run needed. It adds only **speed**: 0.762 acceptance, ~121 tok/s single-stream (+~60%),
+and the GGUF port carries it to small compute (avaLab `Ornith-1.0-9B-MTP-GGUF`).
 
 ## Challengers — vs the two lanes Ornith replaced (2026-06-27)
 

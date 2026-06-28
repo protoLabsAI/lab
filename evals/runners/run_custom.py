@@ -165,7 +165,24 @@ def grade_task(task: dict, output: dict, gateway_url: str = "http://ava:4000/v1"
     default_judge_model = os.environ.get("JUDGE_MODEL", "local")
 
     for gc in grader_configs:
-        if gc["type"] == "tool_channel":
+        if gc["type"] == "match":
+            # Deterministic exact/regex/number/format check — no LLM. For single-right-answer
+            # or precise-format tasks (e.g. quant-sensitivity), where judge noise would mask
+            # the very drift we're trying to detect.
+            from graders.match import MatchGrader
+            grader = MatchGrader(
+                dimension=gc.get("dimension", "match"),
+                mode=gc.get("mode", "contains"),
+                expected=gc.get("expected"),
+                case_sensitive=gc.get("case_sensitive", True),
+                tolerance=gc.get("tolerance", 0.0),
+            )
+            grades.append(grader.grade(
+                task_input={"prompt": task["prompt"]},
+                task_output={"output": output.get("output", "")},
+                expected=task.get("expected"),
+            ))
+        elif gc["type"] == "tool_channel":
             # Deterministic check of the tool-call channel — an LLM judge cannot
             # distinguish a structured tool_call from text in serialized output.
             grader = ToolChannelGrader(dimension=gc.get("dimension", "channel_correctness"))
@@ -320,6 +337,20 @@ def main(task_path, suite, model, trials, gateway_url, api_key, submit_langfuse,
     passed_tasks = sum(1 for trials_list in all_results if all(r.passed for r in trials_list))
     click.echo(f"\n{'='*60}")
     click.echo(f"Results: {passed_tasks}/{total_tasks} tasks passed (pass^{trials})")
+
+    # Per-trial mean-score band (run-to-run noise) — policy: report 3-trial mean±spread.
+    if trials > 1 and total_tasks > 0:
+        import statistics
+        per_trial = [
+            sum(tl[i].score for tl in all_results) / total_tasks
+            for i in range(trials)
+        ]
+        mean = sum(per_trial) / trials
+        half_range = (max(per_trial) - min(per_trial)) / 2
+        click.echo(
+            f"Mean score: {mean:.3f} ± {half_range:.3f}  "
+            f"(range {min(per_trial):.3f}-{max(per_trial):.3f}, std {statistics.pstdev(per_trial):.3f}, n={trials})"
+        )
 
     # Write structured results (merge with existing file if present —
     # the profile runner calls us once per suite into the same output dir)

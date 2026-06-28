@@ -1,0 +1,55 @@
+id: quant_exact_recall
+name: "Quant-sensitivity — exact recall / reproduction"
+difficulty: easy
+category: quant_sensitivity
+# Reproduce a distinctive string exactly, or recall one given in-context. Quant corrupts
+# rare-token sequences first; a flipped character fails the `contains` check. Graded on the
+# distinctive token so model preamble ("here is the code:") doesn't matter.
+
+tests:
+  - id: qe_repro_001
+    prompt: "Repeat this identifier exactly, character for character: PURPLE-TIGER-42-XK9-ZULU"
+    graders:
+      - type: match
+        dimension: exact_recall
+        mode: contains
+        expected: "PURPLE-TIGER-42-XK9-ZULU"
+
+  - id: qe_ctx_recall_001
+    prompt: |
+      Remember this account code exactly: 4471-9923-1186-5538.
+
+      Here is some unrelated filler text to add distance: the quarterly report covered
+      revenue, churn, and pipeline health across three regions, with a note on seasonal
+      variance and a reminder to reconcile the ledger before close.
+
+      Now output only the account code you were told to remember.
+    graders:
+      - type: match
+        dimension: exact_recall
+        mode: contains
+        expected: "4471-9923-1186-5538"
+
+  - id: qe_hex_001
+    prompt: "What is the decimal number 255 in hexadecimal? Output the value in uppercase with no 0x prefix."
+    graders:
+      - type: match
+        dimension: exact_recall
+        mode: regex
+        expected: "\\bFF\\b"
+
+  - id: qe_reverse_001
+    prompt: "Reverse the string 'quant'. Output only the reversed string."
+    graders:
+      - type: match
+        dimension: exact_recall
+        mode: contains
+        expected: "tnauq"
+
+  - id: qe_order_001
+    prompt: "List the integers from 10 down to 1, comma-separated, no spaces and no other text."
+    graders:
+      - type: match
+        dimension: exact_recall
+        mode: contains
+        expected: "10,9,8,7,6,5,4,3,2,1"

@@ -92,12 +92,14 @@ def quantize_model(model_id: str, output_dir: Path):
     logger.info(f"Loaded in {load_time:.1f}s")
 
     # Build skip patterns (matching official Qwen FP8)
+    # NOTE: blanket "linear_attn" keeps the WHOLE DeltaNet/SSM block in bf16. The 9B's
+    # DeltaNet has more projections than the 35B (in_proj_qkv / in_proj_z / out_proj in
+    # addition to in_proj_a/b/conv1d); enumerating them per-model silently FP8s the missed
+    # ones and corrupts the SSM. The blanket pattern is correct for any qwen3_5 hybrid.
     skip_patterns = [
         "lm_head",
         "embed_tokens",
-        "linear_attn.conv1d",
-        "linear_attn.in_proj_a",
-        "linear_attn.in_proj_b",
+        "linear_attn",
         "visual",
         "mtp",
         "layernorm", "layer_norm", "norm",

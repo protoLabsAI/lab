@@ -1,0 +1,60 @@
+# MTP toolkit — first instance: Ornith-1.0-9B (bf16) MTP head.
+#
+# DeepReinforce shipped Ornith-1.0-9B (dense Qwen3.5-9B fine-tune) WITHOUT MTP weights.
+# We graft Qwen3.5-9B's head, then re-align it to Ornith's own hidden states so the
+# native vLLM `mtp` speculative method works on Ornith. Quality is guaranteed unchanged
+# (the base model verifies every speculated token); the payoff is decode tok/s.
+#
+# Reuse this file as a template for other targets (e.g. the FP8 follow-up: point
+# `target` at the FP8 checkpoint, keep the head bf16).
+
+name: ornith-9b-mtp
+
+# --- graft ---
+donor: Qwen/Qwen3.5-9B                       # ships the 15 mtp.* tensors
+target: deepreinforce-ai/Ornith-1.0-9B       # the fine-tune to graft into
+graft_dtype: bfloat16                        # keep the head bf16 even on FP8 bases
+graft_out: /mnt/data/checkpoints/ornith-9b-mtp-graft
+
+# --- corpus (teacher = the target's OWN generations; we re-align the head to them) ---
+corpus:
+  served_url: http://localhost:8005/v1       # off-gateway Ornith-9B (NOT :8003 = production)
+  served_model: ornith-9b
+  out: /mnt/data/datasets/ornith-9b-mtp/corpus.jsonl
+  n_samples: 20000                           # ~5-15M tokens is plenty for one MTP layer
+  max_tokens: 1024
+  temperature: 0.7
+  # prompt sources: mix of agentic / chat / code so the head sees the serving distribution
+  prompt_sets: [claw_business, custom_coding, sharegpt_sample]
+
+# --- distill (freeze base, train ONLY mtp.*) ---
+distill:
+  base_ckpt: /mnt/data/checkpoints/ornith-9b-mtp-graft   # base loaded from here (HF ignores mtp.*)
+  init_from: /mnt/data/checkpoints/ornith-9b-mtp-graft   # mtp.* init (grafted Qwen head)
+  out: /mnt/data/checkpoints/ornith-9b-mtp                # final checkpoint (base + retuned head)
+  # v1 (lr 2e-4, 1 epoch) regressed the strong graft init 0.763->0.721. For v2, gate the
+  # real fix on eval_head.py: if the graft's offline proxy matches its 0.763 vLLM acceptance
+  # (forward is parity-correct), this lower lr + early-stop should let training only improve;
+  # if not, fix the forward first. Keep-best on a held-out acceptance proxy before shipping.
+  epochs: 1
+  lr: 5.0e-5
+  warmup_ratio: 0.05
+  loss: kl          # v2: distribution-match to the target (v1 hard-CE regressed the graft)
+  kl_temp: 1.0      # KD temperature; try 0.7 to match serving sampling temp
+  batch_tokens: 16384                        # tokens per step (grad-accum to hit this)
+  max_seq_len: 2048
+  weight_decay: 0.0
+  head_dtype: bfloat16
+  # the MTP head is one full_attention decoder layer; this layer_idx selects a
+  # full_attention slot in config.layer_types (every 4th layer). 3 is the first.
+  full_attention_layer_idx: 3
+  # position offset: MTP at position t consumes hidden_t + embed(tok_{t+1}) -> predicts tok_{t+2}
+  # (validated empirically via acceptance rate; flip if accept collapses)
+  position_shift: 1
+
+# --- validate ---
+validate:
+  serve_port: 8005
+  baseline_tok_s: 75          # plain Ornith-9B bf16 single-stream (from challenger bench)
+  num_speculative_tokens: 1
+  eval_suite: challenger      # re-run the 9B challenger row; expect ~identical (lossless)
