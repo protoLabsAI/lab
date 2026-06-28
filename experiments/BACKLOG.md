@@ -26,6 +26,16 @@ Add to this list when you find an idea worth holding; promote to an `experiments
 - **Experiment shape:** A/B against Fish S2 Pro on the same script set with prompts-for-affect vs voice-clone-with-no-affect. Measure: human-judged expressiveness, latency, output coherence on multi-sentence affect changes.
 - **Related parked work:** [voice-agent PARKED.md](voice-agent/PARKED.md), [fish-s2 tuning memory](file:///home/ava/.claude/projects/-home-ava-dev-lab/memory/project_fish_s2_tuning.md).
 
+## 3. Qwen-AgentWorld — a world model as a synthetic agentic environment
+
+- **HF:** [`Qwen/Qwen-AgentWorld-35B-A3B`](https://huggingface.co/Qwen/Qwen-AgentWorld-35B-A3B) (+ a 397B variant)
+- **What:** NOT an agent — a **world model**. Qwen3.5-35B-A3B fine-tune (CPT→SFT→RL/GSPO) trained to **simulate agentic environments**: predict the next *state* of a Terminal, SWE repo, Web page, Android, OS, Search, MCP tool-call. AgentWorldBench scores the *simulation* (Format/Factuality/Consistency/Realism/Quality), not the acting. Same arch/size as our Ornith-1.0-35B daily driver (256 experts/8+1, hybrid DeltaNet+attention, 262K ctx); `--language-model-only` in vLLM.
+- **License:** Apache 2.0. 34 community quants already exist.
+- **Why it might fit:** It's the **environment**, not the agent — exactly the missing piece for two things we care about. (a) **Agentic eval at scale without real infra:** claw's coding-agentic (T100–104) needs real Docker sandboxes; a faithful simulator could mock Terminal/SWE/Web responses so we scale agentic eval cheaply. (b) **A substrate for agent RL** (the parked `agent-lightning`/DPO direction): RL on agents needs a fast, controllable env to roll out trajectories — this is built for that ("controllable perturbations / fictional worlds / zero-shot OOD"). Our FP8 / serving / MoE-spec-decode findings transfer (same base arch).
+- **Not for:** the daily driver (it's a simulator, not an assistant), nor AgentWorldBench-as-our-metric (we care about Ornith *acting*, not world-modeling).
+- **Experiment shape (cheap first probe):** point it at one claw task and diff its *simulated* terminal/SWE responses against a real sandbox run — does the simulation match closely enough to trust an eval built on it? That single fidelity check decides whether the synthetic-environment idea is real for our suite before any wiring.
+- **Caveat:** specialist tool, real effort to adopt (wire simulator into eval/RL loop + validate fidelity); doesn't change the current stack. File under "next agentic-eval-at-scale or agent-RL push," not now.
+
 ---
 
 ## Promotion gate
