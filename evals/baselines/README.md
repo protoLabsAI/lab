@@ -27,6 +27,14 @@ suite type — don't waste 3× on a deterministic suite, and never report a samp
 - **Runners emit the band**: `run_function_call` and `run_custom` print `mean ± half-range
   (range …, std …, n=N)`; for `claw`, compute it from the per-trial `task_score`s in the results
   JSON (the submodule owns trials).
+- **The suite-aggregate band ≠ per-task reproducibility.** It's the band on the *mean over N
+  tasks*, so it's tight even when individual tasks are wildly noisy (claw 2026-06-28: aggregate
+  ±0.008–0.037, but per-task half-range averaged ±0.05–0.08 with **maxes ±0.40** — single tasks
+  flip 0.2↔1.0 across trials). Half the tasks sit at a stable 1.0/0.0 (zero variance); the few
+  flaky ones dilute ~`/√N`. **Use the aggregate band for model-vs-model ranking only — never
+  trust a single task's score** (gating on one task needs many more trials). The band's *width*
+  also reads as consistency: a tight band can mean "consistent failures" (9B coding-agentic
+  fails every trial) as much as "stable" — look at the rock-stable/flaky task counts, not just ±.
 - **Temperature by suite type**: exact-match → temp 0; open-ended/judged → serving temp, thinking-on.
   Caveat to record per entry: greedy (temp 0) is **not** universally better — it helped 9B FC
   (+2 pts) but slightly hurt the 35B (greedy sticks on a couple external tasks). When temp-0 and
