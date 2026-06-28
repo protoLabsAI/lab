@@ -25,7 +25,34 @@ Qwen3.5-9B draft transfers to the fine-tune (Ornith is light enough — same as 
 result). `n=5` accepts slightly more per step but the extra verify cost cancels it — the
 graft's acceptance (~1.2–1.4/step) is too low to exploit longer drafts, so **n=3 ≈ ceiling**.
 
-## Headline: train an Ornith-specific draft
+## Concurrency: EAGLE-3 vs MTP (the decisive test)
+
+Single-stream wins lie — the daily-driver regime is concurrent. Aggregate output tok/s,
+`conc_bench.py` (fixed-length, no-think), same base, MTP(n=1) vs EAGLE-3 graft(n=3):
+
+| C | MTP (n=1) | EAGLE-3 graft (n=3) | winner |
+|---|:---:|:---:|---|
+| 1 | 118.8 | **135.6** | EAGLE +14% |
+| 4 | 347.9 | **435.9** | EAGLE +25% |
+| 8 | 866.5 | **956.6** | EAGLE +10% |
+| 16 | **1662.7** | 1644.6 | ~tie |
+| 32 | **2915.0** | 2541.2 | MTP +15% |
+
+**dFlash pattern, milder.** EAGLE-3's tree wins the **interactive regime (C=1–8, +10–25%)**,
+crosses over ~**C=16**, and **MTP wins heavy batch (C=32)** — the 3-token tree inflates the
+verify batch and competes with concurrent requests for compute. Acceptance holds for EAGLE
+(~0.9 vs MTP ~0.7/step); it's the verify cost that erodes the aggregate win, not acceptance.
+
+## Verdict: nothing to ship — it's a use-it recipe
+
+- The interactive-regime win (C=4–8, +10–25% over our shipped MTP) comes from an **existing
+  public draft (`BLR2/Eagle3-Qwen3.5-9B`) + vLLM's built-in `eagle3`** — *download + point
+  vLLM at it*. No artifact for us to ship; our contribution is the **finding** (it transfers
+  to the fine-tune, beats MTP at C≤8, lossless). Unlike MTP, where DeepReinforce dropped the
+  head and we had to graft+distill+publish.
+- **MTP stays the in-checkpoint option** for heavy-batch (C≥16) and simplicity.
+
+## Optional headline (deferred): train an Ornith-specific draft
 
 EAGLE-3 hits 2–4 accepted/step when the draft is trained *for the target*. The graft's 1.2 is
 the transfer tax (base-Qwen draft on moved Ornith hidden states). Training a draft on Ornith's
