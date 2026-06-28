@@ -144,7 +144,8 @@ def print_results(results: dict[tuple[int, float], tuple[bool, float]]) -> None:
     default="http://localhost:8000/v1",
     help="OpenAI-compatible API base URL.",
 )
-@click.option("--api-key", default="not-needed", help="API key if required.")
+@click.option("--api-key", envvar=["GATEWAY_API_KEY", "LITELLM_API_KEY"], default="not-needed",
+              help="API key (auto-reads GATEWAY_API_KEY/LITELLM_API_KEY; needed for the gateway).")
 def main(
     model: str,
     lengths: str,

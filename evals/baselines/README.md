@@ -56,26 +56,37 @@ cd evals
 
 First run under the new policy (`bash baselines/run_3x.sh`). Sampled/judged suites: `mean ±
 half-range` over 3 trials. Deterministic suites (FC @ temp 0): point + ±0 band. Judge =
-`protolabs/reasoning`. 35B served `:8000` (daily driver); 9B served `:8005` (bf16, off-gateway).
-Run dirs: `baselines/runs/2026-06-27-{35b,9b}-3x/`.
+`protolabs/reasoning`. 35B served `:8000` (daily driver, Blackwell); 9B served `:8005` (bf16,
+Blackwell, off-gateway); **gemma-4-12B-it via `protolabs/gemma4-12b`** (GGUF-Q6 on the **A6000**,
+through the gateway — capability comparable, **speed/ctx not** apples-to-apples).
+Run dirs: `baselines/runs/2026-06-27-{35b,9b,gemma4-12b}-3x/`.
 
-| Suite (metric) | Ornith-35B-FP8 (daily) | Ornith-1.0-9B (bf16) | read |
-|---|:---:|:---:|---|
-| function-call (pass, temp 0) | 91% ±0.0% | **93% ±0.0%** | 9B edges it; deterministic |
-| quant-sensitivity (mean) | 1.000 ±0.000 | 1.000 ±0.000 | both ace the full-precision ref |
-| context needle 4k–128k (recall) | 20/20 | 20/20 | both perfect long-context |
-| tool_reliability (mean) | 0.875 ±0.062 | **0.917 ±0.031** | 9B *better* under multi-tool load |
-| reasoning (mean) | **0.933 ±0.050** | 0.883 ±0.075 | modest gap |
-| coding (mean) | **0.962 ±0.033** | 0.797 ±0.095 | capability cliff |
-| structured_output (mean) | **0.967 ±0.050** | 0.817 ±0.075 | gap |
-| routing/alias_fitness (mean) | **0.967 ±0.050** | 0.700 ±0.100 | 9B weak (0/5 pass^3) |
-| claw (agentic) | _pending_ | _pending_ | long pole — batch run |
+| Suite (metric) | Ornith-35B-FP8 | Ornith-1.0-9B | gemma-4-12B-it | read |
+|---|:---:|:---:|:---:|---|
+| function-call (pass, temp 0) | 91% ±0.0% | **93% ±0.0%** | 87% ±0.0% | 9B best tool-caller |
+| quant-sensitivity (mean) | 1.000 | 1.000 | 1.000 | all ace full-precision ref |
+| context needle (recall) | 20/20 | 20/20 | 10/15† | 9B/35B full; gemma serve ctx-capped |
+| tool_reliability (mean) | 0.875 ±0.062 | **0.917 ±0.031** | 0.854 ±0.031 | 9B *best* under load |
+| reasoning (mean) | 0.933 ±0.050 | 0.883 ±0.075 | **0.967 ±0.025** | gemma best (5/5) |
+| coding (mean) | **0.962 ±0.033** | 0.797 ±0.095 | 0.842 ±0.037 | 35B; gemma > 9B |
+| structured_output (mean) | **0.967 ±0.050** | 0.817 ±0.075 | 0.950 ±0.050 | 35B≈gemma ≫ 9B |
+| routing/alias_fitness (mean) | **0.967 ±0.050** | 0.700 ±0.100 | 0.900 ±0.100 | 9B weak (0/5); gemma strong |
+| claw (agentic) | _pending_ | _pending_ | _pending_ | long pole — batch run |
 
-**Read:** the 9B holds its own — and *beats* the 35B — on FC, tool-reliability-under-load,
-long-context recall, and the quant reference; the **capability cliff is real on harder
-generation/judgment**: coding (0.80 vs 0.96), structured output (0.82 vs 0.97), and especially
-**routing** (0.70 vs 0.97 — the 9B can't pick the right alias). The bands matter: 9B coding
-±0.095 is the widest, so treat its 0.80 as "low-0.7s to low-0.9s," still clearly below the 35B.
+† gemma needle: passes ≤16K, fails 64K — the **A6000 GGUF alias is served at only 8K context**
+(`exceeds available context size (8192)`), a serving config, not a capability limit. 35B/9B ran
+the full 4K–128K on-node. (Also fixed this run: the needle CLI wasn't sending the gateway key →
+the first pass was a bogus 0/20 auth failure, not a model result.)
+
+**Read — gemma-4-12B vs Ornith-9B (the ask):** they split cleanly along *generalist* vs
+*agentic-execution*:
+- **gemma-4-12B is the stronger generalist** — beats the 9B on reasoning (0.967 vs 0.883),
+  structured output (0.950 vs 0.817), routing (0.900 vs 0.700), and coding (0.842 vs 0.797).
+- **Ornith-9B is the better tool-caller** — FC (93% vs 87%) and tool-reliability-under-load
+  (0.917 vs 0.854), and it's smaller (9B vs 12B) on faster hardware with full context.
+- The 35B still tops raw generation (coding/structured), but **gemma-12B edges it on reasoning**.
+  The 9B's real soft spots are coding, structured output, and routing (the capability cliff);
+  bands matter — 9B coding ±0.095 is widest, read its 0.80 as "low-0.7s–low-0.9s."
 
 **9B-MTP = the 9B row (lossless).** MTP is distribution-preserving, so its capability is
 *identical* to plain 9B by construction (greedy-verified earlier within noise) — no separate

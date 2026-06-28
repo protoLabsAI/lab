@@ -15,6 +15,10 @@ CLAW="${4:-}"
 cd "$(dirname "$0")/.."   # evals/
 mkdir -p "$OUT"
 
+# Source the local gateway key so the needle step (run directly, not via run.sh --local)
+# can authenticate against the gateway. Harmless for local-served models.
+[ -f .env ] && { set -a; . ./.env; set +a; }
+
 echo "############ 3x baseline: model=$M url=$URL out=$OUT ############"
 
 # --- deterministic (temp 0 / match grader, no judge noise) ---
