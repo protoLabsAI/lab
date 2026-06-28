@@ -76,4 +76,37 @@ plain ~75 → MTP (in-checkpoint, shipped) 121 → **EAGLE-3 graft 138.8** → E
 in-checkpoint option. (On the MoE 35B daily driver, neither is a win — spec-decode is a
 dense-model play; MTP was −11% there.)
 
-Run logs: `results/{local→ornith-9b-eagle3}_…`. Related: `experiments/mtp/`, `project_ornith_9b_mtp`.
+## Spec-decode family — when to use which
+
+All of these are **lossless** (verified spec-decode: the target verifies every drafted token
+via rejection sampling, so the draft only moves speed, never quality — "lossless" =
+distribution-lossless, not bitwise). vLLM 0.22.1 supports: `ngram`, `medusa`, `mtp`,
+`eagle`/`eagle3`, `dflash`. They differ in cost-to-build and where on the workload×concurrency
+surface they pay off:
+
+| Method | What it drafts | Build cost | Wins on | Concurrency |
+|---|---|---|---|---|
+| **ngram** | copies recent n-grams from the context (string lookup, no model) | **free** | copy-heavy: RAG, code-edit, summarization, structured/JSON, long-ctx quoting, tool-echo | same batch-inflation penalty; long copies inflate hard |
+| **Medusa** | K *parallel, independent* heads off the final hidden state | trained heads | general (legacy) — superseded by EAGLE | heads non-autoregressive → low accept |
+| **MTP** | 1 autoregressive head (hidden + next-tok emb) | 1 layer (graft+distill) | general, cheap, in-checkpoint | scales near-linearly (low inflation) |
+| **EAGLE-3** | feature-conditioned *tree* drafter | separate trained draft | general, highest accept, interactive | wins C≤8, inverts ~C≥16 (tree inflation) |
+| **dFlash** | 2B block-diffusion draft | separate model | single-stream latency only | plateaus, loses by C≈4 (`experiments/dflash/`) |
+
+**Mental model — it's a curve over workload × concurrency, not a number:**
+- **ngram** = free, *spiky*: huge on copy-heavy, ~0 (and slightly negative) on novel gen.
+- **MTP** = cheap, general, concurrency-friendly (our shipped in-checkpoint option, heavy-batch).
+- **Medusa** = trained, general, low ceiling (legacy; MTP/EAGLE cover its niche better).
+- **EAGLE-3** = most machinery, highest ceiling, best *interactive* (C≤8).
+
+**ngram is NOT "free with no downside."** It's free to *enable* (no model/training) but not to
+*run*: every drafted token still costs verify compute, so (1) spurious short-n-gram matches draft
+wrong continuations → wasted verify; (2) same concurrency batch-inflation as the rest (a long
+copied span is a big inflation) → can go **net-negative** at high C on non-copy traffic; (3)
+wildly workload-dependent, so bad to blanket-enable on mixed traffic. **Route it to copy-heavy,
+low-concurrency lanes** (RAG, code-edit, structured) — don't turn it on globally.
+
+**Production setups route by lane** — e.g. ngram on RAG/structured, EAGLE/MTP on chat — rather
+than picking one globally. The only question per method is whether your lane sits where its
+curve pays.
+
+Run logs: `results/{local→ornith-9b-eagle3}_…`. Related: `experiments/mtp/`, `experiments/dflash/`, `project_ornith_9b_mtp`, `project_eagle3_ornith9b`.
