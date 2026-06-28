@@ -1,0 +1,262 @@
+{
+  "model": "ornith-9b",
+  "timestamp": "2026-06-27T23:16:52.509642+00:00",
+  "trials": 3,
+  "thinking": true,
+  "suites": {
+    "Structured Output Generation": {
+      "tasks": [
+        {
+          "task_id": "so_001",
+          "trials": [
+            {
+              "trial": 1,
+              "passed": false,
+              "score": 0.5,
+              "grades": [
+                {
+                  "dimension": "correctness",
+                  "score": 0.5,
+                  "passed": false
+                }
+              ],
+              "duration_s": 6.37,
+              "turns": 1
+            },
+            {
+              "trial": 2,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "correctness",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 7.88,
+              "turns": 1
+            },
+            {
+              "trial": 3,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "correctness",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 10.38,
+              "turns": 1
+            }
+          ],
+          "all_passed": false,
+          "avg_score": 0.8333333333333334
+        },
+        {
+          "task_id": "so_002",
+          "trials": [
+            {
+              "trial": 1,
+              "passed": false,
+              "score": 0.5,
+              "grades": [
+                {
+                  "dimension": "correctness",
+                  "score": 0.5,
+                  "passed": false
+                }
+              ],
+              "duration_s": 3.19,
+              "turns": 1
+            },
+            {
+              "trial": 2,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "correctness",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 20.59,
+              "turns": 1
+            },
+            {
+              "trial": 3,
+              "passed": false,
+              "score": 0.5,
+              "grades": [
+                {
+                  "dimension": "correctness",
+                  "score": 0.5,
+                  "passed": false
+                }
+              ],
+              "duration_s": 3.14,
+              "turns": 1
+            }
+          ],
+          "all_passed": false,
+          "avg_score": 0.6666666666666666
+        },
+        {
+          "task_id": "so_003",
+          "trials": [
+            {
+              "trial": 1,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "correctness",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 1.67,
+              "turns": 1
+            },
+            {
+              "trial": 2,
+              "passed": true,
+              "score": 0.75,
+              "grades": [
+                {
+                  "dimension": "correctness",
+                  "score": 0.75,
+                  "passed": true
+                }
+              ],
+              "duration_s": 2.33,
+              "turns": 1
+            },
+            {
+              "trial": 3,
+              "passed": false,
+              "score": 0.5,
+              "grades": [
+                {
+                  "dimension": "correctness",
+                  "score": 0.5,
+                  "passed": false
+                }
+              ],
+              "duration_s": 1.58,
+              "turns": 1
+            }
+          ],
+          "all_passed": false,
+          "avg_score": 0.75
+        },
+        {
+          "task_id": "so_004",
+          "trials": [
+            {
+              "trial": 1,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "correctness",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 4.65,
+              "turns": 1
+            },
+            {
+              "trial": 2,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "correctness",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 3.25,
+              "turns": 1
+            },
+            {
+              "trial": 3,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "correctness",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 3.66,
+              "turns": 1
+            }
+          ],
+          "all_passed": true,
+          "avg_score": 1.0
+        },
+        {
+          "task_id": "so_005",
+          "trials": [
+            {
+              "trial": 1,
+              "passed": true,
+              "score": 0.75,
+              "grades": [
+                {
+                  "dimension": "correctness",
+                  "score": 0.75,
+                  "passed": true
+                }
+              ],
+              "duration_s": 11.45,
+              "turns": 1
+            },
+            {
+              "trial": 2,
+              "passed": true,
+              "score": 0.75,
+              "grades": [
+                {
+                  "dimension": "correctness",
+                  "score": 0.75,
+                  "passed": true
+                }
+              ],
+              "duration_s": 13.15,
+              "turns": 1
+            },
+            {
+              "trial": 3,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "correctness",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 10.49,
+              "turns": 1
+            }
+          ],
+          "all_passed": true,
+          "avg_score": 0.8333333333333334
+        }
+      ]
+    }
+  },
+  "summary": {
+    "total_tasks": 5,
+    "passed_tasks": 2,
+    "pass_rate": 0.4
+  }
+}

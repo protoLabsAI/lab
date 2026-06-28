@@ -1,0 +1,97 @@
+Model: local | Trials: 3 | Tasks: 3
+============================================================
+
+Quant-sensitivity — arithmetic chains (6 tests)
+
+  qa_chain_001:
+    Trial 1: PASS (score=1.00, turns=1, 2.71s)
+    Trial 2: PASS (score=1.00, turns=1, 0.61s)
+    Trial 3: PASS (score=1.00, turns=1, 2.94s)
+    Pass^3: PASS (avg=1.00)
+
+  qa_chain_002:
+    Trial 1: PASS (score=1.00, turns=1, 1.13s)
+    Trial 2: PASS (score=1.00, turns=1, 2.02s)
+    Trial 3: PASS (score=1.00, turns=1, 1.26s)
+    Pass^3: PASS (avg=1.00)
+
+  qa_mult_001:
+    Trial 1: PASS (score=1.00, turns=1, 1.88s)
+    Trial 2: PASS (score=1.00, turns=1, 0.73s)
+    Trial 3: PASS (score=1.00, turns=1, 0.93s)
+    Pass^3: PASS (avg=1.00)
+
+  qa_units_001:
+    Trial 1: PASS (score=1.00, turns=1, 2.46s)
+    Trial 2: PASS (score=1.00, turns=1, 2.68s)
+    Trial 3: PASS (score=1.00, turns=1, 0.91s)
+    Pass^3: PASS (avg=1.00)
+
+  qa_sum_001:
+    Trial 1: PASS (score=1.00, turns=1, 0.88s)
+    Trial 2: PASS (score=1.00, turns=1, 0.44s)
+    Trial 3: PASS (score=1.00, turns=1, 1.99s)
+    Pass^3: PASS (avg=1.00)
+
+  qa_rate_001:
+    Trial 1: PASS (score=1.00, turns=1, 0.72s)
+    Trial 2: PASS (score=1.00, turns=1, 0.91s)
+    Trial 3: PASS (score=1.00, turns=1, 0.82s)
+    Pass^3: PASS (avg=1.00)
+
+Quant-sensitivity — exact recall / reproduction (5 tests)
+
+  qe_repro_001:
+    Trial 1: PASS (score=1.00, turns=1, 1.38s)
+    Trial 2: PASS (score=1.00, turns=1, 1.62s)
+    Trial 3: PASS (score=1.00, turns=1, 1.54s)
+    Pass^3: PASS (avg=1.00)
+
+  qe_ctx_recall_001:
+    Trial 1: PASS (score=1.00, turns=1, 1.78s)
+    Trial 2: PASS (score=1.00, turns=1, 1.48s)
+    Trial 3: PASS (score=1.00, turns=1, 1.63s)
+    Pass^3: PASS (avg=1.00)
+
+  qe_hex_001:
+    Trial 1: PASS (score=1.00, turns=1, 0.77s)
+    Trial 2: PASS (score=1.00, turns=1, 0.84s)
+    Trial 3: PASS (score=1.00, turns=1, 0.74s)
+    Pass^3: PASS (avg=1.00)
+
+  qe_reverse_001:
+    Trial 1: PASS (score=1.00, turns=1, 0.53s)
+    Trial 2: PASS (score=1.00, turns=1, 0.37s)
+    Trial 3: PASS (score=1.00, turns=1, 0.48s)
+    Pass^3: PASS (avg=1.00)
+
+  qe_order_001:
+    Trial 1: PASS (score=1.00, turns=1, 2.66s)
+    Trial 2: PASS (score=1.00, turns=1, 1.01s)
+    Trial 3: PASS (score=1.00, turns=1, 1.1s)
+    Pass^3: PASS (avg=1.00)
+
+Quant-sensitivity — format precision (3 tests)
+
+  qf_json_001:
+    Trial 1: PASS (score=1.00, turns=1, 0.62s)
+    Trial 2: PASS (score=1.00, turns=1, 0.92s)
+    Trial 3: PASS (score=1.00, turns=1, 2.3s)
+    Pass^3: PASS (avg=1.00)
+
+  qf_csv_001:
+    Trial 1: PASS (score=1.00, turns=1, 1.01s)
+    Trial 2: PASS (score=1.00, turns=1, 1.06s)
+    Trial 3: PASS (score=1.00, turns=1, 1.26s)
+    Pass^3: PASS (avg=1.00)
+
+  qf_delim_001:
+    Trial 1: PASS (score=1.00, turns=1, 1.12s)
+    Trial 2: PASS (score=1.00, turns=1, 1.96s)
+    Trial 3: PASS (score=1.00, turns=1, 0.89s)
+    Pass^3: PASS (avg=1.00)
+
+============================================================
+Results: 14/14 tasks passed (pass^3)
+Mean score: 1.000 ± 0.000  (range 1.000-1.000, std 0.000, n=3)
+Results written to baselines/runs/2026-06-27-35b-3x/quant/custom_results.json

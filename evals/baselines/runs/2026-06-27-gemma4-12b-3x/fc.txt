@@ -1,0 +1,77 @@
+Model: protolabs/gemma4-12b | Suites: 5 | Trials: 3
+============================================================
+
+Basic Function Calling (5 tests)
+  fc_001: PASS (1.00) — call 1: name: match; args: 1/1 (1.00)
+  fc_002: PASS (1.00) — call 1: name: match; args: 3/3 (1.00)
+  fc_003: PASS (1.00) — call 1: name: match; args: 3/3 (1.00)
+  fc_004: PASS (1.00) — call 1: name: match; args: 1/1 (1.00); call 2: name: match; args: 1/1 (1.00)
+  fc_005: PASS (1.00) — Correctly made no tool calls
+
+Tool Call Canaries (10 tests)
+  canary_001 [inprocess]: PASS (1.00) — call 1: name: match; args: none expected (1.00)
+  canary_002 [inprocess]: PASS (1.00) — call 1: name: match; args: none expected (1.00)
+  canary_003 [inprocess]: PASS (1.00) — call 1: name: match; args: none expected (1.00)
+  canary_004 [inprocess]: FAIL (0.50) — call 1: name: match; args: none expected (1.00); call 2: Expected call 'get_weat
+  canary_005 [inprocess]: PASS (1.00) — call 1: name: match; args: 1/1 (1.00)
+  canary_006 [external]: PASS (1.00) — call 1: name: match; args: 1/1 (1.00)
+  canary_007 [external]: PASS (1.00) — call 1: name: match; args: 1/1 (1.00)
+  canary_008 [external]: PASS (1.00) — call 1: name: match; args: 2/2 (1.00)
+  canary_009 [external]: PASS (1.00) — call 1: name: match; args: 1/1 (1.00)
+  canary_010 [external]: FAIL (0.50) — call 1: name: match; args: none expected (1.00); call 2: Expected call 'list_ema
+
+Edge Case Function Calling (3 tests)
+  fc_edge_001: PASS (1.00) — call 1: name: match; args: 4/4 (1.00)
+  fc_edge_002: PASS (0.88) — call 1: name: match; arg 'min_year': expected 2024, got 2025; args: 3/4 (0.88)
+  fc_edge_003: PASS (1.00) — Correctly made no tool calls
+
+Gina Advanced Patterns (7 tests)
+  gina_abs_001 [inprocess]: PASS (1.00) — Correctly made no tool calls
+  gina_abs_002 [inprocess]: PASS (1.00) — Correctly made no tool calls
+  gina_chain_001 [inprocess]: FAIL (0.50) — call 1: name: match; args: none expected (1.00); call 2: Expected call 'memory_s
+  gina_chain_002 [inprocess]: PASS (1.00) — call 1: name: match; args: none expected (1.00)
+  gina_err_001 [inprocess]: PASS (1.00) — call 1: name: match; args: none expected (1.00)
+  gina_err_002 [inprocess]: PASS (1.00) — call 1: name: match; args: none expected (1.00)
+  gina_disc_001 [inprocess]: PASS (1.00) — call 1: name: match; args: none expected (1.00)
+
+Gina Tool Routing (29 tests)
+  gina_001 [inprocess]: PASS (1.00) — call 1: name: match; args: 1/1 (1.00)
+  gina_002 [inprocess]: PASS (1.00) — call 1: name: match; args: none expected (1.00)
+  gina_003 [inprocess]: PASS (1.00) — call 1: name: match; args: none expected (1.00)
+  gina_004 [inprocess]: PASS (1.00) — call 1: name: match; args: none expected (1.00)
+  gina_005 [inprocess]: PASS (1.00) — call 1: name: match; args: none expected (1.00)
+  gina_006 [inprocess]: PASS (1.00) — call 1: name: match; args: none expected (1.00)
+  gina_007 [inprocess]: PASS (1.00) — call 1: name: match; args: none expected (1.00)
+  gina_008 [inprocess]: FAIL (0.00) — call 1: Expected call 'agent_task_list' not found (0.00)
+  gina_009 [inprocess]: PASS (1.00) — call 1: name: match; args: none expected (1.00)
+  gina_010 [inprocess]: FAIL (0.00) — call 1: Expected call 'agent_task_list' not found (0.00)
+  gina_011 [inprocess]: PASS (1.00) — call 1: name: match; args: none expected (1.00)
+  gina_012 [inprocess]: PASS (1.00) — call 1: name: match; args: none expected (1.00)
+  gina_013 [inprocess]: PASS (1.00) — call 1: name: match; args: none expected (1.00)
+  gina_014 [inprocess]: PASS (1.00) — call 1: name: match; args: 1/1 (1.00)
+  gina_015 [external]: PASS (1.00) — call 1: name: match; args: none expected (1.00)
+  gina_016 [external]: PASS (1.00) — call 1: name: match; args: 1/1 (1.00)
+  gina_017 [external]: PASS (1.00) — call 1: name: match; args: none expected (1.00)
+  gina_018 [external]: PASS (1.00) — call 1: name: match; args: none expected (1.00)
+  gina_019 [external]: PASS (1.00) — call 1: name: match; args: none expected (1.00)
+  gina_020 [external]: PASS (1.00) — call 1: name: match; args: none expected (1.00)
+  gina_021 [external]: PASS (1.00) — call 1: name: match; args: none expected (1.00)
+  gina_022 [external]: PASS (1.00) — call 1: name: match; args: none expected (1.00)
+  gina_023 [external]: FAIL (0.00) — call 1: Expected call 'gmail_draft' not found (0.00)
+  gina_024 [external]: PASS (1.00) — call 1: name: match; args: none expected (1.00)
+  gina_025 [external]: PASS (1.00) — call 1: name: match; args: none expected (1.00)
+  gina_026 [external]: PASS (1.00) — call 1: name: match; args: none expected (1.00)
+  gina_027 [external]: PASS (1.00) — call 1: name: match; args: none expected (1.00)
+  gina_028 [external]: PASS (1.00) — call 1: name: match; args: none expected (1.00)
+  gina_029 [external]: FAIL (0.00) — call 1: Expected call 'peer_consult' not found (0.00)
+
+============================================================
+Results: 47/54 passed^3 (87%)
+Per-trial pass-rate: 87.0% ± 0.0%  (range 87%-87%, std 0.0%, n=3)
+  external    : 17/20 (85%)
+  inprocess   : 22/26 (85%)
+  untagged    : 8/8 (100%)
+
+No alias tier found for 'protolabs/gemma4-12b' — gate check skipped
+
+Results written to baselines/runs/2026-06-27-gemma4-12b-3x/fc/function_call_results.json

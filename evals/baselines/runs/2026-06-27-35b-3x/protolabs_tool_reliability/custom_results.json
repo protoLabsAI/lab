@@ -1,0 +1,409 @@
+{
+  "model": "local",
+  "timestamp": "2026-06-27T23:04:10.667635+00:00",
+  "trials": 3,
+  "thinking": true,
+  "suites": {
+    "Tool Reliability Under Load": {
+      "tasks": [
+        {
+          "task_id": "tr_001_calculator_with_noise",
+          "trials": [
+            {
+              "trial": 1,
+              "passed": false,
+              "score": 0.5,
+              "grades": [
+                {
+                  "dimension": "tool_selection",
+                  "score": 0.5,
+                  "passed": false
+                }
+              ],
+              "duration_s": 0.85,
+              "turns": 2
+            },
+            {
+              "trial": 2,
+              "passed": false,
+              "score": 0.5,
+              "grades": [
+                {
+                  "dimension": "tool_selection",
+                  "score": 0.5,
+                  "passed": false
+                }
+              ],
+              "duration_s": 1.7,
+              "turns": 2
+            },
+            {
+              "trial": 3,
+              "passed": false,
+              "score": 0.5,
+              "grades": [
+                {
+                  "dimension": "tool_selection",
+                  "score": 0.5,
+                  "passed": false
+                }
+              ],
+              "duration_s": 0.75,
+              "turns": 2
+            }
+          ],
+          "all_passed": false,
+          "avg_score": 0.5
+        },
+        {
+          "task_id": "tr_002_memory_search_with_noise",
+          "trials": [
+            {
+              "trial": 1,
+              "passed": false,
+              "score": 0.5,
+              "grades": [
+                {
+                  "dimension": "tool_selection",
+                  "score": 0.5,
+                  "passed": false
+                }
+              ],
+              "duration_s": 1.73,
+              "turns": 3
+            },
+            {
+              "trial": 2,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "tool_selection",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 0.94,
+              "turns": 2
+            },
+            {
+              "trial": 3,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "tool_selection",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 0.95,
+              "turns": 2
+            }
+          ],
+          "all_passed": false,
+          "avg_score": 0.8333333333333334
+        },
+        {
+          "task_id": "tr_003_task_creation",
+          "trials": [
+            {
+              "trial": 1,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "tool_selection",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 1.17,
+              "turns": 2
+            },
+            {
+              "trial": 2,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "tool_selection",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 1.41,
+              "turns": 2
+            },
+            {
+              "trial": 3,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "tool_selection",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 1.54,
+              "turns": 2
+            }
+          ],
+          "all_passed": true,
+          "avg_score": 1.0
+        },
+        {
+          "task_id": "tr_004_email_with_32_tools",
+          "trials": [
+            {
+              "trial": 1,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "tool_selection",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 1.68,
+              "turns": 3
+            },
+            {
+              "trial": 2,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "tool_selection",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 1.71,
+              "turns": 3
+            },
+            {
+              "trial": 3,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "tool_selection",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 1.52,
+              "turns": 3
+            }
+          ],
+          "all_passed": true,
+          "avg_score": 1.0
+        },
+        {
+          "task_id": "tr_005_chained_tools",
+          "trials": [
+            {
+              "trial": 1,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "tool_chaining",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 3.92,
+              "turns": 4
+            },
+            {
+              "trial": 2,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "tool_chaining",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 3.94,
+              "turns": 4
+            },
+            {
+              "trial": 3,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "tool_chaining",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 3.32,
+              "turns": 4
+            }
+          ],
+          "all_passed": true,
+          "avg_score": 1.0
+        },
+        {
+          "task_id": "tr_006_abstention",
+          "trials": [
+            {
+              "trial": 1,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "tool_selection",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 0.31,
+              "turns": 1
+            },
+            {
+              "trial": 2,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "tool_selection",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 0.41,
+              "turns": 1
+            },
+            {
+              "trial": 3,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "tool_selection",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 0.35,
+              "turns": 1
+            }
+          ],
+          "all_passed": true,
+          "avg_score": 1.0
+        },
+        {
+          "task_id": "tr_007_ambiguous_intent",
+          "trials": [
+            {
+              "trial": 1,
+              "passed": false,
+              "score": 0.5,
+              "grades": [
+                {
+                  "dimension": "tool_selection",
+                  "score": 0.5,
+                  "passed": false
+                }
+              ],
+              "duration_s": 1.59,
+              "turns": 4
+            },
+            {
+              "trial": 2,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "tool_selection",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 1.42,
+              "turns": 3
+            },
+            {
+              "trial": 3,
+              "passed": false,
+              "score": 0.5,
+              "grades": [
+                {
+                  "dimension": "tool_selection",
+                  "score": 0.5,
+                  "passed": false
+                }
+              ],
+              "duration_s": 1.64,
+              "turns": 4
+            }
+          ],
+          "all_passed": false,
+          "avg_score": 0.6666666666666666
+        },
+        {
+          "task_id": "tr_008_parallel_tools",
+          "trials": [
+            {
+              "trial": 1,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "tool_selection",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 3.65,
+              "turns": 3
+            },
+            {
+              "trial": 2,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "tool_selection",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 2.72,
+              "turns": 3
+            },
+            {
+              "trial": 3,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "tool_selection",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 2.61,
+              "turns": 3
+            }
+          ],
+          "all_passed": true,
+          "avg_score": 1.0
+        }
+      ]
+    }
+  },
+  "summary": {
+    "total_tasks": 8,
+    "passed_tasks": 5,
+    "pass_rate": 0.625
+  }
+}

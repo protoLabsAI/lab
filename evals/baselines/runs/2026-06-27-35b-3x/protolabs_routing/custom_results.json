@@ -1,0 +1,262 @@
+{
+  "model": "local",
+  "timestamp": "2026-06-27T23:09:25.344517+00:00",
+  "trials": 3,
+  "thinking": true,
+  "suites": {
+    "Alias Routing Fitness": {
+      "tasks": [
+        {
+          "task_id": "route_001_complex_reasoning",
+          "trials": [
+            {
+              "trial": 1,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "reasoning_quality",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 10.33,
+              "turns": 1
+            },
+            {
+              "trial": 2,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "reasoning_quality",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 10.85,
+              "turns": 1
+            },
+            {
+              "trial": 3,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "reasoning_quality",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 9.89,
+              "turns": 1
+            }
+          ],
+          "all_passed": true,
+          "avg_score": 1.0
+        },
+        {
+          "task_id": "route_002_quick_factual",
+          "trials": [
+            {
+              "trial": 1,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "speed_fitness",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 0.9,
+              "turns": 1
+            },
+            {
+              "trial": 2,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "speed_fitness",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 1.14,
+              "turns": 1
+            },
+            {
+              "trial": 3,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "speed_fitness",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 1.45,
+              "turns": 1
+            }
+          ],
+          "all_passed": true,
+          "avg_score": 1.0
+        },
+        {
+          "task_id": "route_003_code_generation",
+          "trials": [
+            {
+              "trial": 1,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "reasoning_quality",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 17.59,
+              "turns": 1
+            },
+            {
+              "trial": 2,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "reasoning_quality",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 15.2,
+              "turns": 1
+            },
+            {
+              "trial": 3,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "reasoning_quality",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 19.0,
+              "turns": 1
+            }
+          ],
+          "all_passed": true,
+          "avg_score": 1.0
+        },
+        {
+          "task_id": "route_004_creative_quick",
+          "trials": [
+            {
+              "trial": 1,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "creative_quality",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 10.03,
+              "turns": 1
+            },
+            {
+              "trial": 2,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "creative_quality",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 6.39,
+              "turns": 1
+            },
+            {
+              "trial": 3,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "creative_quality",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 6.73,
+              "turns": 1
+            }
+          ],
+          "all_passed": true,
+          "avg_score": 1.0
+        },
+        {
+          "task_id": "route_005_multi_step_analysis",
+          "trials": [
+            {
+              "trial": 1,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "reasoning_quality",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 29.43,
+              "turns": 1
+            },
+            {
+              "trial": 2,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "reasoning_quality",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 28.73,
+              "turns": 1
+            },
+            {
+              "trial": 3,
+              "passed": false,
+              "score": 0.5,
+              "grades": [
+                {
+                  "dimension": "reasoning_quality",
+                  "score": 0.5,
+                  "passed": false
+                }
+              ],
+              "duration_s": 31.39,
+              "turns": 1
+            }
+          ],
+          "all_passed": false,
+          "avg_score": 0.8333333333333334
+        }
+      ]
+    }
+  },
+  "summary": {
+    "total_tasks": 5,
+    "passed_tasks": 4,
+    "pass_rate": 0.8
+  }
+}

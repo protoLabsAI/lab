@@ -1,0 +1,73 @@
+Model: protolabs/gemma4-12b | Trials: 3 | Tasks: 2
+============================================================
+
+Code Analysis & Review (5 tests)
+
+  ca_001:
+    Trial 1: PASS (score=1.00, turns=1, 13.9s)
+    Trial 2: PASS (score=1.00, turns=1, 14.52s)
+    Trial 3: PASS (score=1.00, turns=1, 14.21s)
+    Pass^3: PASS (avg=1.00)
+
+  ca_002:
+    Trial 1: PASS (score=1.00, turns=1, 21.41s)
+    Trial 2: PASS (score=1.00, turns=1, 21.23s)
+    Trial 3: PASS (score=1.00, turns=1, 22.66s)
+    Pass^3: PASS (avg=1.00)
+
+  ca_003:
+    Trial 1: PASS (score=1.00, turns=1, 16.0s)
+    Trial 2: PASS (score=1.00, turns=1, 15.25s)
+    Trial 3: PASS (score=1.00, turns=1, 17.24s)
+    Pass^3: PASS (avg=1.00)
+
+  ca_004:
+    Trial 1: PASS (score=1.00, turns=1, 17.65s)
+    Trial 2: PASS (score=0.75, turns=1, 18.81s)
+    Trial 3: PASS (score=0.75, turns=1, 17.93s)
+    Pass^3: PASS (avg=0.83)
+
+  ca_005:
+    Trial 1: PASS (score=1.00, turns=1, 10.19s)
+    Trial 2: PASS (score=1.00, turns=1, 9.77s)
+    Trial 3: PASS (score=1.00, turns=1, 9.52s)
+    Pass^3: PASS (avg=1.00)
+
+Code Generation Quality (5 tests)
+
+  code_001:
+    Trial 1: PASS (score=1.00, turns=1, 25.43s)
+    Trial 2: PASS (score=1.00, turns=1, 20.89s)
+[llm_judge] correctness: judge call/parse failed -> 0.5 fallback: Expecting value: line 1 column 1 (char 0)
+    Trial 3: FAIL (score=0.50, turns=1, 23.25s)
+    Pass^3: FAIL (avg=0.83)
+
+  code_002:
+    Trial 1: FAIL (score=0.50, turns=1, 16.62s)
+    Trial 2: PASS (score=1.00, turns=1, 19.6s)
+    Trial 3: FAIL (score=0.75, turns=1, 22.03s)
+    Pass^3: FAIL (avg=0.75)
+
+  code_003:
+    Trial 1: PASS (score=1.00, turns=1, 9.02s)
+    Trial 2: PASS (score=1.00, turns=1, 10.36s)
+    Trial 3: PASS (score=1.00, turns=1, 10.55s)
+    Pass^3: PASS (avg=1.00)
+
+  code_004:
+    Trial 1: PASS (score=1.00, turns=1, 9.54s)
+[llm_judge] correctness: judge call/parse failed -> 0.5 fallback: Extra data: line 1 column 4 (char 3)
+    Trial 2: FAIL (score=0.50, turns=1, 10.23s)
+    Trial 3: PASS (score=1.00, turns=1, 9.95s)
+    Pass^3: FAIL (avg=0.83)
+
+  code_005:
+    Trial 1: FAIL (score=0.00, turns=1, 21.07s)
+    Trial 2: FAIL (score=0.50, turns=1, 14.2s)
+    Trial 3: FAIL (score=0.00, turns=1, 19.23s)
+    Pass^3: FAIL (avg=0.17)
+
+============================================================
+Results: 6/10 tasks passed (pass^3)
+Mean score: 0.842 ± 0.037  (range 0.800-0.875, std 0.031, n=3)
+Results written to baselines/runs/2026-06-27-gemma4-12b-3x/coding/custom_results.json

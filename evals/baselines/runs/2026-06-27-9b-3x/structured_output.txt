@@ -1,0 +1,41 @@
+Model: ornith-9b | Trials: 3 | Tasks: 1
+============================================================
+
+Structured Output Generation (5 tests)
+
+  so_001:
+    Trial 1: FAIL (score=0.50, turns=1, 6.37s)
+    Trial 2: PASS (score=1.00, turns=1, 7.88s)
+    Trial 3: PASS (score=1.00, turns=1, 10.38s)
+    Pass^3: FAIL (avg=0.83)
+
+  so_002:
+[llm_judge] correctness: judge call/parse failed -> 0.5 fallback: Expecting value: line 1 column 1 (char 0)
+    Trial 1: FAIL (score=0.50, turns=1, 3.19s)
+    Trial 2: PASS (score=1.00, turns=1, 20.59s)
+[llm_judge] correctness: judge call/parse failed -> 0.5 fallback: Expecting value: line 1 column 1 (char 0)
+    Trial 3: FAIL (score=0.50, turns=1, 3.14s)
+    Pass^3: FAIL (avg=0.67)
+
+  so_003:
+    Trial 1: PASS (score=1.00, turns=1, 1.67s)
+    Trial 2: PASS (score=0.75, turns=1, 2.33s)
+    Trial 3: FAIL (score=0.50, turns=1, 1.58s)
+    Pass^3: FAIL (avg=0.75)
+
+  so_004:
+    Trial 1: PASS (score=1.00, turns=1, 4.65s)
+    Trial 2: PASS (score=1.00, turns=1, 3.25s)
+    Trial 3: PASS (score=1.00, turns=1, 3.66s)
+    Pass^3: PASS (avg=1.00)
+
+  so_005:
+    Trial 1: PASS (score=0.75, turns=1, 11.45s)
+    Trial 2: PASS (score=0.75, turns=1, 13.15s)
+    Trial 3: PASS (score=1.00, turns=1, 10.49s)
+    Pass^3: PASS (avg=0.83)
+
+============================================================
+Results: 2/5 tasks passed (pass^3)
+Mean score: 0.817 ± 0.075  (range 0.750-0.900, std 0.062, n=3)
+Results written to evals/baselines/runs/2026-06-27-9b-3x/structured_output/custom_results.json

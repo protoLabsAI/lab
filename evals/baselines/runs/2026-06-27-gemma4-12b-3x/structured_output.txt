@@ -1,0 +1,40 @@
+Model: protolabs/gemma4-12b | Trials: 3 | Tasks: 1
+============================================================
+
+Structured Output Generation (5 tests)
+
+  so_001:
+    Trial 1: PASS (score=1.00, turns=1, 5.49s)
+    Trial 2: PASS (score=1.00, turns=1, 5.76s)
+    Trial 3: PASS (score=1.00, turns=1, 5.56s)
+    Pass^3: PASS (avg=1.00)
+
+  so_002:
+    Trial 1: PASS (score=1.00, turns=1, 8.95s)
+    Trial 2: PASS (score=1.00, turns=1, 12.18s)
+    Trial 3: PASS (score=1.00, turns=1, 7.1s)
+    Pass^3: PASS (avg=1.00)
+
+  so_003:
+    Trial 1: PASS (score=1.00, turns=1, 4.88s)
+    Trial 2: PASS (score=1.00, turns=1, 4.84s)
+    Trial 3: PASS (score=1.00, turns=1, 4.4s)
+    Pass^3: PASS (avg=1.00)
+
+  so_004:
+    Trial 1: PASS (score=1.00, turns=1, 5.87s)
+    Trial 2: PASS (score=1.00, turns=1, 6.47s)
+[llm_judge] correctness: judge call/parse failed -> 0.5 fallback: Expecting value: line 1 column 2 (char 1)
+    Trial 3: FAIL (score=0.50, turns=1, 6.31s)
+    Pass^3: FAIL (avg=0.83)
+
+  so_005:
+    Trial 1: PASS (score=1.00, turns=1, 23.54s)
+    Trial 2: PASS (score=0.75, turns=1, 21.14s)
+    Trial 3: PASS (score=1.00, turns=1, 24.06s)
+    Pass^3: PASS (avg=0.92)
+
+============================================================
+Results: 4/5 tasks passed (pass^3)
+Mean score: 0.950 ± 0.050  (range 0.900-1.000, std 0.041, n=3)
+Results written to baselines/runs/2026-06-27-gemma4-12b-3x/structured_output/custom_results.json

@@ -1,0 +1,35 @@
+Resolved 'local' to model: local
+Model: local
+Lengths: [4096, 16384, 65536, 131072]
+Depths: ['10%', '25%', '50%', '75%', '90%']
+Gateway: http://localhost:8000/v1
+
+  Testing 4K @ 10% depth ... PASS (0.2s)
+  Testing 4K @ 25% depth ... PASS (0.2s)
+  Testing 4K @ 50% depth ... PASS (0.1s)
+  Testing 4K @ 75% depth ... PASS (0.2s)
+  Testing 4K @ 90% depth ... PASS (0.1s)
+  Testing 16K @ 10% depth ... PASS (0.5s)
+  Testing 16K @ 25% depth ... PASS (0.3s)
+  Testing 16K @ 50% depth ... PASS (0.4s)
+  Testing 16K @ 75% depth ... PASS (0.4s)
+  Testing 16K @ 90% depth ... PASS (0.4s)
+  Testing 64K @ 10% depth ... PASS (2.3s)
+  Testing 64K @ 25% depth ... PASS (2.1s)
+  Testing 64K @ 50% depth ... PASS (2.1s)
+  Testing 64K @ 75% depth ... PASS (1.8s)
+  Testing 64K @ 90% depth ... PASS (1.0s)
+  Testing 128K @ 10% depth ... PASS (6.4s)
+  Testing 128K @ 25% depth ... PASS (4.3s)
+  Testing 128K @ 50% depth ... PASS (4.7s)
+  Testing 128K @ 75% depth ... PASS (4.7s)
+  Testing 128K @ 90% depth ... PASS (3.1s)
+
+  Length |     10%  |      25%  |      50%  |      75%  |      90%  |
+-----------------------------------------------------------------------
+      4K | PASS  0.2s  |  PASS  0.2s  |  PASS  0.1s  |  PASS  0.2s  |  PASS  0.1s  |
+     16K | PASS  0.5s  |  PASS  0.3s  |  PASS  0.4s  |  PASS  0.4s  |  PASS  0.4s  |
+     64K | PASS  2.3s  |  PASS  2.1s  |  PASS  2.1s  |  PASS  1.8s  |  PASS  1.0s  |
+    128K | PASS  6.4s  |  PASS  4.3s  |  PASS  4.7s  |  PASS  4.7s  |  PASS  3.1s  |
+
+Total: 20/20 passed
