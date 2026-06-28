@@ -52,29 +52,39 @@ verify batch and competes with concurrent requests for compute. Acceptance holds
   head and we had to graft+distill+publish.
 - **MTP stays the in-checkpoint option** for heavy-batch (C≥16) and simplicity.
 
-## Optional headline (deferred): train an Ornith-specific draft
+## Training an Ornith draft — ruled out (no transfer tax)
 
-EAGLE-3 hits 2–4 accepted/step when the draft is trained *for the target*. The graft's 1.2 is
-the transfer tax (base-Qwen draft on moved Ornith hidden states). Training a draft on Ornith's
-own generations should push accepted-length ~1.2 → ~2–3 → **tok/s ~170–220**, and *then* longer
-drafts (n=5–8) pay off.
+We checked whether the graft's modest 1.2 accept/step was a *transfer tax* (recoverable by
+training on Ornith) or just the draft's ceiling. **Diagnostic: run the BLR2 draft on its
+*native* target, base Qwen3.5-9B, and compare.**
 
-- **Trainer**: SpecForge (SGLang's EAGLE-3 trainer) or `speculators` — **neither installed**;
-  setup needed (dedicated env to avoid the vllm-env transformers pin).
-- **Data**: Ornith-9B self-generations already on disk — `/mnt/data/datasets/ornith-9b-mtp/corpus.jsonl`
-  (3942 samples, the MTP corpus). Train the 1-layer draft to predict from target aux hidden
-  states at the chosen layers.
-- **Validate**: serve + probe acceptance/tok-s vs the graft (138.8) and MTP (121); confirm
-  lossless via the eval suite (re-run the 9B row — expect identical, only speed changes).
-- **Publish**: draft weights + recipe → HF `protoLabsAI`, same playbook as the MTP head; the
-  GGUF/llama.cpp path is a separate avaLab follow-up (llama.cpp uses `--model-draft`).
+| draft + target | accepted/step | tok/s |
+|---|:---:|:---:|
+| BLR2 on **base Qwen3.5-9B** (native) | 1.26 | 141.4 |
+| BLR2 on **Ornith-9B** (graft) | 1.21 | 138.8 |
+
+**Identical (~4%, noise) → there is no transfer tax.** The draft works the same on Ornith as
+on the model it was trained for (Ornith is a light fine-tune — same as the MTP graft 0.74→0.76).
+So training an Ornith-specific draft would recover ~nothing.
+
+The 1.2/step is the draft's actual ceiling **on our workload** — likely because our probe is
+coding/agentic, which is far less predictable than the ShareGPT chat that EAGLE-3's headline
+2–4 accept/step numbers come from (out-of-distribution → drafts accept less). The only lever
+left is training a *better/bigger* draft on our own distribution — about draft quality, not
+Ornith-specificity, and a speculative +0.2–0.5/step for a full SpecForge run. **Not worth it.**
+
+**Conclusion: don't train.** The free graft *is* the EAGLE-3 win. Ship MTP (in-checkpoint,
+heavy-batch); use the EAGLE-3 graft as a free interactive-lane recipe; train nothing.
+(If a higher-quality draft is ever wanted: SpecForge/`speculators`, train on
+`/mnt/data/datasets/ornith-9b-mtp/corpus.jsonl` or a bigger our-distribution set — but expect
+modest, distribution-bound returns, not the headline 2–4×.)
 
 ## Spec-decode ladder (Ornith-9B, dense)
 
-plain ~75 → MTP (in-checkpoint, shipped) 121 → **EAGLE-3 graft 138.8** → EAGLE-3 trained
-(projected ~170–220). All lossless. EAGLE-3 is the higher ceiling; MTP is the cheaper/simpler
-in-checkpoint option. (On the MoE 35B daily driver, neither is a win — spec-decode is a
-dense-model play; MTP was −11% there.)
+plain ~75 → MTP (in-checkpoint, shipped) 121 → **EAGLE-3 graft 138.8** (the practical top —
+training ruled out, no transfer tax). All lossless. EAGLE-3 is the higher single-stream/
+interactive ceiling; MTP is the cheaper in-checkpoint option that wins heavy batch. (On the
+MoE 35B daily driver, neither is a win — spec-decode is a dense-model play; MTP was −11% there.)
 
 ## Spec-decode family — when to use which
 
