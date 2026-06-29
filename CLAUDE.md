@@ -175,7 +175,7 @@ NCCL env vars for PCIe (no NVLink): `NCCL_ALGO=Ring NCCL_PROTO=Simple NCCL_MIN_N
 cd evals
 
 ./run.sh profile --name quick --model local    # ~15 min smoke test, 1 trial
-./run.sh profile --name full --model local     # ~60-90 min comprehensive, 3 trials
+./run.sh profile --name full --model local     # comprehensive, full breadth, 1 trial
 
 ./run.sh claw --model local --tasks T02,T04,T06,T08 --port-offset 200
 ./run.sh custom --suite coding --model local --trials 1
@@ -200,7 +200,7 @@ cd evals
 | **research** | 4 | Synthesis, conflicting sources, hallucination |
 | **function_call** | 8 | Basic (5) + edge cases (3) |
 
-Profiles: **quick** — 6 claw + 6 custom + FC, 1 trial (~15 min). **full** — 20 claw + 10 custom + FC, 3 trials pass^3 (~60–90 min).
+Profiles: **quick** — 10 claw + custom + FC, 1 trial. **full** — 30 claw + all custom + FC, 1 trial (full breadth). **pass^3 dropped 2026-06-29** — breadth over 3× repetition; use `--trials N` only for targeted consistency checks.
 
 ## Model inventory (`/mnt/models`)
 

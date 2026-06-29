@@ -66,9 +66,9 @@ If the quick profile looks promising, run the full evaluation:
 cd ~/dev/lab/evals && ./run.sh profile --name full --model local
 ```
 
-This runs:
-- **Claw-eval**: 20 agent tasks (3 trials each, pass^3 scoring)
-- **All 10 custom suites**: coding, instruction_following, reasoning, structured_output, summarization, safety, creative_writing, roleplay, svg_generation, research
+This runs (single trial — **pass^3 dropped 2026-06-29**; full breadth discriminates better than 3× repetition. Use `--trials N` only for a targeted run-to-run consistency check on a small task set):
+- **Claw-eval**: 30 agent tasks, 1 trial
+- **All custom suites**: coding, instruction_following, reasoning, structured_output, summarization, safety, creative_writing, roleplay, svg_generation, research, + protolabs suites
 - **Function calling**: all suites
 
 ## Step 6: Speed Benchmark

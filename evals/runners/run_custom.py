@@ -63,6 +63,9 @@ def run_agent(client: OpenAI, model: str, task: dict, max_turns: int = 20, max_t
     tool_calls_made = []
     tool_calls_detail = []
     turns = 0
+    # Default so a run that exhausts max_turns on tool calls (never emits a final
+    # text turn) scores 0 on the task instead of raising UnboundLocalError below.
+    final_content = ""
     start = time.time()
 
     while turns < max_turns:
@@ -220,7 +223,7 @@ def grade_task(task: dict, output: dict, gateway_url: str = "http://ava:4000/v1"
 @click.option("--task", "task_path", type=click.Path(exists=True), help="Path to a single task YAML")
 @click.option("--suite", help="Task suite directory name (e.g., tool_use, browser)")
 @click.option("--model", default="protolabs/smart", help="Gateway model name")
-@click.option("--trials", default=3, help="Trials per task")
+@click.option("--trials", default=1, help="Trials per task (default: 1; pass^3 dropped 2026-06-29 — set --trials N for consistency runs)")
 @click.option("--gateway-url", default="http://ava:4000/v1")
 @click.option("--api-key", envvar=["GATEWAY_API_KEY", "LITELLM_API_KEY"], default="not-needed")
 @click.option("--submit-langfuse", is_flag=True, help="Submit scores to Langfuse")

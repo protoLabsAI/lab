@@ -76,7 +76,7 @@ pass^k = all(trials passed)
 ```
 
 - Default threshold: **0.75** (configurable per grader)
-- Default trials: **3** (pass^3 — all must pass)
+- Default trials: **1** (single-trial; pass^3 dropped from our strategy 2026-06-29 — breadth across tasks/suites discriminates models better than 3× repetition. `--trials N` still available; `pass^k = all(trials passed)` applies when N>1)
 - Partial credit: enabled by default (fraction of assertions passed)
 
 ## Writing Custom Graders

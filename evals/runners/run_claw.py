@@ -94,7 +94,7 @@ def build_claw_config(model: str, gateway_url: str, api_key: str) -> Path:
 @click.option("--model", default="protolabs/smart", help="Gateway model name to evaluate")
 @click.option("--tasks", default=None, help="Comma-separated task IDs (e.g., T01,T02)")
 @click.option("--all-tasks", is_flag=True, help="Run all available tasks")
-@click.option("--trials", default=3, help="Number of trials per task (default: 3 for pass^3)")
+@click.option("--trials", default=1, help="Trials per task (default: 1; pass^3 dropped 2026-06-29 — set --trials 3 for consistency runs)")
 @click.option("--gateway-url", default="http://ava:4000/v1", help="Gateway base URL")
 @click.option("--api-key", envvar=["GATEWAY_API_KEY", "LITELLM_API_KEY"], default="not-needed")
 @click.option("--workers", default=4, help="Parallel workers for batch mode")
