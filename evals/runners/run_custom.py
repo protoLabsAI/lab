@@ -185,6 +185,24 @@ def grade_task(task: dict, output: dict, gateway_url: str = "http://ava:4000/v1"
                 task_output={"output": output.get("output", "")},
                 expected=task.get("expected"),
             ))
+        elif gc["type"] == "code_exec":
+            # Execution-based code grading — runs the model's code against a hidden
+            # test battery, score = fraction passing. Objective; doesn't ceiling the
+            # way an LLM judge does on hard coding.
+            from graders.code_exec import CodeExecGrader
+            grader = CodeExecGrader(
+                dimension=gc.get("dimension", "correctness"),
+                tests=gc.get("tests", []),
+                entry=gc.get("entry"),
+                setup=gc.get("setup", ""),
+                timeout=gc.get("timeout", 10),
+                language=gc.get("language", "python"),
+            )
+            grades.append(grader.grade(
+                task_input={"prompt": task["prompt"]},
+                task_output={"output": output.get("output", "")},
+                expected=task.get("expected"),
+            ))
         elif gc["type"] == "tool_channel":
             # Deterministic check of the tool-call channel — an LLM judge cannot
             # distinguish a structured tool_call from text in serialized output.
