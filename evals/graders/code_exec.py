@@ -136,5 +136,10 @@ class CodeExecGrader(Grader):
         score = passed / n
         fails = [f"  test{i}: {msg}" for i, (ok, msg) in enumerate(results) if not ok][:3]
         reasoning = f"{passed}/{n} tests passed" + ("\n" + "\n".join(fails) if fails else "")
+        # per-test results paired with the assert text, so callers (e.g. a refinement
+        # loop) can show the model exactly which cases failed and why.
+        per_test = [{"test": self.tests[i], "passed": ok, "error": msg}
+                    for i, (ok, msg) in enumerate(results)]
         return GradeResult.from_threshold(self.dimension, score, reasoning=reasoning,
-                                          metadata={"passed": passed, "total": n})
+                                          metadata={"passed": passed, "total": n,
+                                                    "results": per_test, "code": code})
