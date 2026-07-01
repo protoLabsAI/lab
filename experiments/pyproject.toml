@@ -9,7 +9,7 @@ dependencies = [
     "gradio>=5.0",
     "transformers",
     "accelerate",
-    "diffusers>=0.32",
+    "diffusers>=0.38",
     "scipy",
     "huggingface_hub",
     "peft>=0.17.1",
