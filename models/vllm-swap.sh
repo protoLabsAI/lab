@@ -150,6 +150,7 @@ case "$1" in
     qwen-36b-fast)    ;; # fast only touches GPU 1 / :8002
     gemma4-moe-fast)  ;; # fast only touches GPU 1 / :8002
     ornith-9b-fast)   ;; # fast only touches GPU 1 / :8002
+    agents-a1)        ;; # eval on GPU 1 / :8003 — stop vllm-replica-b manually first
     dual)            ;; # dual does stop_all itself
     *) stop_vllm ;;
 esac
@@ -484,6 +485,33 @@ case "$1" in
             --speculative-config '{"method": "mtp", "num_speculative_tokens": 1}' \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
+    qwen36-27b-nvfp4)
+        # NVIDIA ModelOpt NVFP4 quant of Qwen3.6-27B (2026-06-30). MIXED_PRECISION:
+        # linear_attn layers FP8, MLP W4A16_NVFP4 (group 16), KV cache FP8. ~22GB.
+        # VLM arch (qwen3_5) → --language-model-only for text serving.
+        #
+        # ⚠️ BLOCKED on pinned vLLM 0.22.1 (2026-07-01): quantized lm_head
+        # (W4A16_NVFP4) → "no module or parameter named 'lm_head.input_scale'
+        # in Qwen3_5ForCausalLM". Model card targets vllm/vllm-openai:NIGHTLY
+        # + `--quantization modelopt`. Also selects FlashInferFP8ScaledMMLinearKernel
+        # for the FP8 linear_attn layers → set VLLM_USE_TRITON_FP8_GEMM=1 (Blackwell
+        # hang, see memory feedback_flashinfer_fp8_matmul). Retry on next vLLM bump
+        # or via the nightly Docker container (DiffusionGemma-style off-pin lane).
+        echo "Starting Qwen3.6-27B NVFP4 (GPU 0, 256K, NVIDIA ModelOpt FP4)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve nvidia/Qwen3.6-27B-NVFP4 \
+            $O3 \
+            --host 0.0.0.0 --port $PORT \
+            --served-model-name local \
+            --max-model-len 262144 \
+            --max-num-seqs 512 \
+            --reasoning-parser qwen3 \
+            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
+            --gpu-memory-utilization 0.90 \
+            --language-model-only \
+            --enable-chunked-prefill \
+            $PREFIX_FLAGS \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
     qwen36-27b-fp8)
         echo "Starting Qwen3.6-27B FP8 official (GPU 0, 256K, thinking/planning)..."
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.6-27B-FP8 \
@@ -601,6 +629,31 @@ case "$1" in
             --enable-prefix-caching \
             --trust-remote-code \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
+    # ─── InternScience Agents-A1 (eval candidate, 2026-06-30) ──────
+    agents-a1)
+        # Agents-A1 — Qwen3.5-35B-A3B MoE agentic VLM (InternScience), official
+        # FP8-Dynamic (compressed-tensors: linear_attn/SSM + router + shared-expert
+        # + vision kept bf16 → Triton fused-MoE, sm120-safe; experts FP8). EVAL on
+        # GPU 1 :8003 (replica-b slot) so the GPU0 :8000 judge (Ornith) stays up —
+        # stop vllm-replica-b.service first. Chat template uses the qwen3_coder tool
+        # format (<function=name><parameter=k>v). VLLM_USE_TRITON_FP8_GEMM=1 dodges
+        # the Blackwell FlashInfer-FP8 matmul hang. util 0.72: shares GPU1 w/
+        # embed-server (:8001) + Fish TTS (:8092). NO -O3 (MoE regresses ~25%).
+        echo "Starting Agents-A1 FP8-Dynamic (GPU 1, :8003, 131K, agentic eval) — no -O3 (MoE)..."
+        CUDA_VISIBLE_DEVICES=1 VLLM_USE_TRITON_FP8_GEMM=1 $VLLM_BIN serve InternScience/Agents-A1-FP8-dynamic \
+            --host 0.0.0.0 --port 8003 \
+            --served-model-name local \
+            --max-model-len 131072 \
+            --max-num-seqs 256 \
+            --reasoning-parser qwen3 \
+            --enable-auto-tool-choice --tool-call-parser qwen3_coder \
+            --gpu-memory-utilization 0.72 \
+            --language-model-only \
+            --enable-chunked-prefill \
+            --enable-prefix-caching \
+            --trust-remote-code \
+            >> "${LOG_DIR}/vllm-swap-agents-a1.log" 2>&1 &
         ;;
     # ─── Dual GPU configs (TP=2) ───────────────────────────────────
     # NCCL_P2P_DISABLE=1 required for stable CUDA graphs on Blackwell PCIe

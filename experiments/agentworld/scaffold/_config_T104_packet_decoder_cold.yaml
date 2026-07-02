@@ -1,0 +1,38 @@
+defaults:
+  tasks_dir: ../../../evals/claw/claw-eval/tasks
+  trace_dir: traces
+judge:
+  api_key: ${GATEWAY_API_KEY}
+  base_url: http://ava:4000/v1
+  model_id: protolabs/fast
+model:
+  api_key: ${GATEWAY_API_KEY}
+  base_url: http://ava:4000/v1
+  extra_body:
+    chat_template_kwargs:
+      enable_thinking: true
+    max_tokens: 10000
+  model_id: protolabs/smart
+  system_prompt_prefix: "**Scaffold: Binary Protocol Decoder**\n\n1. **Decompose**\n\
+    \   - **Parse Spec**: Extract field layouts, magic bytes, endianness, and state\
+    \ transitions. Note ambiguities.\n   - **Inspect Raw**: Sample first 512 bytes\
+    \ of `capture.bin`. Identify framing, headers, and delimiter patterns.\n   - **Implement\
+    \ Parser**: Build incremental parser handling variable-length fields, padding,\
+    \ and error cases.\n   - **Validate & Export**: Cross-check parsed fields against\
+    \ spec; emit JSONL.\n\n2. **Tool Workflow**\n   - **Read Spec** (`cat`/`head`):\
+    \ Prioritize field definitions, enums, and edge cases.\n   - **Hex Dump** (`xxd`/`hexdump`):\
+    \ Verify magic bytes, endianness, and structural consistency in raw data.\n  \
+    \ - **Iterative Coding**: Write parser in small chunks; test against known packet\
+    \ boundaries.\n   - **Diff/Validate**: Compare decoded output against expected\
+    \ structure (if available) or internal consistency.\n\n3. **Failure Modes + Recovery**\n\
+    \   - **Misaligned Parsing**: If checksums fail or fields look nonsensical, re-evaluate\
+    \ endianness or skip bytes.\n   - **Ambiguous Spec**: Use empirical data (frequency\
+    \ analysis, known values) to resolve ambiguities.\n   - **Truncated/Malformed\
+    \ Packets**: Decide on strict (abort) vs. lenient (skip) parsing; document decisions.\n\
+    \   - **Encoding Issues**: Ensure UTF-8/ASCII handling for string fields; handle\
+    \ null terminators.\n\n4. **Verification**\n   - **Round-trip Check**: Re-serialize\
+    \ decoded data and compare to original binary (if feasible).\n   - **Statistical\
+    \ Sanity**: Check field value distributions (e.g., IDs sequential, lengths positive).\n\
+    \   - **Edge Cases**: Verify handling of first/last packets, zero-length payloads,\
+    \ and max-size fields.\n   - **Output Format**: Confirm JSONL is valid JSON, one\
+    \ object per line, no trailing commas."

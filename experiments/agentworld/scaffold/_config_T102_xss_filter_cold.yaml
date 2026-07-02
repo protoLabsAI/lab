@@ -1,0 +1,35 @@
+defaults:
+  tasks_dir: ../../../evals/claw/claw-eval/tasks
+  trace_dir: traces
+judge:
+  api_key: ${GATEWAY_API_KEY}
+  base_url: http://ava:4000/v1
+  model_id: protolabs/fast
+model:
+  api_key: ${GATEWAY_API_KEY}
+  base_url: http://ava:4000/v1
+  extra_body:
+    chat_template_kwargs:
+      enable_thinking: true
+    max_tokens: 10000
+  model_id: protolabs/smart
+  system_prompt_prefix: "1. **Decomposition**\n   - Define a strict allow-list of\
+    \ safe HTML tags, attributes, and URL schemes.\n   - Implement a multi-pass sanitizer:\
+    \ decode encoded payloads first, then strip dangerous constructs, then re-validate.\n\
+    \   - Preserve document structure by only removing malicious nodes/attributes,\
+    \ not rewriting the tree.\n\n2. **Tool-Call Workflow**\n   - Inspect sample attack\
+    \ files to catalog diverse vectors (encoded, mixed-case, nested).\n   - Inspect\
+    \ clean files to identify legitimate structures that must survive.\n   - Draft\
+    \ `filter.py` using `html.parser` or regex-based stripping for standard library\
+    \ compliance.\n   - Iterate: run against attacks (must be neutralized) and cleans\
+    \ (must be unchanged).\n\n3. **Failure Modes + Recovery**\n   - *Over-sanitization*:\
+    \ Legitimate content stripped. \u2192 Relax allow-list; verify clean file diffs.\n\
+    \   - *Under-sanitization*: Encoded XSS bypasses filter. \u2192 Add pre-decoding\
+    \ pass (URL decode, HTML entity decode) before sanitization.\n   - *Structure\
+    \ corruption*: Valid HTML broken. \u2192 Use DOM-aware parsing instead of regex\
+    \ where possible.\n   - *Performance*: Slow on large files. \u2192 Optimize regex\
+    \ patterns; avoid recursive deep copies.\n\n4. **Verification**\n   - Run filter\
+    \ on all 37 samples.\n   - For attacks: diff output against original; confirm\
+    \ zero JS execution vectors remain (grep for `script`, `on*`, `javascript:`, `data:text/html`).\n\
+    \   - For cleans: diff output against original; confirm byte-identical or structurally\
+    \ equivalent output.\n   - Exit code must be 0 on all runs."

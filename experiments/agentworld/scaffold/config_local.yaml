@@ -1,0 +1,22 @@
+# Scaffold-transfer probe — policy + judge pinned to the local Ornith replica (:8000),
+# bypassing the gateway/Infisical. system_prompt_prefix is the scaffold injection slot
+# (empty here = baseline arm; the treatment arm writes the sim-matured scaffold in).
+model:
+  api_key: dummy
+  base_url: http://localhost:8000/v1
+  model_id: local
+  system_prompt_prefix: null
+  extra_body:
+    chat_template_kwargs:
+      enable_thinking: true
+    max_tokens: 10000
+
+judge:
+  api_key: dummy
+  base_url: http://localhost:8000/v1
+  model_id: local
+  enabled: true
+
+defaults:
+  trace_dir: traces
+  tasks_dir: ../../../evals/claw/claw-eval/tasks

@@ -1,0 +1,34 @@
+defaults:
+  tasks_dir: ../../../evals/claw/claw-eval/tasks
+  trace_dir: traces
+judge:
+  api_key: ${GATEWAY_API_KEY}
+  base_url: http://ava:4000/v1
+  model_id: protolabs/fast
+model:
+  api_key: ${GATEWAY_API_KEY}
+  base_url: http://ava:4000/v1
+  extra_body:
+    chat_template_kwargs:
+      enable_thinking: true
+    max_tokens: 10000
+  model_id: protolabs/smart
+  system_prompt_prefix: "## Scaffold: Binary Encoding/Decoding Task\n\n**1. Inspect**\n\
+    - Read `decoder.py` to identify encoding scheme (zlib, base64, custom, etc.)\n\
+    - Read `target.txt` to understand desired output format\n- Note file sizes for\
+    \ constraint checking\n\n**2. Analyze Constraints**\n- Calculate max allowed size:\
+    \ `0.6 \xD7 target.txt size`\n- Determine if decoder expects raw binary, hex,\
+    \ or specific format\n- Check if decoder has error handling or strict parsing\n\
+    \n**3. Generate Encoded Data**\n- Apply inverse of decoder's encoding to `target.txt`\n\
+    - If decoder uses compression (zlib, gzip, lzma), compress target\n- If decoder\
+    \ expects specific format (base64, hex), encode accordingly\n- Write result to\
+    \ `encoded.dat`\n\n**4. Verify**\n```bash\npython decoder.py < encoded.dat | diff\
+    \ - target.txt\n```\n- Confirm exact match (no trailing whitespace, newlines)\n\
+    - Check size: `wc -c encoded.dat` \u2264 60% of `wc -c target.txt`\n\n**Failure\
+    \ Modes:**\n- **Mismatch**: Decoder expects specific header/magic bytes \u2192\
+    \ prepend if needed\n- **Size overflow**: Use stronger compression or different\
+    \ algorithm\n- **Encoding errors**: Check if decoder reads from `sys.stdin` vs\
+    \ `sys.stdin.buffer`\n- **Trailing newlines**: Verify `diff` shows exact match,\
+    \ not just content\n\n**Recovery:**\n- If compression insufficient, try multiple\
+    \ algorithms (zlib vs gzip vs lzma)\n- If format wrong, inspect decoder source\
+    \ for parsing logic\n- Test incrementally: decode small sample first"

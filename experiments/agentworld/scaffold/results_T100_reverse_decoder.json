@@ -1,0 +1,50 @@
+{
+  "task_id": "T100_reverse_decoder",
+  "results": {
+    "baseline": {
+      "arm": "baseline",
+      "trials": 5,
+      "mean_task_score": 0.832,
+      "mean_completion": 0.79,
+      "pass_rate": 0.6,
+      "scores": [
+        1.0,
+        0.56,
+        0.6,
+        1.0,
+        1.0
+      ]
+    },
+    "cold": {
+      "arm": "cold",
+      "trials": 5,
+      "mean_task_score": 0.699,
+      "mean_completion": 0.624,
+      "pass_rate": 0.4,
+      "scores": [
+        1.0,
+        0.624,
+        0.2,
+        0.672,
+        1.0
+      ]
+    },
+    "sim": {
+      "arm": "sim",
+      "trials": 5,
+      "mean_task_score": 0.851,
+      "mean_completion": 0.814,
+      "pass_rate": 0.8,
+      "scores": [
+        0.256,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    }
+  },
+  "delta_sim_vs_baseline": 0.019,
+  "delta_sim_vs_cold": 0.152,
+  "delta_cold_vs_baseline": -0.133
+}

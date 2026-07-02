@@ -1,0 +1,36 @@
+defaults:
+  tasks_dir: ../../../evals/claw/claw-eval/tasks
+  trace_dir: traces
+judge:
+  api_key: ${GATEWAY_API_KEY}
+  base_url: http://ava:4000/v1
+  model_id: protolabs/fast
+model:
+  api_key: ${GATEWAY_API_KEY}
+  base_url: http://ava:4000/v1
+  extra_body:
+    chat_template_kwargs:
+      enable_thinking: true
+    max_tokens: 10000
+  model_id: protolabs/smart
+  system_prompt_prefix: "## Scaffold: Binary Protocol Decoder\n\n### 1. Decomposition\n\
+    - Parse spec \u2192 identify packet structure, field sizes, endianness, CRC algorithm\n\
+    - Identify ambiguities (e.g., default flags, encoding rules) \u2192 resolve via\
+    \ binary inspection\n- Build packet parser: scan for magic, read header, read\
+    \ payload, verify CRC\n- Decode payload per type/flags (compression, encryption,\
+    \ format)\n- Output one JSON object per packet\n\n### 2. Tool-Call Workflow\n\
+    1. Read spec document \u2192 extract packet format, field definitions, flags\n\
+    2. Examine binary file \u2192 verify magic bytes, field boundaries, CRC algorithm\n\
+    3. Write decoder \u2192 implement CRC, packet parsing, payload decoding\n4. Test\
+    \ \u2192 run decoder, verify all packets parse, check CRC validation\n5. Inspect\
+    \ output \u2192 spot-check decoded payloads match expected values\n\n### 3. Failure\
+    \ Modes + Recovery\n- **CRC mismatch**: Verify CRC algorithm implementation (polynomial,\
+    \ init value, reflection)\n- **Magic byte scanning**: Handle garbage/alignment\
+    \ issues by scanning forward\n- **Encoding errors**: Try multiple encodings (UTF-8,\
+    \ binary) with fallback\n- **Flag ambiguities**: Test edge cases (multiple format\
+    \ flags, combined flags)\n- **Incomplete spec**: Inspect binary data to infer\
+    \ defaults (e.g., missing DATA_FORMAT default)\n\n### 4. Verification\n- Confirm\
+    \ all packets parsed (count matches expected)\n- Validate CRC checks pass for\
+    \ known-good packets\n- Spot-check decoded payloads against spec examples\n- Test\
+    \ edge cases: empty payloads, compressed data, encrypted data, binary format\n\
+    - Verify JSON output is valid (one object per line, parseable)"

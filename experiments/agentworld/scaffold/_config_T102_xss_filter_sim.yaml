@@ -1,0 +1,38 @@
+defaults:
+  tasks_dir: ../../../evals/claw/claw-eval/tasks
+  trace_dir: traces
+judge:
+  api_key: ${GATEWAY_API_KEY}
+  base_url: http://ava:4000/v1
+  model_id: protolabs/fast
+model:
+  api_key: ${GATEWAY_API_KEY}
+  base_url: http://ava:4000/v1
+  extra_body:
+    chat_template_kwargs:
+      enable_thinking: true
+    max_tokens: 10000
+  model_id: protolabs/smart
+  system_prompt_prefix: "## Scaffold: HTML Sanitizer Implementation\n\n### 1. Decomposition\n\
+    - **Inspect fixtures first**: List all attack/clean files, sample 3-5 of each\
+    \ to catalog XSS patterns\n- **Classify vectors**: Group by type (script tags,\
+    \ event handlers, javascript: URLs, encoded payloads, dangerous embeds, CSS expressions,\
+    \ SVG/MathML injection)\n- **Design multi-pass pipeline**: Pre-decode \u2192 structural\
+    \ parse \u2192 attribute sanitization \u2192 post-cleanup\n- **Define safe allowlists**:\
+    \ Tags, attributes, URL schemes, CSS properties\n\n### 2. Tool-Call Workflow\n\
+    1. `ls` fixture directory to enumerate files\n2. `cat` 2-3 attack files to identify\
+    \ patterns\n3. `cat` 2-3 clean files to understand preservation requirements\n\
+    4. Write filter.py with iterative testing against samples\n5. Run against all\
+    \ 37 files, diff clean outputs for unintended changes\n\n### 3. Failure Modes\
+    \ + Recovery\n- **Over-sanitization**: Clean files lose content \u2192 check diffs,\
+    \ relax allowlists\n- **Under-sanitization**: Attack files still contain vectors\
+    \ \u2192 add regex patterns, decode entities recursively\n- **Entity encoding\
+    \ bypass**: `&#111;nerror`, `%3Cscript%3E` \u2192 pre-decode all entities before\
+    \ pattern matching\n- **HTMLParser limitations**: Doesn't handle malformed HTML\
+    \ \u2192 add regex pre-processing\n- **Style attribute injection**: `expression()`,\
+    \ `url(javascript:)` \u2192 sanitize style values\n\n### 4. Verification\n- Run\
+    \ filter on all attack files \u2192 grep for remaining XSS patterns (script, on*,\
+    \ javascript:, data:text/html)\n- Run filter on all clean files \u2192 diff against\
+    \ originals (should be identical or minimal whitespace changes)\n- Test edge cases:\
+    \ mixed case, nested encoding, comments, CDATA, SVG/MathML contexts\n- Exit code\
+    \ check: confirm 0 on success"

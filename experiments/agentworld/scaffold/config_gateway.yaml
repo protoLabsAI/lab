@@ -1,0 +1,22 @@
+# Scaffold-transfer probe — policy + judge through the protoLabs gateway (ava:4000),
+# model `local` = Ornith replica(s). Gateway runs the thinking-normalizer (salvages Ornith's
+# reasoning_content->content), matching the published Ornith claw numbers.
+# system_prompt_prefix is the scaffold slot (null = baseline arm).
+model:
+  api_key: ${GATEWAY_API_KEY}
+  base_url: http://ava:4000/v1
+  model_id: protolabs/smart
+  system_prompt_prefix: null
+  extra_body:
+    chat_template_kwargs:
+      enable_thinking: true
+    max_tokens: 10000
+
+judge:
+  api_key: ${GATEWAY_API_KEY}
+  base_url: http://ava:4000/v1
+  model_id: protolabs/fast
+
+defaults:
+  trace_dir: traces
+  tasks_dir: ../../../evals/claw/claw-eval/tasks
