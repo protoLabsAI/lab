@@ -203,6 +203,20 @@ def grade_task(task: dict, output: dict, gateway_url: str = "http://ava:4000/v1"
                 task_output={"output": output.get("output", "")},
                 expected=task.get("expected"),
             ))
+        elif gc["type"] == "json_validate":
+            # Deterministic structured-output check: parse JSON + assertion
+            # battery (partial credit). No LLM — for composed schema/invariant
+            # tasks where judge noise would mask the constraint we're testing.
+            from graders.json_validate import JsonValidateGrader
+            grader = JsonValidateGrader(
+                dimension=gc.get("dimension", "structure"),
+                assertions=gc.get("assertions", []),
+            )
+            grades.append(grader.grade(
+                task_input={"prompt": task["prompt"]},
+                task_output={"output": output.get("output", "")},
+                expected=task.get("expected"),
+            ))
         elif gc["type"] == "tool_channel":
             # Deterministic check of the tool-call channel — an LLM judge cannot
             # distinguish a structured tool_call from text in serialized output.

@@ -1,0 +1,126 @@
+id: reasoning_v2_knights
+name: Reasoning v2 — knights (solver-verified, seed 20260702)
+category: reasoning
+tests:
+- id: v2_knights_0_easy
+  prompt: 'On an island, knights always tell the truth and knaves always lie. You meet 3 inhabitants:
+    Alice, Bob, Carol.
+
+
+    - Carol says: "Alice is a knave."
+
+    - Alice says: "Bob is a knave."
+
+    - Bob says: "At least one of Carol and Alice is a knave."
+
+
+    Determine what each inhabitant is. Give your final answer on the last line in exactly this format
+    (comma-separated, no spaces around ''=''):
+
+    ANSWER: Alice=<knight|knave>, Bob=<knight|knave>, ...'
+  graders:
+  - type: match
+    dimension: reasoning_exact
+    mode: all_of
+    expected: &id001
+    - Alice=knave
+    - Bob=knight
+    - Carol=knight
+    case_sensitive: false
+  ground_truth: *id001
+  difficulty: easy
+- id: v2_knights_1_easy
+  prompt: 'On an island, knights always tell the truth and knaves always lie. You meet 3 inhabitants:
+    Alice, Bob, Carol.
+
+
+    - Carol says: "Bob is a knight."
+
+    - Bob says: "At least one of Carol and Alice is a knave."
+
+
+    Determine what each inhabitant is. Give your final answer on the last line in exactly this format
+    (comma-separated, no spaces around ''=''):
+
+    ANSWER: Alice=<knight|knave>, Bob=<knight|knave>, ...'
+  graders:
+  - type: match
+    dimension: reasoning_exact
+    mode: all_of
+    expected: &id002
+    - Alice=knave
+    - Bob=knight
+    - Carol=knight
+    case_sensitive: false
+  ground_truth: *id002
+  difficulty: easy
+- id: v2_knights_2_medium
+  prompt: 'On an island, knights always tell the truth and knaves always lie. You meet 5 inhabitants:
+    Alice, Bob, Carol, Dan, Erin.
+
+
+    - Bob says: "Dan is a knave."
+
+    - Alice says: "Erin and Carol are both knights."
+
+    - Carol says: "Bob is a knave."
+
+    - Erin says: "Alice is a knave."
+
+
+    Determine what each inhabitant is. Give your final answer on the last line in exactly this format
+    (comma-separated, no spaces around ''=''):
+
+    ANSWER: Alice=<knight|knave>, Bob=<knight|knave>, ...'
+  graders:
+  - type: match
+    dimension: reasoning_exact
+    mode: all_of
+    expected: &id003
+    - Alice=knave
+    - Bob=knight
+    - Carol=knave
+    - Dan=knave
+    - Erin=knight
+    case_sensitive: false
+  ground_truth: *id003
+  difficulty: medium
+- id: v2_knights_3_hard
+  prompt: 'On an island, knights always tell the truth and knaves always lie. You meet 7 inhabitants:
+    Alice, Bob, Carol, Dan, Erin, Frank, Grace.
+
+
+    - Grace says: "Alice is a knight."
+
+    - Bob says: "Frank is a knave."
+
+    - Erin says: "Carol and Grace are the same type."
+
+    - Dan says: "Erin is a knave."
+
+    - Bob says: "Erin is a knight."
+
+    - Grace says: "Dan and Alice are both knights."
+
+    - Bob says: "Alice is a knight."
+
+
+    Determine what each inhabitant is. Give your final answer on the last line in exactly this format
+    (comma-separated, no spaces around ''=''):
+
+    ANSWER: Alice=<knight|knave>, Bob=<knight|knave>, ...'
+  graders:
+  - type: match
+    dimension: reasoning_exact
+    mode: all_of
+    expected: &id004
+    - Alice=knave
+    - Bob=knave
+    - Carol=knight
+    - Dan=knight
+    - Erin=knave
+    - Frank=knight
+    - Grace=knave
+    case_sensitive: false
+  ground_truth: *id004
+  difficulty: hard

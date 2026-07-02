@@ -1,0 +1,69 @@
+id: reasoning_v2_sequence
+name: Reasoning v2 — sequence (solver-verified, seed 20260702)
+category: reasoning
+tests:
+- id: v2_sequence_0_easy
+  prompt: 'Consider the integer sequence: 20, 24, 27, 31, 34, 38, ...
+
+    What is the next term?
+
+
+    Work through this step by step, then give your final answer on the last line in exactly this format:
+
+    ANSWER: <answer>'
+  graders:
+  - type: match
+    dimension: reasoning_exact
+    mode: number
+    expected: 41
+    tolerance: 0
+  ground_truth: 41
+  difficulty: easy
+- id: v2_sequence_1_easy
+  prompt: 'Consider the integer sequence: 7, 12, 19, 24, 31, 36, ...
+
+    What is the next term?
+
+
+    Work through this step by step, then give your final answer on the last line in exactly this format:
+
+    ANSWER: <answer>'
+  graders:
+  - type: match
+    dimension: reasoning_exact
+    mode: number
+    expected: 43
+    tolerance: 0
+  ground_truth: 43
+  difficulty: easy
+- id: v2_sequence_2_medium
+  prompt: 'Consider the integer sequence: 8, 9, 7, 17, 16, 24, 33, 40, ...
+
+    What is the next term?
+
+
+    Work through this step by step, then give your final answer on the last line in exactly this format:
+
+    ANSWER: <answer>'
+  graders:
+  - type: match
+    dimension: reasoning_exact
+    mode: number
+    expected: 57
+    tolerance: 0
+  ground_truth: 57
+  difficulty: medium
+- id: v2_sequence_3_hard
+  prompt: 'Consider the integer sequence: 1, 18, 6, 2, 27, 8, 4, 36, 14, ...
+
+    What are the next TWO terms? Work through this step by step, then give your final answer on the last
+    line in exactly this format:
+
+    ANSWER: <term10>, <term11>'
+  graders:
+  - type: match
+    dimension: next_terms
+    mode: regex
+    expected: ANSWER:\s*8\s*,\s*45\b
+  ground_truth: 8, 45
+  difficulty: hard

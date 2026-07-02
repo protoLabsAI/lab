@@ -1,0 +1,156 @@
+id: reasoning_v2_grid
+name: Reasoning v2 — grid (solver-verified, seed 20260702)
+category: reasoning
+tests:
+- id: v2_grid_0_easy
+  prompt: 'There are 3 houses in a row, positions 1 (leftmost) to 3 (rightmost). Each house has a distinct
+    color, and each is occupied by a different person with a distinct drink.
+
+
+    - Alice lives immediately to the left of Bob.
+
+    - Alice lives in the first (leftmost) house.
+
+    - The person in the red house drinks milk.
+
+    - The milk drinker lives in house 1.
+
+    - The tea drinker lives in house 2.
+
+    - Bob lives in the green house.
+
+
+    Determine, for every person, their house number, house color, and drink. Work through this step by
+    step, then give your final answer on the last line as a comma-separated list in exactly this per-person
+    format (no spaces inside a person''s entry):
+
+    ANSWER: Alice=h<pos>,<color>,<drink>; Bob=h<pos>,<color>,<drink>; ...'
+  graders:
+  - type: match
+    dimension: grid_full
+    mode: all_of
+    expected: &id001
+    - Alice=h1,red,milk
+    - Bob=h2,green,tea
+    - Carol=h3,blue,coffee
+    case_sensitive: false
+  ground_truth: *id001
+  difficulty: easy
+- id: v2_grid_1_easy
+  prompt: 'There are 3 houses in a row, positions 1 (leftmost) to 3 (rightmost). Each house has a distinct
+    color, and each is occupied by a different person with a distinct drink.
+
+
+    - The coffee drinker lives in house 3.
+
+    - The person in the blue house drinks tea.
+
+    - Alice lives in the red house.
+
+    - Alice lives in the first (leftmost) house.
+
+    - Carol lives immediately to the left of Bob.
+
+
+    Determine, for every person, their house number, house color, and drink. Work through this step by
+    step, then give your final answer on the last line as a comma-separated list in exactly this per-person
+    format (no spaces inside a person''s entry):
+
+    ANSWER: Alice=h<pos>,<color>,<drink>; Bob=h<pos>,<color>,<drink>; ...'
+  graders:
+  - type: match
+    dimension: grid_full
+    mode: all_of
+    expected: &id002
+    - Alice=h1,red,milk
+    - Bob=h3,green,coffee
+    - Carol=h2,blue,tea
+    case_sensitive: false
+  ground_truth: *id002
+  difficulty: easy
+- id: v2_grid_2_medium
+  prompt: 'There are 4 houses in a row, positions 1 (leftmost) to 4 (rightmost). Each house has a distinct
+    color, and each is occupied by a different person with a distinct drink.
+
+
+    - Dan lives immediately to the left of Carol.
+
+    - The person in the yellow house drinks milk.
+
+    - Bob lives in the blue house.
+
+    - The coffee drinker does not live in house 3.
+
+    - Alice lives immediately to the left of Bob.
+
+    - Dan lives in the first (leftmost) house.
+
+    - Dan does not drink coffee.
+
+    - The person in the blue house drinks tea.
+
+    - Alice lives in the red house.
+
+
+    Determine, for every person, their house number, house color, and drink. Work through this step by
+    step, then give your final answer on the last line as a comma-separated list in exactly this per-person
+    format (no spaces inside a person''s entry):
+
+    ANSWER: Alice=h<pos>,<color>,<drink>; Bob=h<pos>,<color>,<drink>; ...'
+  graders:
+  - type: match
+    dimension: grid_full
+    mode: all_of
+    expected: &id003
+    - Alice=h3,red,juice
+    - Bob=h4,blue,tea
+    - Carol=h2,green,coffee
+    - Dan=h1,yellow,milk
+    case_sensitive: false
+  ground_truth: *id003
+  difficulty: medium
+- id: v2_grid_3_hard
+  prompt: 'There are 4 houses in a row, positions 1 (leftmost) to 4 (rightmost). Each house has a distinct
+    color, and each is occupied by a different person with a distinct drink.
+
+
+    - The person in the red house drinks juice.
+
+    - The person in the yellow house drinks milk.
+
+    - The coffee drinker does not live in house 3.
+
+    - The tea drinker does not live in house 4.
+
+    - Carol lives immediately to the left of Bob.
+
+    - The person in the green house drinks tea.
+
+    - Carol does not drink juice.
+
+    - Alice lives in house 1 or house 3.
+
+    - The red house is not house 4.
+
+    - Dan lives immediately to the left of Carol.
+
+    - The coffee drinker lives in house 2 or house 3.
+
+
+    Determine, for every person, their house number, house color, and drink. Work through this step by
+    step, then give your final answer on the last line as a comma-separated list in exactly this per-person
+    format (no spaces inside a person''s entry):
+
+    ANSWER: Alice=h<pos>,<color>,<drink>; Bob=h<pos>,<color>,<drink>; ...'
+  graders:
+  - type: match
+    dimension: grid_full
+    mode: all_of
+    expected: &id004
+    - Alice=h1,red,juice
+    - Bob=h4,yellow,milk
+    - Carol=h3,green,tea
+    - Dan=h2,blue,coffee
+    case_sensitive: false
+  ground_truth: *id004
+  difficulty: hard

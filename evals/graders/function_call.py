@@ -94,8 +94,16 @@ class FunctionCallGrader(Grader):
             scores.append(best_score)
             details.append(f"call {i+1}: {best_detail} ({best_score:.2f})")
 
-        # Penalize extra unexpected calls
-        extra_calls = max(0, len(actual_calls) - len(expected_calls))
+        # Penalize extra unexpected calls — but NOT legitimate intermediate
+        # grounding calls (e.g. current_time before a relative-date query). A
+        # call counts as "extra" only if its name is neither expected nor in the
+        # task's allowed_intermediate whitelist. This fixes the gina_019/gina_021
+        # false-negatives where correct grounding was scored as a miss.
+        allowed = set(expected.get("allowed_intermediate", []))
+        allowed |= {e.get("name", "") for e in expected_calls}
+        unexpected = [a for a in actual_calls
+                      if (a.get("name", "") if isinstance(a, dict) else "") not in allowed]
+        extra_calls = len(unexpected)
         extra_penalty = min(0.2, extra_calls * 0.05)
 
         final_score = max(0.0, (sum(scores) / len(scores)) - extra_penalty) if scores else 0.0

@@ -1,0 +1,127 @@
+id: reasoning_v2_schedule
+name: Reasoning v2 — schedule (solver-verified, seed 20260702)
+category: reasoning
+tests:
+- id: v2_schedule_0_easy
+  prompt: '4 colleagues each give one presentation on a distinct day, Mon through Thu.
+
+
+    - Bob presents earlier in the week than Dan.
+
+    - At least 2 days separate Carol and Bob (in some order).
+
+    - Dan presents on the day right after Carol.
+
+
+    Determine the unique schedule. Give your final answer on the last line in exactly this format (comma-separated,
+    no spaces around ''=''):
+
+    ANSWER: Alice=<day>, Bob=<day>, ...'
+  graders:
+  - type: match
+    dimension: reasoning_exact
+    mode: all_of
+    expected: &id001
+    - Alice=Tue
+    - Bob=Mon
+    - Carol=Wed
+    - Dan=Thu
+    case_sensitive: false
+  ground_truth: *id001
+  difficulty: easy
+- id: v2_schedule_1_easy
+  prompt: '4 colleagues each give one presentation on a distinct day, Mon through Thu.
+
+
+    - Alice presents earlier in the week than Bob.
+
+    - Dan presents on the day right after Alice.
+
+    - At least 2 days separate Bob and Dan (in some order).
+
+
+    Determine the unique schedule. Give your final answer on the last line in exactly this format (comma-separated,
+    no spaces around ''=''):
+
+    ANSWER: Alice=<day>, Bob=<day>, ...'
+  graders:
+  - type: match
+    dimension: reasoning_exact
+    mode: all_of
+    expected: &id002
+    - Alice=Mon
+    - Bob=Thu
+    - Carol=Wed
+    - Dan=Tue
+    case_sensitive: false
+  ground_truth: *id002
+  difficulty: easy
+- id: v2_schedule_2_medium
+  prompt: '6 colleagues each give one presentation on a distinct day, Mon through Sat.
+
+
+    - At least 5 days separate Bob and Alice (in some order).
+
+    - Erin presents on the day right after Alice.
+
+    - At least 3 days separate Frank and Erin (in some order).
+
+    - Frank presents on the day right after Carol.
+
+
+    Determine the unique schedule. Give your final answer on the last line in exactly this format (comma-separated,
+    no spaces around ''=''):
+
+    ANSWER: Alice=<day>, Bob=<day>, ...'
+  graders:
+  - type: match
+    dimension: reasoning_exact
+    mode: all_of
+    expected: &id003
+    - Alice=Mon
+    - Bob=Sat
+    - Carol=Thu
+    - Dan=Wed
+    - Erin=Tue
+    - Frank=Fri
+    case_sensitive: false
+  ground_truth: *id003
+  difficulty: medium
+- id: v2_schedule_3_hard
+  prompt: '7 colleagues each give one presentation on a distinct day, Mon through Sun.
+
+
+    - At least 4 days separate Erin and Carol (in some order).
+
+    - At least 4 days separate Bob and Grace (in some order).
+
+    - Erin presents earlier in the week than Dan.
+
+    - At least 4 days separate Dan and Frank (in some order).
+
+    - Erin presents on Mon or Wed.
+
+    - At least 3 days separate Dan and Alice (in some order).
+
+    - At least 3 days separate Carol and Bob (in some order).
+
+
+    Determine the unique schedule. Give your final answer on the last line in exactly this format (comma-separated,
+    no spaces around ''=''):
+
+    ANSWER: Alice=<day>, Bob=<day>, ...'
+  graders:
+  - type: match
+    dimension: reasoning_exact
+    mode: all_of
+    expected: &id004
+    - Alice=Thu
+    - Bob=Tue
+    - Carol=Fri
+    - Dan=Sun
+    - Erin=Mon
+    - Frank=Wed
+    - Grace=Sat
+    case_sensitive: false
+  ground_truth: *id004
+  difficulty: hard
