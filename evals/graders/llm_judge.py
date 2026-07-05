@@ -56,11 +56,17 @@ class LLMJudge(Grader):
         base_url: str = os.environ.get("JUDGE_GATEWAY_URL", "http://ava:4000/v1"),
         api_key: str | None = None,
         threshold: float = 0.75,
+        raise_on_error: bool = False,
     ):
         self.dimension = dimension
         self.rubric = rubric or DEFAULT_RUBRIC
         self.model = model
         self.threshold = threshold
+        # RL callers pass raise_on_error=True: a judge failure must NOT become a usable
+        # 0.5 reward (a policy could farm it by inducing judge errors). Raising lets the
+        # RL loop drop the sample (zero-and-exclude) instead. Eval callers keep the
+        # default — a loud stderr 0.5 is a deliberate measurement choice there.
+        self.raise_on_error = raise_on_error
         self.client = OpenAI(base_url=base_url, api_key=api_key or "not-needed")
 
     def grade(self, task_input: dict, task_output: dict, expected: dict | None = None) -> GradeResult:
@@ -119,6 +125,10 @@ class LLMJudge(Grader):
         except Exception as e:
             # Do NOT silently bury judge failures as 0.5 — surface them so a broken
             # judge can't masquerade as a wall of 0.5 scores (the recurring footgun).
+            if self.raise_on_error:
+                # RL path: propagate so the caller excludes the sample rather than
+                # rewarding a judge error with a farmable 0.5.
+                raise
             score = 0.5
             reasoning = f"Judge error (FALLBACK 0.5): {e}"
             print(f"[llm_judge] {self.dimension}: judge call/parse failed -> 0.5 fallback: {e}",
