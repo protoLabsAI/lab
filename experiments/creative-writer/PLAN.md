@@ -32,6 +32,28 @@ Open question to settle in Phase 0: 26B-A4B vs a 9B for the speed/quality knee.
 Blog copy may not need 26B; a 9B non-thinking writer at 2-3x the throughput could
 win on "fast content" if quality holds. Bake off both.
 
+### Strong contender: gemma-4-12B-it (DENSE) — may be the better base
+Added 2026-07-06 after finding DeepSeek's **DeepSpec** ([[reference_deepspec_dspark]]).
+Three converging reasons the 12B dense may beat the 26B-A4B MoE as the *fine-tune* base:
+1. **Dense = far easier/cheaper to fine-tune** (clean LoRA/full-FT; no MoE
+   expert-routing/calibration headache). Big practical win for the training run.
+2. **Off-the-shelf non-thinking spec-decode drafts** — DeepSeek released Eagle3 /
+   DFlash / DSpark drafts for `google/gemma-4-12B-it`, trained in non-thinking mode
+   on open-perfectblend. vLLM 0.22.1 serves eagle3 + dflash today (DSpark TBD).
+   Fast single-stream decode with zero draft-training effort.
+3. **Single-stream is our regime** → DFlash-class drafts are single-stream kings
+   (their non-scaling under concurrency is irrelevant for content drafting).
+Tradeoff to MEASURE: 12B active vs 26B-A4B's 3.8B active — raw the MoE decodes
+faster, but a good draft may close/beat it single-stream. Base + all 3 drafts
+staged to cache (2026-07-06). **Decisive bench:** serve gemma-4-12B-it + released
+eagle3 (or dflash) draft, measure single-stream tok/s + accept, vs the validated
+26B-A4B NVFP4+MTP **257 tok/s** ([[project_gemma4_nvfp4_mtp]]).
+
+### 26B-A4B NVFP4 baseline is validated (the speed anchor)
+185 tok/s no-MTP, **257 tok/s with MTP @ SPEC_TOK=2 (+39%)**, non-thinking clean.
+Fast, but MoE = hard to fine-tune. It's the "keep as-is / prompt-only" option if
+the 12B fine-tune doesn't clearly win on house-voice quality.
+
 ### Abliterated base? — refusals are a *separate axis* from prose quality
 Abliteration buys **latitude (fewer refusals), not better writing**. Our own data
 says so: Qwythos-9B (abliterated) is FC 94% but **NOT a creative standout**, and
@@ -118,7 +140,7 @@ revisit if content volume makes it batch-bound). `enable_thinking:false`,
 
 | Phase | Exit criterion |
 |---|---|
-| 0 experiment | base bake-off across 4 arms — {Gemma-4-26B-A4B-it, its abliterated variant, a 9B, its abliterated variant} scored on creative harness + false-refusal rate + speed + sampler sweep; eval harness wired; data manifest exported from protoContent |
+| 0 experiment | base bake-off — {Gemma-4-26B-A4B (MoE, NVFP4+MTP validated), **gemma-4-12B-it (dense, + DeepSpec draft)**, a 9B} × {stock, abliterated} scored on creative harness + false-refusal rate + single-stream speed (with draft) + sampler sweep; eval harness wired; data manifest exported from protoContent. Decide base on quality × trainability × single-stream speed |
 | 1 train | SFT+ORPO run beats stock base on creative harness AND ties it on brief-adherence |
 | 2 report | RESULTS.md: honest slop delta, house-voice win-rate, what didn't work |
 | 3 engineering | wired into the content workflow (a `protolabs/writer` route or CLI) |
