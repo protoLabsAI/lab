@@ -45,9 +45,18 @@ Three converging reasons the 12B dense may beat the 26B-A4B MoE as the *fine-tun
    (their non-scaling under concurrency is irrelevant for content drafting).
 Tradeoff to MEASURE: 12B active vs 26B-A4B's 3.8B active — raw the MoE decodes
 faster, but a good draft may close/beat it single-stream. Base + all 3 drafts
-staged to cache (2026-07-06). **Decisive bench:** serve gemma-4-12B-it + released
-eagle3 (or dflash) draft, measure single-stream tok/s + accept, vs the validated
-26B-A4B NVFP4+MTP **257 tok/s** ([[project_gemma4_nvfp4_mtp]]).
+staged to cache (2026-07-06).
+
+> **BLOCKED on our stack — tested live 2026-07-06.** The 12B+draft bench does NOT
+> run on pinned vLLM 0.22.1: the 12B arch is `Gemma4UnifiedForConditionalGeneration`
+> (`gemma4_unified`) which vLLM has no native path for → generic Transformers
+> fallback fails with a weight-shape bug (compiled AND eager). The DeepSpec drafts'
+> archs (`Gemma4Eagle3Model`, `Gemma4DSparkModel`) aren't registered either. See
+> [[reference_deepspec_dspark]]. **Consequence:** the 12B's easier-to-train edge is
+> real, but SERVING a fine-tuned 12B on this rig needs a vLLM bump (add gemma4_unified
+> + draft archs) OR a llama.cpp GGUF path. Fine-tuning itself is unaffected (HF/
+> LLaMA-Factory). Until that's resolved, the **26B-A4B NVFP4+MTP (257 t/s, validated)
+> is the only working non-thinking creative base on the current stack.**
 
 ### 26B-A4B NVFP4 baseline is validated (the speed anchor)
 185 tok/s no-MTP, **257 tok/s with MTP @ SPEC_TOK=2 (+39%)**, non-thinking clean.
