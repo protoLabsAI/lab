@@ -64,3 +64,6 @@ unsloth_compiled_cache/
 # Experiment data artifacts (keep on /mnt/data, not in repo)
 *.faiss
 experiments/**/large_corpus.*
+
+# strategy docs stay local — repo is public, playbook is not (2026-07-03)
+PUBLISHING.md

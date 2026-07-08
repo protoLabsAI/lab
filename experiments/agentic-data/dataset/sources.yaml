@@ -1,0 +1,130 @@
+# protoLabs agentic-distill — source manifest.
+#
+# License is METADATA, not a gate (see ../DATASETS.md). `teacher` drives the pilot ablations.
+# Add a source  =  add a block here  +  an adapter in adapters.py (verify its columns first).
+# `weight` is the relative sampling weight when building a blended mix; `enabled` gates ingest.
+
+held_out_eval:
+  # NOT trained on — our gate + the contamination anchor. build.py drops any train row
+  # whose prompt_hash collides with these.
+  tau2_bench:
+    hf_id: sierra-research/tau2-bench
+    teacher: human
+    domain: retail,airline,telecom
+    note: deterministic DB-state verifier; held-out eval for the distilled student
+
+sources:
+  # ---- Tier 1: highest quality, exact domain (license-unfiltered, train-on) ----
+  apigen_mt:
+    hf_id: Salesforce/APIGen-MT-5k
+    teacher: gpt-4o+deepseek-v3
+    domain: retail,airline
+    format: multi_turn_verified
+    license_note: "cc-by-nc-4.0 (train-on OK; do NOT re-host rows verbatim)"
+    verified: true
+    weight: 1.0
+    enabled: true
+  orca_agentinstruct:
+    hf_id: microsoft/orca-agentinstruct-1M-v1
+    teacher: gpt-4
+    domain: mixed_instruction   # general instruction/reasoning (GPT-4), NOT tool-use — fuel
+    format: multi_turn
+    license_note: "cdla-permissive-2.0 (azure gpt-4 gen)"
+    weight: 0.5
+    enabled: true
+
+  # ---- Tier 2: tool-use / agentic breadth ----
+  toolace:
+    hf_id: Team-ACE/ToolACE
+    teacher: non-openai-synth
+    domain: finance,social,realestate,gaming,weather
+    format: multi_turn
+    license_note: apache-2.0
+    weight: 1.0
+    enabled: true
+  hermes_reasoning_tool_use:
+    hf_id: interstellarninja/hermes_reasoning_tool_use
+    teacher: deephermes-3-8b
+    domain: mixed_tool_use
+    format: multi_turn_think_toolcall   # already <think>+<tool_call> — matches our serving format
+    license_note: apache-2.0
+    weight: 1.0
+    enabled: true
+  when2call:
+    hf_id: nvidia/When2Call
+    teacher: synth
+    domain: tool_decision
+    format: single_turn_decision        # teaches when-NOT-to-call (2B over-triggers)
+    license_note: "cc-by-4.0 (commercial-OK)"
+    weight: 0.5
+    enabled: true
+  agenttraj_l:
+    hf_id: AgentGym/AgentTraj-L
+    teacher: env-verified
+    domain: web,embodied,science,sql,games
+    format: multi_turn_verified
+    license_note: "MIT repo (confirm data-artifact field)"
+    verified: true
+    weight: 1.0
+    enabled: true
+  os_genesis:
+    hf_id: OS-Copilot/OS-Genesis-mobile-data
+    teacher: rule-verified
+    domain: crm,calendar,contacts,ops   # claw ops via a11y-tree TEXT (drop screenshots)
+    format: gui_trajectory
+    license_note: MIT
+    verified: true
+    weight: 0.5
+    enabled: true                       # arm-D: <image> stripped, a11y-tree text kept
+
+  # ---- arm-D: strong-teacher / in-family public we skipped in arm-A ----
+  smoltalk2_smolagents:
+    hf_id: HuggingFaceTB/smoltalk2
+    config: SFT
+    split: smolagents_toolcalling_traces_think
+    teacher: qwen3-32b                   # STRONG, in-family (vs arm-A's DeepSeek-V2/GPT-3.5/Llama)
+    domain: mixed_tool_use
+    format: multi_turn_think_toolcall
+    license_note: apache-2.0
+    weight: 1.0
+    enabled: true
+  smoltalk2_xlam:
+    hf_id: HuggingFaceTB/smoltalk2
+    config: SFT
+    split: xlam_traces_no_think
+    teacher: qwen3-family
+    domain: tool_use
+    format: multi_turn
+    license_note: apache-2.0
+    weight: 0.5
+    enabled: true
+  toolbench:
+    hf_id: OpenBMB/ToolBench
+    teacher: gpt-3.5
+    domain: rapidapi_breadth
+    format: multi_turn
+    license_note: "apache tag + gpt-3.5 gen"
+    weight: 0.3
+    enabled: false                      # large; enable for a breadth pass
+
+  # ---- Reasoning fuel (harden the small student underneath the agentic data) ----
+  openthoughts3:
+    hf_id: open-thoughts/OpenThoughts3-1.2M
+    teacher: qwq-32b
+    domain: reasoning
+    format: reasoning
+    license_note: apache-2.0
+    weight: 0.2
+    enabled: false
+
+  # ---- Ours: Ornith-generated verified core (the distillation signal) ----
+  ornith_tau:
+    hf_id: null                         # generated locally, never downloaded
+    teacher: ornith-35b
+    domain: retail,airline,telecom
+    format: multi_turn_verified
+    license_note: "ours (clean)"
+    verified: true
+    weight: 2.0                         # highest — teacher-consistent, in-domain, verified
+    enabled: true
+    generator: "tau-bench env + reward-filter (see ../PILOT.md)"

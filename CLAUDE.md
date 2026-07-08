@@ -59,14 +59,14 @@ Each phase has an exit criterion; don't move on until current phase is done.
 
 Default to publishing publicly via `protoLabsAI/` on HuggingFace and protolabs.studio for the writeup. Privacy is a drafting state, not a target. **Every shipped experiment produces a blog draft in `experiments/<name>/BLOG.md` before the next experiment starts.** audio-tags is the template.
 
-## Daily setup (dual GPU) — Ornith-35B-FP8 replicas (2026-06-27)
+## Daily setup (dual GPU) — Ornith-35B-NVFP4 replicas (2026-07-04)
 
-All services run as systemd and auto-start on boot. **Daily driver = 2× our `Ornith-1.0-35B-FP8` replicas** (one per GPU, gateway round-robin). North star in [`FOCUS.md`](FOCUS.md); model published at [`protoLabsAI/Ornith-1.0-35B-FP8`](https://huggingface.co/protoLabsAI/Ornith-1.0-35B-FP8) (our quant — upstream FP8 was broken; SSM kept bf16, 92.9% truly-fp8, parity-verified).
+All services run as systemd and auto-start on boot. **Daily driver = 2× our `Ornith-1.0-35B-NVFP4` replicas** (one per GPU, gateway round-robin) — flipped from FP8 on 2026-07-04 after a 6/6 gate PASS vs the FP8 prod baseline (claw paired +0.005, reasoning ×3 tied, FC +1.4, coherence clean to 60K, C1 speed parity at 208 tok/s, **24 GB vs 35 GB weights** → +11 GB KV headroom per card). Published at [`protoLabsAI/Ornith-1.0-35B-NVFP4`](https://huggingface.co/protoLabsAI/Ornith-1.0-35B-NVFP4); FP8 units backed up at `~/dev/.vllm-bump-review/unit-backups/*.pre-nvfp4-20260704-0850` (rollback = restore + daemon-reload + restart). **NVFP4 units REQUIRE the sm120 recipe env in the unit** (`FLASHINFER_CUDA_ARCH_LIST=12.0f`, `CUDA_HOME=<cu13>`, cu13 in PATH, `NVCC_APPEND_FLAGS=-DCCCL_DISABLE_CTK_COMPATIBILITY_CHECK`, `VLLM_USE_TRITON_FP8_GEMM=1`) — without it the NVFP4 linear GEMMs hit the FlashInfer "no CUDA arch for major 12" crash — plus `--moe-backend marlin` (trtllm Sm120_SafeFP4 segfaults). Vision verified working on the quant (visual tower kept bf16). North star in [`FOCUS.md`](FOCUS.md).
 
 | GPU | Service | Model | Port | Notes |
 |-----|---------|-------|------|-------|
-| 0 | `vllm.service` | Ornith-1.0-35B-FP8 | :8000 | replica A, util 0.90, 256K, vision, `local` |
-| 1 | `vllm-replica-b.service` | Ornith-1.0-35B-FP8 | :8003 | replica B, util 0.72 (Fish+embed co-resident), 256K, vision, `local` |
+| 0 | `vllm.service` | Ornith-1.0-35B-NVFP4 | :8000 | replica A, util 0.90, 256K, vision, `local` |
+| 1 | `vllm-replica-b.service` | Ornith-1.0-35B-NVFP4 | :8003 | replica B, util 0.72 (Fish+embed co-resident), 256K, vision, `local` |
 | 0 | `embed-b.service` | Qwen3-Embedding-0.6B | :8004 | embed B (doubled) |
 | 1 | `embed-server.service` | Qwen3-Embedding-0.6B | :8001 | embed A |
 | 1 | `protovoice-stack.service` | Fish S2-Pro TTS | :8092 | ~20GB, lazy-load |
@@ -122,14 +122,20 @@ bash models/vllm-swap.sh qwen-27b-fp8-tp2   # FP8 official TP=2 (70 tok/s, 131K)
 ## Speed testing
 
 ```bash
-bash models/speed-test.sh           # 5 runs on current model (800 tok gen)
+bash models/speed-test.sh           # v1: 5 single-stream runs (800 tok gen) — legacy/continuity only
 bash models/speed-test.sh 10        # 10 runs
 bash models/speed-test.sh 3 short   # 3 short runs (200 tokens)
+
+bash models/speed-test-v2.sh quick        # v2: 2 regimes × C{1,8}, ~10 min (release gate)
+bash models/speed-test-v2.sh full         # v2: 4 ISL/OSL regimes × C{1,4,8,16,32}, ~60-90 min
+bash models/speed-test-v2.sh depth        # v2: decode-at-depth ladder 4/16/32/64K × C{1,4} (~20 min;
+                                          #     server needs max-model-len ≥ 64K; hybrid flat-curve + MTP-vs-depth data)
+bash models/speed-test-v2.sh full 8003 x  # custom port + label
 
 cd evals && bash run-ab-speed.sh qwen-4b-int4 5
 ```
 
-Reports decode tok/s (1/TPOT), wall tok/s, TTFT, and TPOT from vLLM's `/metrics` endpoint — not wall-clock estimation.
+v1 reports decode tok/s (1/TPOT), wall tok/s, TTFT, and TPOT from vLLM's `/metrics` endpoint — not wall-clock estimation. **v2 is the standard for published numbers** (InferenceMAX-style): client-side `vllm bench serve`, random dataset at fixed seed, regimes chat 1k/1k · context 8k/1k · gen 1k/8k · legacy 128/800, TTFT/TPOT p50/p99, aggregate tok/s, and goodput at TTFT≤2s+TPOT≤50ms. Single-stream-only numbers are banned from model cards (the dFlash lesson: single-stream wins can invert 3× under C=4–8 fan-out, which is what prod traffic actually is). JSONs land in `evals/results/speed-v2/` and feed the board's benchmark-result schema.
 
 ### Optimization flags (`-opt` configs)
 

@@ -38,6 +38,44 @@ bash benchmark.sh Qwen/Qwen3.5-9B gptq --eval
 | `fp8` | llm-compressor | None | ~50% | ~99% | ~10 min | ~24 GB |
 | `gptq` | llm-compressor | 512 samples | ~75% | ~95% | ~1-2 hrs | ~24 GB |
 | `awq` | AutoAWQ | 128 samples | ~75% | ~95% | ~15 min | ~24 GB |
+| `nvfp4` | llm-compressor | 512 samples | ~72% | dense: −1.5–2.5 MMLU-Pro | ~30 min | ~24 GB |
+| `nvfp4a16` | llm-compressor | None | ~72% | ≈nvfp4 | ~15 min | ~24 GB |
+
+**`nvfp4`/`nvfp4a16` require quant-env** (`~/dev/quant-env/`, llm-compressor ≥0.10 with NVFP4 presets), not vllm-env.
+
+## NVFP4 (Blackwell-native 4-bit)
+
+E2M1 values, 16-element blocks with FP8 E4M3 fractional scales + per-tensor FP32
+scale. Dequant happens inside the sm120 tensor core (`mma.sync...e2m1.e2m1`).
+`nvfp4` = W4A4 (the hardware path, calibrated); `nvfp4a16` = weight-only,
+data-free fallback if the W4A4 serve path fights back.
+
+```bash
+source ~/dev/quant-env/bin/activate
+python quantize.py --model deepreinforce-ai/Ornith-1.0-9B --method nvfp4
+```
+
+Recipe details for the Qwen3.5 hybrid family (Ornith):
+
+- **DeltaNet (`linear_attn`) stays bf16** — low-precision activations corrupt it
+  (same class as the W8A8-FP8 finding on this arch). Vision tower and `lm_head`
+  also excluded; excluding `lm_head` sidesteps the vLLM 0.22.1 quantized-lm_head
+  loader gap that blocked the ModelOpt Qwen3.6-27B-NVFP4 checkpoint.
+- **MTP composes cleanly**: the draft head is a bf16 sidecar
+  (`protoLabsAI/Ornith-1.0-9B-MTP`, `model-mtp.safetensors`) loaded via
+  `--speculative-config` — never part of the quantized checkpoint. Spec decode
+  verifies against the quantized target, so MTP+NVFP4 output ≡ NVFP4-only
+  output; only the acceptance rate can drift (head was distilled on bf16
+  Ornith logits — re-measure accept% and re-distill only if it craters).
+
+Serving gates on sm120 (vLLM 0.22.1):
+
+- FlashInfer NVFP4 cutlass + fused-MoE GEMMs need the local kernel build —
+  `FLASHINFER-SM120-RECIPE.md` (CUDA_HOME at bundled CUDA-13 + dev symlinks).
+- `VLLM_USE_TRITON_FP8_GEMM=1` (the FlashInfer FP8 matmul silently deadlocks
+  on Blackwell) + the usual `VLLM_USE_FLASHINFER_SAMPLER=0`.
+- If W4A4 won't serve, `nvfp4a16` weight-only loads through the
+  compressed-tensors marlin-style path with none of the cutlass dependencies.
 
 ## Custom Calibration Data
 
