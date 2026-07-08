@@ -67,3 +67,7 @@ experiments/**/large_corpus.*
 
 # strategy docs stay local — repo is public, playbook is not (2026-07-03)
 PUBLISHING.md
+
+# external benchmark clones (not our work)
+experiments/agentic-data/tau-bench/
+experiments/agentic-data/tau2-bench/
