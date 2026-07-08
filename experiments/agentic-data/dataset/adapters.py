@@ -209,3 +209,23 @@ def _orca(row: dict, cfg: dict) -> Iterator[Trajectory]:
 @register("ornith_tau")
 def _ornith(row: dict, cfg: dict) -> Iterator[Trajectory]:
     yield Trajectory(**row)
+
+
+# --- ProtoAgent fleet: the Observe seam — already canonical (protoAgent#1897) ---
+
+@register("fleet", "protoagent_fleet")
+def _fleet(row: dict, cfg: dict) -> Iterator[Trajectory]:
+    """Fleet production traces, written directly in canonical Trajectory shape by
+    protoAgent's `observability/trace_export.py`. Validate + normalize tool_call
+    `arguments` (JSON-string -> dict). The OODA signal — `meta.loop_shape` (react/ooda)
+    and `meta.orient` (the goal-plan snapshot = scratchpad-as-world-model) — passes
+    through in `meta`. Reward is terminal-state verifiable (1.0/0.0/None), never a judge."""
+    for m in row.get("messages") or []:
+        for tc in (m.get("tool_calls") or []):
+            a = tc.get("arguments")
+            if isinstance(a, str):
+                try:
+                    tc["arguments"] = json.loads(a)
+                except Exception:
+                    pass  # schema tolerates str pre-normalization
+    yield Trajectory(**row)
