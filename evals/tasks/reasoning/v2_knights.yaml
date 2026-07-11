@@ -124,3 +124,89 @@ tests:
     case_sensitive: false
   ground_truth: *id004
   difficulty: hard
+- id: v2_knights_4_extreme
+  prompt: 'On an island, knights always tell the truth and knaves always lie. You meet 9 inhabitants:
+    Alice, Bob, Carol, Dan, Erin, Frank, Grace, Heidi, Ivan.
+
+
+    - Bob says: "Frank is a knight."
+
+    - Bob says: "Carol and Erin are the same type."
+
+    - Carol says: "Grace and Ivan are both knights."
+
+    - Frank says: "Grace is a knight."
+
+    - Ivan says: "Alice is a knight."
+
+    - Heidi says: "Grace is a knight."
+
+    - Dan says: "Grace is a knave."
+
+    - Heidi says: "Erin is a knight."
+
+
+    Determine what each inhabitant is. Give your final answer on the last line in exactly this format
+    (comma-separated, no spaces around ''=''):
+
+    ANSWER: Alice=<knight|knave>, Bob=<knight|knave>, ...'
+  graders:
+  - type: match
+    dimension: reasoning_exact
+    mode: all_of
+    expected: &id005
+    - Alice=knight
+    - Bob=knight
+    - Carol=knight
+    - Dan=knave
+    - Erin=knight
+    - Frank=knight
+    - Grace=knight
+    - Heidi=knight
+    - Ivan=knight
+    case_sensitive: false
+  ground_truth: *id005
+  difficulty: extreme
+- id: v2_knights_5_extreme
+  prompt: 'On an island, knights always tell the truth and knaves always lie. You meet 9 inhabitants:
+    Alice, Bob, Carol, Dan, Erin, Frank, Grace, Heidi, Ivan.
+
+
+    - Grace says: "Frank is a knave."
+
+    - Ivan says: "Dan is a knave."
+
+    - Dan says: "Bob and Erin are both knights."
+
+    - Heidi says: "Frank is a knave."
+
+    - Alice says: "Dan is a knight."
+
+    - Grace says: "Alice is a knight."
+
+    - Alice says: "Bob is a knave."
+
+    - Grace says: "Carol is a knight."
+
+
+    Determine what each inhabitant is. Give your final answer on the last line in exactly this format
+    (comma-separated, no spaces around ''=''):
+
+    ANSWER: Alice=<knight|knave>, Bob=<knight|knave>, ...'
+  graders:
+  - type: match
+    dimension: reasoning_exact
+    mode: all_of
+    expected: &id006
+    - Alice=knave
+    - Bob=knight
+    - Carol=knave
+    - Dan=knave
+    - Erin=knave
+    - Frank=knight
+    - Grace=knave
+    - Heidi=knave
+    - Ivan=knight
+    case_sensitive: false
+  ground_truth: *id006
+  difficulty: extreme

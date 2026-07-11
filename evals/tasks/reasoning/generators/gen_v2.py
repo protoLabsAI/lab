@@ -42,8 +42,8 @@ def gen_arith(rng: random.Random, difficulty: str) -> dict:
     distractor items and non-events salted in, events in shuffled order (all ops
     are +/- so the final counts are order-independent). Medium/hard must report
     BOTH final counts (two graders -> partial credit)."""
-    n_steps = {"easy": 4, "medium": 10, "hard": 16}[difficulty]
-    n_distractors = {"easy": 1, "medium": 4, "hard": 8}[difficulty]
+    n_steps = {"easy": 4, "medium": 10, "hard": 16, "extreme": 28}[difficulty]
+    n_distractors = {"easy": 1, "medium": 4, "hard": 8, "extreme": 14}[difficulty]
     both = difficulty != "easy"
 
     item_a, item_b, other = rng.sample(
@@ -154,7 +154,7 @@ def gen_sequence(rng: random.Random, difficulty: str) -> dict:
             seq.append(seq[-2] + seq[-3])
         shown, answer = seq[:n_show], seq[n_show]
         assert shown[-2] + shown[-3] == answer
-    else:
+    elif difficulty == "hard":
         # THREE interleaved streams (period 3): *2 stream, +k stream, 2nd-diff
         # stream; asked for the next TWO terms -> partial credit per term
         n_show = 9
@@ -184,6 +184,35 @@ def gen_sequence(rng: random.Random, difficulty: str) -> dict:
                          "expected": rf"ANSWER:\s*{a1}\s*,\s*{a2}\b"}],
             "meta": {"family": "sequence", "difficulty": difficulty, "truth": f"{a1}, {a2}"},
         }
+    else:
+        # extreme: a single sequence governed by a DEEP compound recurrence that is
+        # not a famous sequence — a lag-4 linear recurrence with distinct integer
+        # coefficients AND a constant offset: a(n) = c1*a(n-1) + c3*a(n-3) - a(n-4) + b.
+        # Four leading terms + the 4-deep lag + the additive constant make the rule
+        # far harder to induce than the hard tier's period-3 interleave; asked for
+        # the next TWO terms (partial credit per term).
+        n_show = 12
+        c1, c3, b = rng.randint(1, 2), rng.randint(1, 3), rng.randint(1, 5)
+        seq = [rng.randint(1, 4) for _ in range(4)]
+        while len(seq) < n_show + 2:
+            seq.append(c1 * seq[-1] + c3 * seq[-3] - seq[-4] + b)
+        shown, a1, a2 = seq[:n_show], seq[n_show], seq[n_show + 1]
+        # independent recomputation from the shown window only (no reuse of seq)
+        w = list(shown)
+        w.append(c1 * w[-1] + c3 * w[-3] - w[-4] + b)
+        w.append(c1 * w[-1] + c3 * w[-3] - w[-4] + b)
+        assert w[n_show] == a1 and w[n_show + 1] == a2
+        prompt = (
+            f"Consider the integer sequence: {', '.join(map(str, shown))}, ...\n"
+            "What are the next TWO terms? Work through this step by step, then give your final "
+            "answer on the last line in exactly this format:\nANSWER: <term13>, <term14>"
+        )
+        return {
+            "prompt": prompt,
+            "graders": [{"type": "match", "dimension": "next_terms", "mode": "regex",
+                         "expected": rf"ANSWER:\s*{a1}\s*,\s*{a2}\b"}],
+            "meta": {"family": "sequence", "difficulty": difficulty, "truth": f"{a1}, {a2}"},
+        }
 
     prompt = (
         f"Consider the integer sequence: {', '.join(map(str, shown))}, ...\n"
@@ -205,7 +234,7 @@ def gen_machine(rng: random.Random, difficulty: str) -> dict:
     Multi-step exact state tracking — the capability our OOD probe showed models
     fake via memorization on famous constants but fail on arbitrary instances.
     """
-    n_ops = {"easy": 6, "medium": 18, "hard": 30}[difficulty]
+    n_ops = {"easy": 6, "medium": 18, "hard": 30, "extreme": 50}[difficulty]
     regs = [rng.randint(1, 9) for _ in range(3)]
     lines = [f"Registers start at R0={regs[0]}, R1={regs[1]}, R2={regs[2]}."]
     prog = []
@@ -268,13 +297,16 @@ def gen_machine(rng: random.Random, difficulty: str) -> dict:
 
 # ---------------------------------------------------------------- schedule
 
-NAMES = ["Alice", "Bob", "Carol", "Dan", "Erin", "Frank", "Grace"]
-DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+# Extended past 7 so the extreme tier can reach n=8 (schedule) / n=9 (knights).
+# Kept collision-free for the all_of substring grader: no label is a substring of
+# another (e.g. no "Mon"/"Mon2" pair that would false-positive).
+NAMES = ["Alice", "Bob", "Carol", "Dan", "Erin", "Frank", "Grace", "Heidi", "Ivan", "Judy"]
+DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun", "Hol"]
 
 
 def gen_schedule(rng: random.Random, difficulty: str) -> dict:
     """Assign n people to n distinct days under constraints; unique solution required."""
-    n = {"easy": 4, "medium": 6, "hard": 7}[difficulty]
+    n = {"easy": 4, "medium": 6, "hard": 7, "extreme": 8}[difficulty]
     people = NAMES[:n]
     days = DAYS[:n]
 
@@ -304,12 +336,25 @@ def gen_schedule(rng: random.Random, difficulty: str) -> dict:
                                  lambda a, i=i, j=j, g=gap: abs(a[i] - a[j]) >= g))
         for i in range(n):
             wrong = rng.choice([d for d in range(n) if d != sol[i]])
-            if difficulty != "hard":
+            # direct "not on <day>" anchors only below the relational tiers
+            if difficulty in ("easy", "medium"):
                 pool.append((f"{people[i]} does not present on {days[wrong]}.",
                              lambda a, i=i, w=wrong: a[i] != w))
             if difficulty != "easy":
                 pool.append((f"{people[i]} presents on {days[sol[i]]} or {days[wrong]}.",
                              lambda a, i=i, s=sol[i], w=wrong: a[i] in (s, w)))
+        if difficulty == "extreme":
+            # ternary "between" clues (person j strictly between i and k in the week)
+            # — no anchor, forces three-way chained inference.
+            for j in range(n):
+                lo = [i for i in range(n) if sol[i] < sol[j]]
+                hi = [k for k in range(n) if sol[k] > sol[j]]
+                if lo and hi:
+                    i, k = rng.choice(lo), rng.choice(hi)
+                    pool.append((
+                        f"{people[j]} presents on a day strictly between {people[i]}'s and "
+                        f"{people[k]}'s days.",
+                        lambda a, i=i, j=j, k=k: a[i] < a[j] < a[k]))
         rng.shuffle(pool)
 
         chosen = []
@@ -366,7 +411,7 @@ def gen_grid(rng: random.Random, difficulty: str) -> dict:
     relational-only clues (observed 15+ CPU-min). Hard difficulty comes from
     clue indirection (no direct person->color anchors, disjunctions), not size.
     """
-    n = {"easy": 3, "medium": 4, "hard": 4}[difficulty]
+    n = {"easy": 3, "medium": 4, "hard": 4, "extreme": 4}[difficulty]
     people = NAMES[:n]
     colors = ["red", "blue", "green", "yellow", "white"][:n]
     drinks = ["tea", "coffee", "milk", "juice", "cocoa"][:n]
@@ -380,8 +425,8 @@ def gen_grid(rng: random.Random, difficulty: str) -> dict:
         pool = []
         for k in range(n):
             pi, ci, di = p_sol[k], c_sol[k], d_sol[k]
-            if difficulty != "hard":
-                # direct person->color anchors only below hard tier
+            if difficulty in ("easy", "medium"):
+                # direct person->color anchors only below the relational tiers
                 pool.append((f"{people[pi]} lives in the {colors[ci]} house.",
                              lambda P, C, D, pi=pi, ci=ci: P.index(pi) == C.index(ci)))
             pool.append((f"The person in the {colors[ci]} house drinks {drinks[di]}.",
@@ -400,7 +445,7 @@ def gen_grid(rng: random.Random, difficulty: str) -> dict:
                 wrong_d = rng.choice([x for x in range(n) if x != di])
                 pool.append((f"{people[pi]} does not drink {drinks[wrong_d]}.",
                              lambda P, C, D, pi=pi, w=wrong_d: D[P.index(pi)] != w))
-            if difficulty == "hard":
+            if difficulty in ("hard", "extreme"):
                 # relational / disjunctive clues force chained inference
                 for k2 in range(k + 2, n):
                     pj2 = p_sol[k2]
@@ -415,7 +460,26 @@ def gen_grid(rng: random.Random, difficulty: str) -> dict:
                 w3 = rng.choice([x for x in range(n) if x != k])
                 pool.append((f"The {colors[ci]} house is not house {w3 + 1}.",
                              lambda P, C, D, ci=ci, w=w3: C.index(ci) != w))
-        if difficulty != "hard":
+            if difficulty == "extreme":
+                # cross-attribute RELATIONAL clues (no attribute is pinned to a
+                # position): tie a colour's position to a drink's position, and a
+                # person's position to another colour's position. Maximal indirection
+                # at n=4 — the whole grid must be inferred by chaining, not lookup.
+                for k2 in range(n):
+                    if k2 == k:
+                        continue
+                    dj = d_sol[k2]
+                    if c_sol.index(ci) < d_sol.index(dj):
+                        pool.append((
+                            f"The {colors[ci]} house is somewhere to the left of the "
+                            f"{drinks[dj]} drinker.",
+                            lambda P, C, D, ci=ci, dj=dj: C.index(ci) < D.index(dj)))
+                    cj = c_sol[k2]
+                    if p_sol.index(pi) != c_sol.index(cj):
+                        pool.append((
+                            f"{people[pi]} does not live in the {colors[cj]} house.",
+                            lambda P, C, D, pi=pi, cj=cj: P.index(pi) != C.index(cj)))
+        if difficulty in ("easy", "medium"):
             pool.append((f"{people[p_sol[0]]} lives in the first (leftmost) house.",
                          lambda P, C, D, p0=p_sol[0]: P.index(p0) == 0))
         rng.shuffle(pool)
@@ -483,7 +547,7 @@ def gen_grid(rng: random.Random, difficulty: str) -> dict:
 
 def gen_knights(rng: random.Random, difficulty: str) -> dict:
     """Knights (always true) & knaves (always false); unique assignment."""
-    n = {"easy": 3, "medium": 5, "hard": 7}[difficulty]
+    n = {"easy": 3, "medium": 5, "hard": 7, "extreme": 9}[difficulty]
     people = NAMES[:n]
 
     def stmt_pool(sol):
@@ -506,11 +570,25 @@ def gen_knights(rng: random.Random, difficulty: str) -> dict:
             if difficulty != "easy":
                 pool.append((f'{people[i]} says: "{people[j]} and {people[k]} are both knights."',
                              lambda a, i=i, j=j, k=k: a[i] == (a[j] and a[k])))
-            if difficulty == "hard":
+            if difficulty in ("hard", "extreme"):
                 pool.append((f'{people[i]} says: "Exactly one of {people[j]} and {people[k]} is a knight."',
                              lambda a, i=i, j=j, k=k: a[i] == (a[j] != a[k])))
                 pool.append((f'{people[i]} says: "{people[j]} and {people[k]} are the same type."',
                              lambda a, i=i, j=j, k=k: a[i] == (a[j] == a[k])))
+            if difficulty == "extreme":
+                others = [x for x in range(n) if x != i]
+                if len(others) >= 3:
+                    p, q, r = rng.sample(others, 3)
+                    # majority / counting statements over THREE others — truth is not
+                    # flip-invariant and needs the whole assignment to evaluate.
+                    pool.append((
+                        f'{people[i]} says: "At least two of {people[p]}, {people[q]}, and '
+                        f'{people[r]} are knights."',
+                        lambda a, i=i, p=p, q=q, r=r: a[i] == ((a[p] + a[q] + a[r]) >= 2)))
+                    pool.append((
+                        f'{people[i]} says: "{people[p]}, {people[q]}, and {people[r]} are '
+                        f'not all the same type."',
+                        lambda a, i=i, p=p, q=q, r=r: a[i] == (not (a[p] == a[q] == a[r]))))
         return pool
 
     for _attempt in range(400):
@@ -572,9 +650,10 @@ FAMILIES = {
     "knights": gen_knights,
 }
 
-# 4 per family: easy, easy, medium, hard  → suite mix 12:6:6 (≈4:3:3 with the
-# harder-than-labeled tail; calibration run re-tiers empirically)
-TIERS = ["easy", "easy", "medium", "hard"]
+# 6 per family: easy, easy, medium, hard, extreme, extreme. The two extreme
+# instances (ids v2_<family>_4_extreme / _5_extreme) push each knob past hard so a
+# frontier model lands ~0.4-0.7 instead of saturating; all remain solver-verified.
+TIERS = ["easy", "easy", "medium", "hard", "extreme", "extreme"]
 
 
 def main():

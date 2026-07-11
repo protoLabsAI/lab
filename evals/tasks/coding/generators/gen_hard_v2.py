@@ -744,10 +744,270 @@ def build_cache(rng: random.Random) -> dict:
             "prompt": prompt, "tests": tests}
 
 
+# ================================================================ skyline
+# LC-218 Hard: outline of overlapping rectangular buildings. Half-open columns
+# [l, r); a building of height h covers columns l..r-1. Output the contour as
+# [x, h] key points: the skyline BECOMES height h at column x. Cross-check: a
+# per-column max scan vs a boundary-only scan (height changes only at endpoints).
+
+def _skyline_ref(buildings) -> list:
+    if not buildings:
+        return []
+    xmin = min(l for l, r, h in buildings)
+    xmax = max(r for l, r, h in buildings)
+    out, prev = [], 0
+    for x in range(xmin, xmax + 1):
+        h = 0
+        for l, r, bh in buildings:
+            if l <= x < r and bh > h:
+                h = bh
+        if h != prev:
+            out.append([x, h])
+            prev = h
+    return out
+
+
+def _skyline_alt(buildings) -> list:
+    """Independent impl: sample only at endpoints (height is constant between)."""
+    if not buildings:
+        return []
+    xs = sorted({l for l, r, h in buildings} | {r for l, r, h in buildings})
+    out, prev = [], 0
+    for x in xs:
+        h = max((bh for l, r, bh in buildings if l <= x < r), default=0)
+        if h != prev:
+            out.append([x, h])
+            prev = h
+    return out
+
+
+def build_skyline(rng: random.Random) -> dict:
+    cases = []
+    while len(cases) < 11:
+        n = rng.randint(1, 6)
+        segs = []
+        for _ in range(n):
+            l = rng.randint(0, 15)
+            r = l + rng.randint(1, 8)
+            segs.append((l, r, rng.randint(1, 9)))
+        r1, r2 = _skyline_ref(segs), _skyline_alt(segs)
+        assert r1 == r2, f"skyline cross-check failed: {segs}"
+        cases.append((segs, r1))
+    hand = [
+        ([], []),
+        ([(0, 2, 3)], [[0, 3], [2, 0]]),
+        ([(0, 10, 3), (2, 5, 6)], [[0, 3], [2, 6], [5, 3], [10, 0]]),      # nested
+        ([(0, 4, 3), (2, 6, 5)], [[0, 3], [2, 5], [6, 0]]),                # overlap, taller wins
+        ([(0, 2, 3), (5, 7, 4)], [[0, 3], [2, 0], [5, 4], [7, 0]]),        # disjoint
+        ([(0, 5, 7), (5, 10, 7)], [[0, 7], [10, 0]]),                      # adjacent, same h -> merge
+        ([(0, 3, 3), (1, 5, 3)], [[0, 3], [5, 0]]),                        # overlap, same h -> merge
+        ([(2, 9, 10), (3, 7, 15), (5, 12, 12)], [[2, 10], [3, 15], [7, 12], [12, 0]]),
+    ]
+    for segs, want in hand:
+        assert _skyline_ref(segs) == want == _skyline_alt(segs), segs
+    tests = [f"assert skyline({[list(x) for x in s]!r}) == {w!r}" for s, w in hand + cases]
+    prompt = (
+        "Implement `def skyline(buildings: list) -> list`. Each building is `[l, r, h]` and occupies "
+        "the half-open column range [l, r) at height h (h >= 1, l < r, all integers). Return the "
+        "skyline outline as a list of `[x, height]` key points, sorted by x: each point marks a "
+        "column x where the skyline's height CHANGES to `height` (and stays there until the next "
+        "point). The outline starts at height 0, and the final point returns it to 0 at the right "
+        "edge. Never emit two consecutive points with the same height (merge equal-height runs, "
+        "including across abutting buildings). Overlapping buildings take the max height. For empty "
+        "input return []. Return only the function in a Python code block."
+    )
+    return {"id": "v2_skyline", "difficulty": "hard", "entry": "skyline",
+            "prompt": prompt, "tests": tests}
+
+
+# ================================================================ scc
+# Strongly connected components of a directed graph. Report the component sizes,
+# sorted descending. Reference = transitive-closure grouping; cross-check =
+# Kosaraju two-pass DFS (fully independent structure).
+
+def _scc_ref(n: int, edges) -> list:
+    reach = [[i == j for j in range(n)] for i in range(n)]
+    for a, b in edges:
+        reach[a][b] = True
+    for k in range(n):
+        rk = reach[k]
+        for i in range(n):
+            if reach[i][k]:
+                ri = reach[i]
+                for j in range(n):
+                    if rk[j]:
+                        ri[j] = True
+    seen, sizes = [False] * n, []
+    for i in range(n):
+        if seen[i]:
+            continue
+        comp = [j for j in range(n) if reach[i][j] and reach[j][i]]
+        for j in comp:
+            seen[j] = True
+        sizes.append(len(comp))
+    return sorted(sizes, reverse=True)
+
+
+def _scc_alt(n: int, edges) -> list:
+    adj = [[] for _ in range(n)]
+    radj = [[] for _ in range(n)]
+    for a, b in edges:
+        adj[a].append(b)
+        radj[b].append(a)
+    seen, order = [False] * n, []
+    for s in range(n):
+        if seen[s]:
+            continue
+        stack = [(s, 0)]
+        while stack:
+            v, i = stack[-1]
+            if i == 0:
+                seen[v] = True
+            if i < len(adj[v]):
+                stack[-1] = (v, i + 1)
+                w = adj[v][i]
+                if not seen[w]:
+                    stack.append((w, 0))
+            else:
+                order.append(v)
+                stack.pop()
+    comp = [-1] * n
+    c = 0
+    for s in reversed(order):
+        if comp[s] != -1:
+            continue
+        st = [s]
+        comp[s] = c
+        while st:
+            v = st.pop()
+            for w in radj[v]:
+                if comp[w] == -1:
+                    comp[w] = c
+                    st.append(w)
+        c += 1
+    sizes = [0] * c
+    for x in comp:
+        sizes[x] += 1
+    return sorted(sizes, reverse=True)
+
+
+def build_scc(rng: random.Random) -> dict:
+    cases = []
+    while len(cases) < 10:
+        n = rng.randint(2, 7)
+        edges = set()
+        for _ in range(rng.randint(0, n * 2)):
+            edges.add((rng.randint(0, n - 1), rng.randint(0, n - 1)))
+        if rng.random() < 0.4:  # bias toward some non-trivial cycles
+            cyc = rng.sample(range(n), rng.randint(2, n))
+            edges |= {(cyc[i], cyc[(i + 1) % len(cyc)]) for i in range(len(cyc))}
+        edges = sorted(edges)
+        want = _scc_ref(n, edges)
+        assert want == _scc_alt(n, edges), f"scc cross-check failed: {n} {edges}"
+        cases.append((n, edges, want))
+    hand = [
+        (3, [], [1, 1, 1]),                                             # all singletons
+        (1, [(0, 0)], [1]),                                             # self-loop
+        (3, [(0, 1), (1, 2), (2, 0)], [3]),                            # one big cycle
+        (4, [(0, 1), (1, 0), (2, 3), (3, 2)], [2, 2]),                 # two 2-cycles
+        (2, [(0, 1)], [1, 1]),                                          # DAG
+        (5, [(0, 1), (1, 2), (2, 0), (3, 4)], [3, 1, 1]),             # cycle + singletons
+        (6, [(0, 1), (1, 2), (2, 0), (3, 4), (4, 5), (5, 3)], [3, 3]),
+    ]
+    for n, e, w in hand:
+        assert _scc_ref(n, e) == w == _scc_alt(n, e)
+    tests = [f"assert scc_sizes({n}, {[list(x) for x in e]!r}) == {w!r}" for n, e, w in hand + cases]
+    prompt = (
+        "Implement `def scc_sizes(n: int, edges: list) -> list`. The graph is DIRECTED: nodes are "
+        "0..n-1 and each edge `[a, b]` goes from a to b (self-loops and duplicate edges are "
+        "possible). Find the strongly connected components — maximal sets of nodes where every node "
+        "is reachable from every other node in the set following edge directions. Return the list of "
+        "component SIZES sorted in DESCENDING order. A node with no cycle through it is its own "
+        "component of size 1. Return only the function in a Python code block."
+    )
+    return {"id": "v2_scc_sizes", "difficulty": "hard", "entry": "scc_sizes",
+            "prompt": prompt, "tests": tests}
+
+
+# ================================================================ subseq count
+# Number of DISTINCT subsequences of s equal to t, modulo 1e9+7 (LC-115 Hard).
+# Reference = O(len(s)*len(t)) DP; cross-check on small s = brute over all
+# 2^len(s) subsequences; large modular cases cross-checked by an independent
+# closed-form (choose-counts) so the modular reduction path is genuinely tested.
+
+_ND_MOD = 10**9 + 7
+
+
+def _nd_ref(s: str, t: str) -> int:
+    m = len(t)
+    dp = [0] * (m + 1)
+    dp[0] = 1
+    for c in s:
+        for j in range(m, 0, -1):
+            if t[j - 1] == c:
+                dp[j] = (dp[j] + dp[j - 1]) % _ND_MOD
+    return dp[m]
+
+
+def _nd_brute(s: str, t: str) -> int:
+    n = len(s)
+    cnt = 0
+    for mask in range(1 << n):
+        if "".join(s[i] for i in range(n) if (mask >> i) & 1) == t:
+            cnt += 1
+    return cnt % _ND_MOD
+
+
+def build_subseqcount(rng: random.Random) -> dict:
+    import math
+    cases = []
+    while len(cases) < 10:
+        s = "".join(rng.choice("ab") for _ in range(rng.randint(2, 13)))
+        t = "".join(rng.choice("ab") for _ in range(rng.randint(0, 4)))
+        ref = _nd_ref(s, t)
+        assert ref == _nd_brute(s, t), f"subseq cross-check failed: {(s, t)}"
+        cases.append((s, t, ref))
+    # large cases: s = a^p b^q, t = a^i b^j  =>  count = C(p,i)*C(q,j); big enough
+    # that the answer exceeds the modulus, so a correct solution MUST reduce mod.
+    big = []
+    for p, q, i, j in [(40, 40, 20, 20), (60, 10, 30, 5), (55, 33, 27, 30)]:
+        s, t = "a" * p + "b" * q, "a" * i + "b" * j
+        ref = _nd_ref(s, t)
+        assert ref == (math.comb(p, i) * math.comb(q, j)) % _ND_MOD
+        assert ref != math.comb(p, i) * math.comb(q, j)  # confirm reduction actually happened
+        big.append((s, t, ref))
+    hand = [
+        ("rabbbit", "rabbit", 3),   # classic LC-115
+        ("babgbag", "bag", 5),      # classic LC-115
+        ("", "", 1),                # empty subsequence of empty string
+        ("abc", "", 1),             # empty target: exactly one (empty) subsequence
+        ("a", "aa", 0),             # target longer than source
+        ("aaa", "aa", 3),           # C(3,2)
+        ("abc", "abc", 1),
+    ]
+    for s, t, v in hand:
+        assert _nd_ref(s, t) == v
+        if len(s) <= 14:
+            assert _nd_brute(s, t) == v
+    tests = [f"assert num_distinct({s!r}, {t!r}) == {v}" for s, t, v in hand + cases + big]
+    prompt = (
+        "Implement `def num_distinct(s: str, t: str) -> int`. Return the number of DISTINCT "
+        "subsequences of `s` that equal `t`, taken MODULO 1_000_000_007. A subsequence is formed by "
+        "deleting zero or more characters without changing the order of the remaining characters; "
+        "two subsequences are counted separately when they use different sets of index positions "
+        "(even if the resulting strings are identical). The empty string is a subsequence of every "
+        "string, so `num_distinct(s, '')` is 1. The count can be astronomically large — reduce it "
+        "modulo 1_000_000_007. Return only the function in a Python code block."
+    )
+    return {"id": "v2_subseq_count", "difficulty": "hard", "entry": "num_distinct",
+            "prompt": prompt, "tests": tests}
+
+
 # ================================================================ emit
 
 BUILDERS = [build_expand, build_paint, build_topolex, build_multikey,
-            build_wordwild, build_calc2, build_parens, build_cache]
+            build_wordwild, build_calc2, build_parens, build_cache,
+            build_skyline, build_scc, build_subseqcount]
 
 
 def main():
