@@ -27,7 +27,11 @@ No single eval layer catches everything. Stack multiple methods:
 | pass@k | P(at least 1 success in k trials) | Tools (one success is enough) |
 | pass^k | P(all k trials succeed) | Agents (consistency is essential) |
 
-We use **pass^3** as default — agents must be reliable, not lucky.
+We **previously** used pass^3 as default, but dropped it 2026-06-29: at our breadth (30 claw tasks +
+~16 custom suites + FC) the 3× repetition cost far outweighed the marginal signal — running *more
+distinct tasks* separates models better than running the *same* task three times. Default is now
+single-trial; reach for pass^k (`--trials N`) only when run-to-run consistency on a specific small
+task set is the actual question.
 
 ## The 8-Step Roadmap
 

@@ -1,0 +1,40 @@
+Model: local | Trials: 3 | Tasks: 1
+============================================================
+
+Alias Routing Fitness (5 tests)
+
+  route_001_complex_reasoning:
+    Trial 1: PASS (score=1.00, turns=1, 10.33s)
+    Trial 2: PASS (score=1.00, turns=1, 10.85s)
+    Trial 3: PASS (score=1.00, turns=1, 9.89s)
+    Pass^3: PASS (avg=1.00)
+
+  route_002_quick_factual:
+    Trial 1: PASS (score=1.00, turns=1, 0.9s)
+    Trial 2: PASS (score=1.00, turns=1, 1.14s)
+    Trial 3: PASS (score=1.00, turns=1, 1.45s)
+    Pass^3: PASS (avg=1.00)
+
+  route_003_code_generation:
+    Trial 1: PASS (score=1.00, turns=1, 17.59s)
+    Trial 2: PASS (score=1.00, turns=1, 15.2s)
+    Trial 3: PASS (score=1.00, turns=1, 19.0s)
+    Pass^3: PASS (avg=1.00)
+
+  route_004_creative_quick:
+    Trial 1: PASS (score=1.00, turns=1, 10.03s)
+    Trial 2: PASS (score=1.00, turns=1, 6.39s)
+    Trial 3: PASS (score=1.00, turns=1, 6.73s)
+    Pass^3: PASS (avg=1.00)
+
+  route_005_multi_step_analysis:
+    Trial 1: PASS (score=1.00, turns=1, 29.43s)
+    Trial 2: PASS (score=1.00, turns=1, 28.73s)
+[llm_judge] reasoning_quality: judge call/parse failed -> 0.5 fallback: Expecting value: line 1 column 1 (char 0)
+    Trial 3: FAIL (score=0.50, turns=1, 31.39s)
+    Pass^3: FAIL (avg=0.83)
+
+============================================================
+Results: 4/5 tasks passed (pass^3)
+Mean score: 0.967 ± 0.050  (range 0.900-1.000, std 0.047, n=3)
+Results written to baselines/runs/2026-06-27-35b-3x/protolabs_routing/custom_results.json

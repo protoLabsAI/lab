@@ -1,0 +1,57 @@
+Model: local | Trials: 3 | Tasks: 1
+============================================================
+
+Tool Reliability Under Load (8 tests)
+
+  tr_001_calculator_with_noise:
+    Trial 1: FAIL (score=0.50, turns=2, 0.85s)
+    Trial 2: FAIL (score=0.50, turns=2, 1.7s)
+    Trial 3: FAIL (score=0.50, turns=2, 0.75s)
+    Pass^3: FAIL (avg=0.50)
+
+  tr_002_memory_search_with_noise:
+    Trial 1: FAIL (score=0.50, turns=3, 1.73s)
+    Trial 2: PASS (score=1.00, turns=2, 0.94s)
+    Trial 3: PASS (score=1.00, turns=2, 0.95s)
+    Pass^3: FAIL (avg=0.83)
+
+  tr_003_task_creation:
+    Trial 1: PASS (score=1.00, turns=2, 1.17s)
+    Trial 2: PASS (score=1.00, turns=2, 1.41s)
+    Trial 3: PASS (score=1.00, turns=2, 1.54s)
+    Pass^3: PASS (avg=1.00)
+
+  tr_004_email_with_32_tools:
+    Trial 1: PASS (score=1.00, turns=3, 1.68s)
+    Trial 2: PASS (score=1.00, turns=3, 1.71s)
+    Trial 3: PASS (score=1.00, turns=3, 1.52s)
+    Pass^3: PASS (avg=1.00)
+
+  tr_005_chained_tools:
+    Trial 1: PASS (score=1.00, turns=4, 3.92s)
+    Trial 2: PASS (score=1.00, turns=4, 3.94s)
+    Trial 3: PASS (score=1.00, turns=4, 3.32s)
+    Pass^3: PASS (avg=1.00)
+
+  tr_006_abstention:
+    Trial 1: PASS (score=1.00, turns=1, 0.31s)
+    Trial 2: PASS (score=1.00, turns=1, 0.41s)
+    Trial 3: PASS (score=1.00, turns=1, 0.35s)
+    Pass^3: PASS (avg=1.00)
+
+  tr_007_ambiguous_intent:
+    Trial 1: FAIL (score=0.50, turns=4, 1.59s)
+    Trial 2: PASS (score=1.00, turns=3, 1.42s)
+    Trial 3: FAIL (score=0.50, turns=4, 1.64s)
+    Pass^3: FAIL (avg=0.67)
+
+  tr_008_parallel_tools:
+    Trial 1: PASS (score=1.00, turns=3, 3.65s)
+    Trial 2: PASS (score=1.00, turns=3, 2.72s)
+    Trial 3: PASS (score=1.00, turns=3, 2.61s)
+    Pass^3: PASS (avg=1.00)
+
+============================================================
+Results: 5/8 tasks passed (pass^3)
+Mean score: 0.875 ± 0.062  (range 0.812-0.938, std 0.051, n=3)
+Results written to baselines/runs/2026-06-27-35b-3x/protolabs_tool_reliability/custom_results.json

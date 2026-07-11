@@ -8,6 +8,8 @@ Methods:
   fp8       FP8_DYNAMIC W8A8 — no calibration, ~50% size, ~99% quality, minutes
   gptq      W4A16 GPTQ INT4 — calibration required, ~75% size, ~95% quality, hours
   awq       AWQ INT4 — calibration required, ~75% size, ~95% quality, fast
+  nvfp4     NVFP4 W4A4 — Blackwell-native 4-bit, calibrated, ~72% size (quant-env)
+  nvfp4a16  NVFP4 weight-only — data-free, safer fallback if W4A4 serve breaks
 
 Usage:
   # FP8 (fast, no calibration)
@@ -53,7 +55,11 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 DEFAULT_OUTPUT_ROOT = Path("/mnt/models/quantized")
-DEFAULT_CALIB_DATASET = "HuggingFaceH4/ultrachat_200k"
+# llm-compressor resolves dataset names against its own registry
+# (ultrachat-200k, cnn-dailymail, wikitext, gsm8k, ...) — raw HF repo ids
+# like "HuggingFaceH4/ultrachat_200k" are NOT accepted; use the registry
+# name or a local JSONL path.
+DEFAULT_CALIB_DATASET = "ultrachat_200k"
 DEFAULT_CALIB_SPLIT = "train_sft[:512]"
 
 
@@ -281,8 +287,155 @@ def quantize_awq(
 
 
 # ---------------------------------------------------------------------------
+# NVFP4 (llm-compressor, Blackwell-native 4-bit)
+# ---------------------------------------------------------------------------
+
+def quantize_nvfp4(
+    model_id: str,
+    output_dir: Path,
+    scheme: str = "NVFP4",
+    calib_dataset: str = DEFAULT_CALIB_DATASET,
+    calib_split: str = DEFAULT_CALIB_SPLIT,
+    calib_samples: int = 512,
+    max_seq_length: int = 2048,
+    trust_remote_code: bool = True,
+    gpu_mem_cap: str | None = None,
+) -> dict:
+    """NVFP4 quantization via llm-compressor (needs quant-env, not vllm-env).
+
+    E2M1 values in 16-element blocks with FP8 E4M3 fractional scales plus a
+    per-tensor FP32 scale. scheme="NVFP4" (W4A4) quantizes activations too
+    and needs calibration for the global activation scales; "NVFP4A16" is
+    weight-only and data-free.
+
+    Ignore list is load-bearing on the Qwen3.5 hybrid family (Ornith):
+    - linear_attn (DeltaNet) corrupts under low-precision activations —
+      same failure class as the W8A8-FP8 finding on this arch
+    - lm_head excluded also sidesteps the vLLM 0.22.1 quantized-lm_head
+      loader gap that blocked the ModelOpt Qwen3.6-27B-NVFP4 checkpoint
+    - MTP draft heads ship as a bf16 sidecar (model-mtp.safetensors) and
+      are never part of the quantized base checkpoint
+    """
+    from transformers import AutoTokenizer
+    from llmcompressor import oneshot
+    from llmcompressor.modifiers.quantization import QuantizationModifier
+
+    logger.info(f"Loading {model_id} for {scheme} quantization...")
+    t0 = time.time()
+
+    model = _load_model(model_id, trust_remote_code, gpu_mem_cap=gpu_mem_cap)
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_id, trust_remote_code=trust_remote_code
+    )
+
+    load_time = time.time() - t0
+    logger.info(f"Model loaded in {load_time:.1f}s")
+    vram = _get_gpu_memory()
+    logger.info(f"VRAM after load: {vram}")
+
+    ignore = [
+        "lm_head",
+        "re:.*linear_attn.*",
+        "re:.*visual.*",
+        "re:.*mtp.*",
+    ]
+    if getattr(model.config, "model_type", "").endswith("_moe") or any(
+        "Moe" in a for a in (model.config.architectures or [])
+    ):
+        # MoE router gates corrupt under low-bit (INT4-routing finding);
+        # shared_expert_gate is a same-shaped sibling
+        ignore += ["re:.*mlp\\.gate$", "re:.*shared_expert_gate$"]
+        logger.info("MoE detected — router gates kept bf16")
+
+    recipe = QuantizationModifier(
+        targets="Linear",
+        scheme=scheme,
+        ignore=ignore,
+    )
+
+    t1 = time.time()
+    if scheme == "NVFP4":
+        dataset_kwargs = _resolve_calib_dataset(calib_dataset, calib_split)
+        logger.info(
+            f"Running NVFP4 W4A4 quantization "
+            f"({calib_samples} samples, seq_len={max_seq_length})..."
+        )
+        oneshot(
+            model=model,
+            recipe=recipe,
+            max_seq_length=max_seq_length,
+            num_calibration_samples=calib_samples,
+            **dataset_kwargs,
+        )
+    else:
+        logger.info("Running NVFP4A16 weight-only quantization (data-free)...")
+        oneshot(model=model, recipe=recipe)
+    quant_time = time.time() - t1
+    logger.info(f"Quantization completed in {quant_time:.1f}s")
+
+    logger.info(f"Saving to {output_dir}...")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    model.save_pretrained(output_dir, save_compressed=True)
+    tokenizer.save_pretrained(output_dir)
+
+    _patch_config_for_vllm(model_id, output_dir)
+
+    output_size = _dir_size_gb(output_dir)
+    logger.info(f"Output size: {output_size:.1f} GB")
+
+    return {
+        "method": scheme.lower(),
+        "model": model_id,
+        "output_dir": str(output_dir),
+        "calib_dataset": calib_dataset if scheme == "NVFP4" else None,
+        "calib_samples": calib_samples if scheme == "NVFP4" else 0,
+        "load_time_s": round(load_time, 1),
+        "quant_time_s": round(quant_time, 1),
+        "total_time_s": round(time.time() - t0, 1),
+        "output_size_gb": round(output_size, 1),
+        "vram_after_load": vram,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _load_model(
+    model_id: str,
+    trust_remote_code: bool = True,
+    gpu_mem_cap: str | None = None,
+):
+    """Load a checkpoint for quantization, handling VL architectures.
+
+    AutoModelForCausalLM silently loads only the text submodel of a
+    ForConditionalGeneration checkpoint (drops the vision tower) — detect
+    VL architectures from config and load the full model instead. The
+    vision modules stay bf16 via the recipe's ignore list.
+    """
+    from transformers import AutoConfig, AutoModelForCausalLM
+
+    kwargs = dict(
+        torch_dtype="auto",
+        device_map="auto",
+        trust_remote_code=trust_remote_code,
+    )
+    if gpu_mem_cap:
+        # Cap GPU placement, spill tail layers to CPU — needed for big MoE:
+        # llm-compressor's moe_calibration_context (runs even data-free)
+        # allocates conversion transients that OOM a fully-packed card.
+        kwargs["max_memory"] = {0: gpu_mem_cap, "cpu": "42GiB"}
+        logger.info(f"GPU memory cap {gpu_mem_cap} — tail layers offload to CPU")
+    config = AutoConfig.from_pretrained(
+        model_id, trust_remote_code=trust_remote_code
+    )
+    archs = config.architectures or []
+    if any("ConditionalGeneration" in a or "ImageTextToText" in a for a in archs):
+        from transformers import AutoModelForImageTextToText
+
+        logger.info(f"VL architecture {archs} — loading full model with vision tower")
+        return AutoModelForImageTextToText.from_pretrained(model_id, **kwargs)
+    return AutoModelForCausalLM.from_pretrained(model_id, **kwargs)
 
 def _resolve_calib_dataset(dataset: str, split: str) -> dict:
     """Resolve calibration dataset — local JSONL or HuggingFace dataset."""
@@ -326,25 +479,29 @@ def _patch_config_for_vllm(model_id: str, output_dir: Path):
                 if comp:
                     orig_config["compression_config"] = comp
                 json.dump(orig_config, open(quant_config_path, "w"), indent=2)
-
-                # Copy missing tokenizer/preprocessor files
-                for fname in [
-                    "preprocessor_config.json",
-                    "video_preprocessor_config.json",
-                    "tokenizer_config.json",
-                    "tokenizer.json",
-                    "vocab.json",
-                    "generation_config.json",
-                ]:
-                    dest = output_dir / fname
-                    if not dest.exists():
-                        try:
-                            src = hf_hub_download(model_id, fname)
-                            shutil.copy2(src, dest)
-                        except Exception:
-                            pass
         except Exception as e:
             logger.warning(f"Config patching failed (non-fatal): {e}")
+
+    # Copy missing processor/tokenizer aux files unconditionally —
+    # save_pretrained on the model+tokenizer doesn't emit processor configs,
+    # and vLLM refuses to serve a VL checkpoint without them.
+    for fname in [
+        "preprocessor_config.json",
+        "processor_config.json",
+        "video_preprocessor_config.json",
+        "tokenizer_config.json",
+        "tokenizer.json",
+        "vocab.json",
+        "generation_config.json",
+        "chat_template.jinja",
+    ]:
+        dest = output_dir / fname
+        if not dest.exists():
+            try:
+                src = hf_hub_download(model_id, fname)
+                shutil.copy2(src, dest)
+            except Exception:
+                pass
 
 
 def _get_gpu_memory() -> dict:
@@ -366,7 +523,13 @@ def _dir_size_gb(path: Path) -> float:
 def _default_output_name(model_id: str, method: str) -> str:
     """Generate output dir name from model and method."""
     name = model_id.split("/")[-1]
-    suffix = {"fp8": "FP8", "gptq": "GPTQ-Int4", "awq": "AWQ-Int4"}[method]
+    suffix = {
+        "fp8": "FP8",
+        "gptq": "GPTQ-Int4",
+        "awq": "AWQ-Int4",
+        "nvfp4": "NVFP4",
+        "nvfp4a16": "NVFP4-A16",
+    }[method]
     return f"{name}-{suffix}"
 
 
@@ -403,7 +566,7 @@ Examples:
     parser.add_argument(
         "--method",
         required=True,
-        choices=["fp8", "gptq", "awq"],
+        choices=["fp8", "gptq", "awq", "nvfp4", "nvfp4a16"],
         help="Quantization method",
     )
     parser.add_argument(
@@ -430,6 +593,11 @@ Examples:
         help="Max sequence length for calibration (default: 2048)",
     )
     parser.add_argument(
+        "--gpu-mem-cap",
+        default=None,
+        help="Cap GPU weight placement (e.g. 70GiB), spill tail to CPU — for big MoE nvfp4",
+    )
+    parser.add_argument(
         "--push-to-hub",
         action="store_true",
         help="Push quantized model to HuggingFace Hub after quantization",
@@ -446,7 +614,7 @@ Examples:
     logger.info(f"  Model:    {args.model}")
     logger.info(f"  Method:   {args.method}")
     logger.info(f"  Output:   {args.output}")
-    if args.method in ("gptq", "awq"):
+    if args.method in ("gptq", "awq", "nvfp4"):
         logger.info(f"  Dataset:  {args.calib_dataset}")
     logger.info(f"  GPUs:     {torch.cuda.device_count()}x {torch.cuda.get_device_name(0)}")
     logger.info("")
@@ -468,6 +636,18 @@ Examples:
     elif args.method == "awq":
         samples = args.calib_samples or 128
         result = quantize_awq(args.model, args.output, calib_samples=samples)
+
+    elif args.method in ("nvfp4", "nvfp4a16"):
+        samples = args.calib_samples or 512
+        result = quantize_nvfp4(
+            args.model,
+            args.output,
+            scheme="NVFP4" if args.method == "nvfp4" else "NVFP4A16",
+            calib_dataset=args.calib_dataset,
+            calib_samples=samples,
+            max_seq_length=args.max_seq_length,
+            gpu_mem_cap=args.gpu_mem_cap,
+        )
 
     # Save run metadata
     result_path = args.output / "quantize_result.json"

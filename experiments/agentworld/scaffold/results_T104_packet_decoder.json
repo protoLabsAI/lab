@@ -1,0 +1,50 @@
+{
+  "task_id": "T104_packet_decoder",
+  "results": {
+    "baseline": {
+      "arm": "baseline",
+      "trials": 5,
+      "mean_task_score": 0.352,
+      "mean_completion": 0.19,
+      "pass_rate": 0.2,
+      "scores": [
+        0.96,
+        0.2,
+        0.2,
+        0.2,
+        0.2
+      ]
+    },
+    "cold": {
+      "arm": "cold",
+      "trials": 5,
+      "mean_task_score": 0.656,
+      "mean_completion": 0.57,
+      "pass_rate": 0.6,
+      "scores": [
+        0.2,
+        0.96,
+        0.96,
+        0.2,
+        0.96
+      ]
+    },
+    "sim": {
+      "arm": "sim",
+      "trials": 5,
+      "mean_task_score": 0.789,
+      "mean_completion": 0.736,
+      "pass_rate": 0.8,
+      "scores": [
+        0.936,
+        0.936,
+        0.2,
+        0.936,
+        0.936
+      ]
+    }
+  },
+  "delta_sim_vs_baseline": 0.437,
+  "delta_sim_vs_cold": 0.133,
+  "delta_cold_vs_baseline": 0.304
+}

@@ -1,0 +1,140 @@
+id: code_generation_hard
+name: "Code Generation (Hard, execution-graded)"
+difficulty: hard
+category: coding
+# Execution-graded with hidden test batteries (graders/code_exec.py). Designed to
+# DISCRIMINATE: the medium suite tops out at ~0.95 because it's LLM-judge graded and
+# the problems are textbook. These are error-prone-even-when-you-know-the-approach
+# (subtle edge cases), scored by running the code → partial credit spreads scores.
+
+tests:
+  - id: hard_calc
+    prompt: |
+      Implement `def calculate(s: str) -> int` that evaluates a mathematical expression string and returns its integer value.
+      The expression contains non-negative integers, the binary operators `+ - * /`, parentheses `(` `)`, unary minus, and arbitrary spaces.
+      `*` and `/` have higher precedence than `+` and `-`; `/` is integer division that truncates toward zero. Assume the expression is valid.
+      Return only the function in a Python code block.
+    graders:
+      - type: code_exec
+        dimension: correctness
+        entry: calculate
+        timeout: 10
+        tests:
+          - "assert calculate('3+2*2') == 7"
+          - "assert calculate(' 3/2 ') == 1"
+          - "assert calculate(' 3+5 / 2 ') == 5"
+          - "assert calculate('(1+(4+5+2)-3)+(6+8)') == 23"
+          - "assert calculate('2*(5+5*2)/3+(6/2+8)') == 21"
+          - "assert calculate('100 * ( 2 + 12 ) / 14') == 100"
+          - "assert calculate('10 - 2 * 3') == 4"
+          - "assert calculate('-3 + 2') == -1"
+          - "assert calculate('3 - (-2)') == 5"
+          - "assert calculate('2*3*4') == 24"
+
+  - id: hard_wildcard
+    prompt: |
+      Implement `def is_match(s: str, p: str) -> bool` for wildcard pattern matching over the entire string `s`.
+      In pattern `p`: `?` matches any single character; `*` matches any sequence of characters including the empty sequence. All other characters match themselves.
+      Return only the function in a Python code block.
+    graders:
+      - type: code_exec
+        dimension: correctness
+        entry: is_match
+        timeout: 10
+        tests:
+          - "assert is_match('aa','a') == False"
+          - "assert is_match('aa','*') == True"
+          - "assert is_match('cb','?a') == False"
+          - "assert is_match('adceb','*a*b') == True"
+          - "assert is_match('acdcb','a*c?b') == False"
+          - "assert is_match('','*') == True"
+          - "assert is_match('','') == True"
+          - "assert is_match('abc','') == False"
+          - "assert is_match('abc','***a*b*c***') == True"
+          - "assert is_match('xaylmz','x?y*z') == True"
+
+  - id: hard_damerau
+    prompt: |
+      Implement `def dl_distance(a: str, b: str) -> int` returning the optimal-string-alignment Damerau-Levenshtein distance between `a` and `b`:
+      the minimum number of single-character insertions, deletions, substitutions, and transpositions of two ADJACENT characters needed to turn `a` into `b`
+      (each position edited at most once). Return only the function in a Python code block.
+    graders:
+      - type: code_exec
+        dimension: correctness
+        entry: dl_distance
+        timeout: 10
+        tests:
+          - "assert dl_distance('','') == 0"
+          - "assert dl_distance('abc','abc') == 0"
+          - "assert dl_distance('ca','ac') == 1"
+          - "assert dl_distance('ab','ba') == 1"
+          - "assert dl_distance('teh','the') == 1"
+          - "assert dl_distance('abcd','acbd') == 1"
+          - "assert dl_distance('kitten','sitting') == 3"
+          - "assert dl_distance('','abc') == 3"
+          - "assert dl_distance('abc','') == 3"
+          - "assert dl_distance('flaw','lawn') == 2"
+
+  - id: hard_histogram
+    prompt: |
+      Implement `def largest_rectangle(heights: list[int]) -> int` returning the area of the largest rectangle that fits entirely under the histogram,
+      where `heights[i]` is the height of the i-th bar (each bar width 1). Return only the function in a Python code block.
+    graders:
+      - type: code_exec
+        dimension: correctness
+        entry: largest_rectangle
+        timeout: 10
+        tests:
+          - "assert largest_rectangle([2,1,5,6,2,3]) == 10"
+          - "assert largest_rectangle([2,4]) == 4"
+          - "assert largest_rectangle([]) == 0"
+          - "assert largest_rectangle([5]) == 5"
+          - "assert largest_rectangle([0,0,0]) == 0"
+          - "assert largest_rectangle([1,1,1,1]) == 4"
+          - "assert largest_rectangle([6,2,5,4,5,1,6]) == 12"
+          - "assert largest_rectangle([2,1,2]) == 3"
+          - "assert largest_rectangle([4,2,0,3,2,5]) == 6"
+          - "assert largest_rectangle([1,2,3,4,5]) == 9"
+
+  - id: hard_longest_parens
+    prompt: |
+      Implement `def longest_valid(s: str) -> int` returning the length of the longest substring of `s` (containing only `(` and `)`) that is a well-formed parentheses string.
+      Return only the function in a Python code block.
+    graders:
+      - type: code_exec
+        dimension: correctness
+        entry: longest_valid
+        timeout: 10
+        tests:
+          - "assert longest_valid('(()') == 2"
+          - "assert longest_valid(')()())') == 4"
+          - "assert longest_valid('') == 0"
+          - "assert longest_valid('()(()') == 2"
+          - "assert longest_valid('()(())') == 6"
+          - "assert longest_valid(')(') == 0"
+          - "assert longest_valid('(()())') == 6"
+          - "assert longest_valid('()(()))))') == 6"
+          - "assert longest_valid('((()))(') == 6"
+          - "assert longest_valid('))((') == 0"
+
+  - id: hard_int_to_words
+    prompt: |
+      Implement `def number_to_words(n: int) -> str` that converts a non-negative integer `n` (0 <= n < 2**31) to its English-words representation.
+      Words are capitalized and separated by single spaces, with no commas and no use of the word "and". Examples: 0 -> "Zero", 123 -> "One Hundred Twenty Three",
+      12345 -> "Twelve Thousand Three Hundred Forty Five". Return only the function in a Python code block.
+    graders:
+      - type: code_exec
+        dimension: correctness
+        entry: number_to_words
+        timeout: 10
+        tests:
+          - "assert number_to_words(0) == 'Zero'"
+          - "assert number_to_words(13) == 'Thirteen'"
+          - "assert number_to_words(20) == 'Twenty'"
+          - "assert number_to_words(100) == 'One Hundred'"
+          - "assert number_to_words(123) == 'One Hundred Twenty Three'"
+          - "assert number_to_words(12345) == 'Twelve Thousand Three Hundred Forty Five'"
+          - "assert number_to_words(1000000) == 'One Million'"
+          - "assert number_to_words(1234567) == 'One Million Two Hundred Thirty Four Thousand Five Hundred Sixty Seven'"
+          - "assert number_to_words(1000000000) == 'One Billion'"
+          - "assert number_to_words(2147483647) == 'Two Billion One Hundred Forty Seven Million Four Hundred Eighty Three Thousand Six Hundred Forty Seven'"

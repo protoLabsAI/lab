@@ -1,0 +1,97 @@
+Model: protolabs/gemma4-12b | Trials: 3 | Tasks: 3
+============================================================
+
+Quant-sensitivity — arithmetic chains (6 tests)
+
+  qa_chain_001:
+    Trial 1: PASS (score=1.00, turns=1, 2.71s)
+    Trial 2: PASS (score=1.00, turns=1, 1.73s)
+    Trial 3: PASS (score=1.00, turns=1, 1.97s)
+    Pass^3: PASS (avg=1.00)
+
+  qa_chain_002:
+    Trial 1: PASS (score=1.00, turns=1, 1.53s)
+    Trial 2: PASS (score=1.00, turns=1, 1.54s)
+    Trial 3: PASS (score=1.00, turns=1, 1.5s)
+    Pass^3: PASS (avg=1.00)
+
+  qa_mult_001:
+    Trial 1: PASS (score=1.00, turns=1, 2.89s)
+    Trial 2: PASS (score=1.00, turns=1, 1.42s)
+    Trial 3: PASS (score=1.00, turns=1, 1.47s)
+    Pass^3: PASS (avg=1.00)
+
+  qa_units_001:
+    Trial 1: PASS (score=1.00, turns=1, 1.83s)
+    Trial 2: PASS (score=1.00, turns=1, 1.43s)
+    Trial 3: PASS (score=1.00, turns=1, 1.76s)
+    Pass^3: PASS (avg=1.00)
+
+  qa_sum_001:
+    Trial 1: PASS (score=1.00, turns=1, 1.24s)
+    Trial 2: PASS (score=1.00, turns=1, 2.22s)
+    Trial 3: PASS (score=1.00, turns=1, 1.11s)
+    Pass^3: PASS (avg=1.00)
+
+  qa_rate_001:
+    Trial 1: PASS (score=1.00, turns=1, 1.21s)
+    Trial 2: PASS (score=1.00, turns=1, 0.9s)
+    Trial 3: PASS (score=1.00, turns=1, 1.26s)
+    Pass^3: PASS (avg=1.00)
+
+Quant-sensitivity — exact recall / reproduction (5 tests)
+
+  qe_repro_001:
+    Trial 1: PASS (score=1.00, turns=1, 0.88s)
+    Trial 2: PASS (score=1.00, turns=1, 2.52s)
+    Trial 3: PASS (score=1.00, turns=1, 1.4s)
+    Pass^3: PASS (avg=1.00)
+
+  qe_ctx_recall_001:
+    Trial 1: PASS (score=1.00, turns=1, 1.72s)
+    Trial 2: PASS (score=1.00, turns=1, 1.34s)
+    Trial 3: PASS (score=1.00, turns=1, 1.55s)
+    Pass^3: PASS (avg=1.00)
+
+  qe_hex_001:
+    Trial 1: PASS (score=1.00, turns=1, 2.32s)
+    Trial 2: PASS (score=1.00, turns=1, 1.47s)
+    Trial 3: PASS (score=1.00, turns=1, 1.94s)
+    Pass^3: PASS (avg=1.00)
+
+  qe_reverse_001:
+    Trial 1: PASS (score=1.00, turns=1, 0.78s)
+    Trial 2: PASS (score=1.00, turns=1, 0.76s)
+    Trial 3: PASS (score=1.00, turns=1, 0.4s)
+    Pass^3: PASS (avg=1.00)
+
+  qe_order_001:
+    Trial 1: PASS (score=1.00, turns=1, 1.79s)
+    Trial 2: PASS (score=1.00, turns=1, 1.73s)
+    Trial 3: PASS (score=1.00, turns=1, 1.78s)
+    Pass^3: PASS (avg=1.00)
+
+Quant-sensitivity — format precision (3 tests)
+
+  qf_json_001:
+    Trial 1: PASS (score=1.00, turns=1, 1.52s)
+    Trial 2: PASS (score=1.00, turns=1, 1.5s)
+    Trial 3: PASS (score=1.00, turns=1, 1.75s)
+    Pass^3: PASS (avg=1.00)
+
+  qf_csv_001:
+    Trial 1: PASS (score=1.00, turns=1, 1.62s)
+    Trial 2: PASS (score=1.00, turns=1, 1.63s)
+    Trial 3: PASS (score=1.00, turns=1, 1.86s)
+    Pass^3: PASS (avg=1.00)
+
+  qf_delim_001:
+    Trial 1: PASS (score=1.00, turns=1, 1.15s)
+    Trial 2: PASS (score=1.00, turns=1, 1.15s)
+    Trial 3: PASS (score=1.00, turns=1, 1.24s)
+    Pass^3: PASS (avg=1.00)
+
+============================================================
+Results: 14/14 tasks passed (pass^3)
+Mean score: 1.000 ± 0.000  (range 1.000-1.000, std 0.000, n=3)
+Results written to baselines/runs/2026-06-27-gemma4-12b-3x/quant/custom_results.json

@@ -8,7 +8,7 @@ as a git submodule at `claw/claw-eval/`.
 
 ## Key Concepts
 
-- **Pass^3**: Task passes only if agent succeeds in ALL 3 independent trials
+- **Pass^k** (opt-in via `--trials N`): task passes only if agent succeeds in ALL N independent trials. Default is single-trial — pass^3 was dropped from our strategy 2026-06-29 (breadth over repetition)
 - **Mock Services**: 15 FastAPI services (Gmail, Calendar, CRM, etc.) with deterministic data
 - **Docker Sandbox**: Isolated execution with shell, file I/O, and browser tools
 - **Multi-dimensional scoring**: 80% completion + 20% robustness, with safety multiplier

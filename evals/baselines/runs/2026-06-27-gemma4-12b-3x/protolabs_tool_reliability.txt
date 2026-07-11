@@ -1,0 +1,57 @@
+Model: protolabs/gemma4-12b | Trials: 3 | Tasks: 1
+============================================================
+
+Tool Reliability Under Load (8 tests)
+
+  tr_001_calculator_with_noise:
+    Trial 1: FAIL (score=0.50, turns=2, 2.0s)
+    Trial 2: FAIL (score=0.50, turns=2, 1.13s)
+    Trial 3: FAIL (score=0.50, turns=2, 1.11s)
+    Pass^3: FAIL (avg=0.50)
+
+  tr_002_memory_search_with_noise:
+    Trial 1: PASS (score=1.00, turns=2, 3.16s)
+    Trial 2: FAIL (score=0.50, turns=3, 3.43s)
+    Trial 3: PASS (score=1.00, turns=2, 4.13s)
+    Pass^3: FAIL (avg=0.83)
+
+  tr_003_task_creation:
+    Trial 1: PASS (score=1.00, turns=2, 3.11s)
+    Trial 2: PASS (score=1.00, turns=2, 3.86s)
+    Trial 3: PASS (score=1.00, turns=2, 4.17s)
+    Pass^3: PASS (avg=1.00)
+
+  tr_004_email_with_32_tools:
+    Trial 1: PASS (score=1.00, turns=2, 3.9s)
+    Trial 2: PASS (score=1.00, turns=3, 5.27s)
+    Trial 3: PASS (score=1.00, turns=2, 3.19s)
+    Pass^3: PASS (avg=1.00)
+
+  tr_005_chained_tools:
+    Trial 1: PASS (score=1.00, turns=4, 8.97s)
+    Trial 2: PASS (score=1.00, turns=6, 8.67s)
+    Trial 3: PASS (score=1.00, turns=6, 9.71s)
+    Pass^3: PASS (avg=1.00)
+
+  tr_006_abstention:
+    Trial 1: PASS (score=1.00, turns=1, 1.79s)
+    Trial 2: PASS (score=1.00, turns=1, 0.87s)
+    Trial 3: PASS (score=1.00, turns=1, 0.88s)
+    Pass^3: PASS (avg=1.00)
+
+  tr_007_ambiguous_intent:
+    Trial 1: FAIL (score=0.50, turns=5, 10.07s)
+    Trial 2: FAIL (score=0.50, turns=5, 6.43s)
+    Trial 3: FAIL (score=0.50, turns=4, 6.04s)
+    Pass^3: FAIL (avg=0.50)
+
+  tr_008_parallel_tools:
+    Trial 1: PASS (score=1.00, turns=3, 4.19s)
+    Trial 2: PASS (score=1.00, turns=3, 3.44s)
+    Trial 3: PASS (score=1.00, turns=3, 5.23s)
+    Pass^3: PASS (avg=1.00)
+
+============================================================
+Results: 5/8 tasks passed (pass^3)
+Mean score: 0.854 ± 0.031  (range 0.812-0.875, std 0.029, n=3)
+Results written to baselines/runs/2026-06-27-gemma4-12b-3x/protolabs_tool_reliability/custom_results.json

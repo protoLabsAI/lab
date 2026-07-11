@@ -1,0 +1,29 @@
+{
+  "task_id": "T104_packet_decoder",
+  "scaffold": "scaffolds/T104_packet_decoder.md",
+  "results": {
+    "baseline": {
+      "arm": "baseline",
+      "trials": 2,
+      "mean_task_score": 0.58,
+      "mean_completion": 0.475,
+      "pass_rate": 0.5,
+      "scores": [
+        0.96,
+        0.2
+      ]
+    },
+    "treatment": {
+      "arm": "treatment",
+      "trials": 2,
+      "mean_task_score": 0.948,
+      "mean_completion": 0.935,
+      "pass_rate": 1.0,
+      "scores": [
+        0.96,
+        0.936
+      ]
+    }
+  },
+  "delta_task_score": 0.368
+}

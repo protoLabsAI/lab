@@ -1,0 +1,190 @@
+id: reasoning_v2_arith
+name: Reasoning v2 — arith (solver-verified, seed 20260702)
+category: reasoning
+tests:
+- id: v2_arith_0_easy
+  prompt: 'A warehouse starts the week with 83 bins, 63 pallets, and 43 crates. An order ships out 10
+    bins. A supplier drops off 26 pallets. A supplier invoice for 36 crates arrives (not yet delivered).
+    21 pallets are consolidated into 21 bins (the pallets leave stock). 28 pallets are consolidated into
+    28 bins (the pallets leave stock).
+
+
+    How many bins does the warehouse have at the end?
+
+
+    Work through this step by step, then give your final answer on the last line in exactly this format:
+
+    ANSWER: <answer>'
+  graders:
+  - type: match
+    dimension: reasoning_exact
+    mode: number
+    expected: 122
+    tolerance: 0
+  ground_truth: 122
+  difficulty: easy
+- id: v2_arith_1_easy
+  prompt: 'A warehouse starts the week with 131 cartons, 112 pallets, and 54 drums. 5 cartons are inspected
+    and returned to the same shelf. An order ships out 19 cartons. 13 cartons are repacked: their contents
+    now count as 13 pallets (the cartons leave stock). 8 pallets are consolidated into 8 cartons (the
+    pallets leave stock). 9 cartons are repacked: their contents now count as 9 pallets (the cartons leave
+    stock).
+
+
+    How many cartons does the warehouse have at the end?
+
+
+    Work through this step by step, then give your final answer on the last line in exactly this format:
+
+    ANSWER: <answer>'
+  graders:
+  - type: match
+    dimension: reasoning_exact
+    mode: number
+    expected: 98
+    tolerance: 0
+  ground_truth: 98
+  difficulty: easy
+- id: v2_arith_2_medium
+  prompt: 'A warehouse starts the week with 108 crates, 134 drums, and 32 cartons. A customer pickup removes
+    8 drums. 3 drums are consolidated into 3 crates (the drums leave stock). A customer pickup removes
+    23 drums. A quote is requested for 5 additional cartons. A supplier invoice for 30 cartons arrives
+    (not yet delivered). A customer pickup removes 15 drums. An order ships out 15 crates. An audit finds
+    9 miscounted crates and adds them back to the ledger. The site manager notes 8 cartons were repainted.
+    An audit finds 8 miscounted crates and adds them back to the ledger. 28 drums are consolidated into
+    28 crates (the drums leave stock). 21 cartons are moved between aisles within the warehouse. A delivery
+    adds 10 crates. A customer pickup removes 23 drums.
+
+
+    How many crates and how many drums does the warehouse have at the end? Work through this step by step,
+    then give your final answer on the last line in exactly this format:
+
+    ANSWER: crates=<n>, drums=<n>'
+  graders:
+  - type: match
+    dimension: count_a
+    mode: regex
+    expected: crates\s*=\s*151\b
+    case_sensitive: false
+  - type: match
+    dimension: count_b
+    mode: regex
+    expected: drums\s*=\s*34\b
+    case_sensitive: false
+  ground_truth: crates=151, drums=34
+  difficulty: medium
+- id: v2_arith_3_hard
+  prompt: 'A warehouse starts the week with 92 sacks, 80 crates, and 43 drums. 25 sacks are repacked:
+    their contents now count as 25 crates (the sacks leave stock). A customer pickup removes 22 crates.
+    20 sacks are repacked: their contents now count as 20 crates (the sacks leave stock). A delivery adds
+    9 sacks. A customer pickup removes 14 crates. A quote is requested for 7 additional drums. A supplier
+    drops off 15 crates. An order ships out 15 sacks. A quote is requested for 34 additional drums. 36
+    sacks are inspected and returned to the same shelf. 5 crates are consolidated into 5 sacks (the crates
+    leave stock). 17 sacks are inspected and returned to the same shelf. 34 sacks are inspected and returned
+    to the same shelf. An audit finds 6 miscounted sacks and adds them back to the ledger. The site manager
+    notes 33 drums were repainted. The site manager notes 10 drums were repainted. 24 sacks are inspected
+    and returned to the same shelf. A delivery adds 22 sacks. An audit finds 8 miscounted sacks and adds
+    them back to the ledger. An order ships out 25 sacks. A supplier drops off 27 crates. A supplier drops
+    off 24 crates. A supplier drops off 22 crates. 6 sacks are repacked: their contents now count as 6
+    crates (the sacks leave stock).
+
+
+    How many sacks and how many crates does the warehouse have at the end? Work through this step by step,
+    then give your final answer on the last line in exactly this format:
+
+    ANSWER: sacks=<n>, crates=<n>'
+  graders:
+  - type: match
+    dimension: count_a
+    mode: regex
+    expected: sacks\s*=\s*51\b
+    case_sensitive: false
+  - type: match
+    dimension: count_b
+    mode: regex
+    expected: crates\s*=\s*178\b
+    case_sensitive: false
+  ground_truth: sacks=51, crates=178
+  difficulty: hard
+- id: v2_arith_4_extreme
+  prompt: 'A warehouse starts the week with 109 drums, 104 crates, and 29 bins. A supplier invoice for
+    5 bins arrives (not yet delivered). 6 drums are repacked: their contents now count as 6 crates (the
+    drums leave stock). The site manager notes 31 bins were repainted. A customer pickup removes 22 crates.
+    A supplier invoice for 37 bins arrives (not yet delivered). An order ships out 14 drums. An order
+    ships out 6 drums. An order ships out 20 drums. 6 crates are consolidated into 6 drums (the crates
+    leave stock). The site manager notes 37 bins were repainted. A delivery adds 25 drums. A supplier
+    drops off 25 crates. 21 crates are consolidated into 21 drums (the crates leave stock). 23 drums are
+    inspected and returned to the same shelf. A delivery adds 7 drums. An audit finds 2 miscounted drums
+    and adds them back to the ledger. A quote is requested for 12 additional bins. A supplier drops off
+    27 crates. An audit finds 9 miscounted drums and adds them back to the ledger. A customer pickup removes
+    5 crates. The site manager notes 24 bins were repainted. 20 drums are repacked: their contents now
+    count as 20 crates (the drums leave stock). A customer pickup removes 9 crates. A supplier invoice
+    for 13 bins arrives (not yet delivered). A quote is requested for 5 additional bins. 16 crates are
+    consolidated into 16 drums (the crates leave stock). 27 bins are moved between aisles within the warehouse.
+    The site manager notes 5 bins were repainted. 14 crates are consolidated into 14 drums (the crates
+    leave stock). A supplier drops off 25 crates. A quote is requested for 29 additional bins. A quote
+    is requested for 37 additional bins. A delivery adds 5 drums. 6 crates are consolidated into 6 drums
+    (the crates leave stock). A supplier invoice for 17 bins arrives (not yet delivered). An order ships
+    out 16 drums. An order ships out 9 drums. A customer pickup removes 14 crates. A delivery adds 19
+    drums. A customer pickup removes 4 crates. 6 drums are repacked: their contents now count as 6 crates
+    (the drums leave stock). A delivery adds 11 drums.
+
+
+    How many drums and how many crates does the warehouse have at the end? Work through this step by step,
+    then give your final answer on the last line in exactly this format:
+
+    ANSWER: drums=<n>, crates=<n>'
+  graders:
+  - type: match
+    dimension: count_a
+    mode: regex
+    expected: drums\s*=\s*153\b
+    case_sensitive: false
+  - type: match
+    dimension: count_b
+    mode: regex
+    expected: crates\s*=\s*96\b
+    case_sensitive: false
+  ground_truth: drums=153, crates=96
+  difficulty: extreme
+- id: v2_arith_5_extreme
+  prompt: 'A warehouse starts the week with 101 bins, 125 cartons, and 25 crates. A customer pickup removes
+    8 cartons. The site manager notes 31 crates were repainted. A delivery adds 9 bins. A delivery adds
+    4 bins. A supplier drops off 9 cartons. 23 cartons are consolidated into 23 bins (the cartons leave
+    stock). A customer pickup removes 24 cartons. A customer pickup removes 3 cartons. An audit finds
+    5 miscounted bins and adds them back to the ledger. A supplier drops off 18 cartons. The site manager
+    notes 28 crates were repainted. A customer pickup removes 4 cartons. 12 bins are repacked: their contents
+    now count as 12 cartons (the bins leave stock). A delivery adds 8 bins. 35 crates are moved between
+    aisles within the warehouse. 20 bins are repacked: their contents now count as 20 cartons (the bins
+    leave stock). The site manager notes 29 crates were repainted. A supplier drops off 27 cartons. An
+    order ships out 20 bins. An order ships out 8 bins. 17 cartons are consolidated into 17 bins (the
+    cartons leave stock). A quote is requested for 16 additional crates. 34 crates are moved between aisles
+    within the warehouse. 3 cartons are consolidated into 3 bins (the cartons leave stock). The site manager
+    notes 30 crates were repainted. 29 bins are inspected and returned to the same shelf. The site manager
+    notes 5 crates were repainted. A customer pickup removes 4 cartons. 17 bins are inspected and returned
+    to the same shelf. An audit finds 3 miscounted bins and adds them back to the ledger. The site manager
+    notes 25 crates were repainted. An audit finds 8 miscounted bins and adds them back to the ledger.
+    An order ships out 21 bins. A supplier drops off 5 cartons. An audit finds 6 miscounted bins and adds
+    them back to the ledger. A customer pickup removes 21 cartons. A supplier invoice for 34 crates arrives
+    (not yet delivered). 35 bins are inspected and returned to the same shelf. An audit finds 3 miscounted
+    bins and adds them back to the ledger. A supplier invoice for 25 crates arrives (not yet delivered).
+    A supplier drops off 9 cartons. 22 cartons are consolidated into 22 bins (the cartons leave stock).
+
+
+    How many bins and how many cartons does the warehouse have at the end? Work through this step by step,
+    then give your final answer on the last line in exactly this format:
+
+    ANSWER: bins=<n>, cartons=<n>'
+  graders:
+  - type: match
+    dimension: count_a
+    mode: regex
+    expected: bins\s*=\s*131\b
+    case_sensitive: false
+  - type: match
+    dimension: count_b
+    mode: regex
+    expected: cartons\s*=\s*96\b
+    case_sensitive: false
+  ground_truth: bins=131, cartons=96
+  difficulty: extreme

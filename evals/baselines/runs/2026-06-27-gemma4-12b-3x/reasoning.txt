@@ -1,0 +1,39 @@
+Model: protolabs/gemma4-12b | Trials: 3 | Tasks: 1
+============================================================
+
+Reasoning & Logic (5 tests)
+
+  logic_001:
+    Trial 1: PASS (score=1.00, turns=1, 9.2s)
+    Trial 2: PASS (score=1.00, turns=1, 9.33s)
+    Trial 3: PASS (score=1.00, turns=1, 7.98s)
+    Pass^3: PASS (avg=1.00)
+
+  logic_002:
+    Trial 1: PASS (score=1.00, turns=1, 74.55s)
+    Trial 2: PASS (score=0.75, turns=1, 73.62s)
+    Trial 3: PASS (score=0.75, turns=1, 73.2s)
+    Pass^3: PASS (avg=0.83)
+
+  logic_003:
+    Trial 1: PASS (score=1.00, turns=1, 8.14s)
+    Trial 2: PASS (score=1.00, turns=1, 10.28s)
+    Trial 3: PASS (score=1.00, turns=1, 9.34s)
+    Pass^3: PASS (avg=1.00)
+
+  logic_004:
+    Trial 1: PASS (score=1.00, turns=1, 9.39s)
+    Trial 2: PASS (score=1.00, turns=1, 11.81s)
+    Trial 3: PASS (score=1.00, turns=1, 9.35s)
+    Pass^3: PASS (avg=1.00)
+
+  logic_005:
+    Trial 1: PASS (score=1.00, turns=1, 10.02s)
+    Trial 2: PASS (score=1.00, turns=1, 9.57s)
+    Trial 3: PASS (score=1.00, turns=1, 9.89s)
+    Pass^3: PASS (avg=1.00)
+
+============================================================
+Results: 5/5 tasks passed (pass^3)
+Mean score: 0.967 ± 0.025  (range 0.950-1.000, std 0.024, n=3)
+Results written to baselines/runs/2026-06-27-gemma4-12b-3x/reasoning/custom_results.json

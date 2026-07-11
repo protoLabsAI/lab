@@ -1,0 +1,16 @@
+defaults:
+  tasks_dir: ../../../evals/claw/claw-eval/tasks
+  trace_dir: traces
+judge:
+  api_key: ${GATEWAY_API_KEY}
+  base_url: http://ava:4000/v1
+  model_id: protolabs/fast
+model:
+  api_key: ${GATEWAY_API_KEY}
+  base_url: http://ava:4000/v1
+  extra_body:
+    chat_template_kwargs:
+      enable_thinking: true
+    max_tokens: 10000
+  model_id: protolabs/smart
+  system_prompt_prefix: null

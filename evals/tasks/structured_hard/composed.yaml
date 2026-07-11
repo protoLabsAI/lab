@@ -1,0 +1,136 @@
+id: structured_output_hard
+name: "Structured Output (Hard, composed invariants, deterministic)"
+category: structured_hard
+# Each task demands ONE JSON object satisfying many simultaneous constraints:
+# schema shape + cross-field consistency + exactly-computed values. Graded by
+# json_validate (assertion battery, partial credit) — zero LLM judge. Designed
+# to land Ornith-35B in 0.3-0.7: any single dropped invariant costs a point.
+
+tests:
+  - id: hard_seating
+    prompt: |
+      Assign 8 guests (G1..G8) to two round tables of 4 (table A, table B) and output JSON:
+      {"A": [..4 guest ids..], "B": [..4 guest ids..], "adjacency": {"G1": [..], ...}}
+      Rules:
+      - Every guest is at exactly one table; each table has exactly 4.
+      - "adjacency" lists, for each of the 8 guests, the guests immediately clockwise and
+        counter-clockwise from them at their table (so exactly 2 neighbors each, both at the
+        same table). Adjacency must be symmetric (if X neighbors Y, Y neighbors X).
+      - Enemies must never be neighbors: (G1,G2), (G3,G4), (G5,G6) are enemy pairs.
+      - G7 and G8 must be at DIFFERENT tables.
+      Output only the JSON object.
+    graders:
+      - type: json_validate
+        dimension: structure
+        assertions:
+          - "set(data) >= {'A','B','adjacency'}"
+          - "len(data['A'])==4 and len(data['B'])==4"
+          - "set(data['A']) | set(data['B']) == {f'G{i}' for i in range(1,9)} and not (set(data['A']) & set(data['B']))"
+          - "all(len(v)==2 for v in data['adjacency'].values()) and len(data['adjacency'])==8"
+          - "all((n in data['A'])==(g in data['A']) for g,ns in data['adjacency'].items() for n in ns)"
+          - "all(g in data['adjacency'][n] for g,ns in data['adjacency'].items() for n in ns)"
+          - "all(not (b in data['adjacency'][a]) for a,b in [('G1','G2'),('G3','G4'),('G5','G6')])"
+          - "(('G7' in data['A']) != ('G8' in data['A']))"
+
+  - id: hard_ledger
+    prompt: |
+      Given these transactions, output a reconciliation JSON.
+      Transactions (id, account, cents, kind):
+      (T1,acc1,5000,credit)(T2,acc1,1200,debit)(T3,acc2,3000,credit)(T4,acc1,800,debit)
+      (T5,acc2,3000,debit)(T6,acc3,10000,credit)(T7,acc3,2500,debit)(T8,acc2,500,credit)
+      Output: {"balances": {"acc1":<cents>,...}, "total_credit": <cents>, "total_debit": <cents>,
+      "net": <cents>, "zero_accounts": [<ids with balance 0>], "largest_account": <id>}
+      where balance = sum(credits) - sum(debits) per account; net = total_credit - total_debit;
+      largest_account = the account with the greatest balance. Output only the JSON.
+    graders:
+      - type: json_validate
+        dimension: correctness
+        assertions:
+          - "data['balances']['acc1'] == 3000"
+          - "data['balances']['acc2'] == 500"
+          - "data['balances']['acc3'] == 7500"
+          - "data['total_credit'] == 21500"
+          - "data['total_debit'] == 8300"
+          - "data['net'] == 13200"
+          - "data['zero_accounts'] == []"
+          - "data['largest_account'] == 'acc3'"
+
+  - id: hard_state_machine
+    prompt: |
+      Simulate this vending FSM and output the trace as JSON. States: IDLE, PARTIAL, DISPENSE.
+      Start IDLE, credit 0. Events (in order): coin25, coin25, coin25, select (price 60),
+      coin25, coin25, select (price 60), refund.
+      Rules: each coin25 adds 25 credit; `select` with credit>=price dispenses (emit to
+      "dispensed"), subtract price, return change=credit-price to 0, go IDLE; select with
+      credit<price is ignored (stay/enter PARTIAL). `refund` returns remaining credit, sets 0.
+      Output: {"dispensed": <count of successful selects>, "total_change_returned": <cents>,
+      "total_refunded": <cents>, "final_state": <str>, "final_credit": 0,
+      "coins_inserted": <count>}. Output only the JSON.
+    graders:
+      - type: json_validate
+        dimension: correctness
+        assertions:
+          - "data['coins_inserted'] == 5"
+          - "data['dispensed'] == 2"
+          - "data['total_change_returned'] == 15"
+          - "data['total_refunded'] == 0"
+          - "data['final_state'] == 'IDLE'"
+          - "data['final_credit'] == 0"
+
+  - id: hard_dependency_plan
+    prompt: |
+      Given task dependencies, output a valid parallel execution plan as JSON.
+      Tasks and prereqs: A:[], B:[A], C:[A], D:[B,C], E:[C], F:[D,E].
+      Each task takes 1 time unit. Output {"waves": [[...],[...],...], "makespan": <int>,
+      "critical_path": [<tasks>]} where each wave is the set of tasks that can run in that
+      time unit (all prereqs completed in earlier waves), waves are as early as possible
+      (greedy), makespan = number of waves, critical_path = one longest dependency chain
+      from a root to F (list of task ids in order). Output only the JSON.
+    graders:
+      - type: json_validate
+        dimension: correctness
+        assertions:
+          - "data['waves'][0] == ['A']"
+          - "sorted(data['waves'][1]) == ['B','C']"
+          - "sorted(data['waves'][2]) == ['D','E']"
+          - "data['waves'][3] == ['F']"
+          - "data['makespan'] == 4"
+          - "len(data['critical_path']) == 4 and data['critical_path'][0]=='A' and data['critical_path'][-1]=='F'"
+          - "data['critical_path'] in [['A','B','D','F'],['A','C','D','F']]"
+
+  - id: hard_interval_merge
+    prompt: |
+      Given time bookings, output a room-occupancy JSON. Bookings (start,end) in 24h minutes:
+      (540,600)(570,630)(600,660)(700,760)(750,800)(900,960).
+      Output {"merged": [[s,e],...], "num_merged_blocks": <int>, "total_busy_minutes": <int>,
+      "max_concurrent": <int>, "gaps": [[s,e],...]} where merged = overlapping/touching
+      intervals unioned (sorted); total_busy = sum of merged lengths; max_concurrent = the
+      peak number of simultaneously-active bookings at any instant; gaps = free intervals
+      BETWEEN merged blocks (not before the first or after the last). Output only the JSON.
+    graders:
+      - type: json_validate
+        dimension: correctness
+        assertions:
+          - "data['merged'] == [[540,660],[700,800],[900,960]]"
+          - "data['num_merged_blocks'] == 3"
+          - "data['total_busy_minutes'] == 280"
+          - "data['max_concurrent'] == 2"
+          - "data['gaps'] == [[660,700],[800,900]]"
+
+  - id: hard_inventory_alloc
+    prompt: |
+      Allocate stock to orders by priority and output JSON. Stock: {widget:10, gadget:5, gizmo:0}.
+      Orders (id, priority 1=highest, items):
+      (O1,1,{widget:4,gadget:2})(O2,1,{gizmo:1})(O3,2,{widget:5,gadget:2})(O4,3,{widget:3}).
+      Rule: process orders by priority then id; an order is FILLED only if ALL its items are
+      fully available (no partial fills); filling deducts stock. Output {"filled": [<ids>],
+      "rejected": [<ids>], "remaining": {widget:<n>,gadget:<n>,gizmo:<n>},
+      "fill_rate": <filled/total as a fraction rounded to 2 decimals>}. Output only the JSON.
+    graders:
+      - type: json_validate
+        dimension: correctness
+        assertions:
+          - "data['filled'] == ['O1','O3']"
+          - "sorted(data['rejected']) == ['O2','O4']"
+          - "data['remaining'] == {'widget':1,'gadget':1,'gizmo':0}"
+          - "abs(data['fill_rate'] - 0.5) < 0.001"

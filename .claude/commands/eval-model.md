@@ -25,7 +25,7 @@ The user wants to evaluate: $ARGUMENTS
 
 ## Step 2: Download & Configure
 
-1. Download with: `source ~/dev/vllm-env/bin/activate && HF_HOME=/mnt/models/huggingface huggingface-cli download <model-id>`
+1. Download with: `source ~/dev/vllm-env/bin/activate && HF_HOME=/mnt/models/huggingface hf download <model-id>` (`huggingface-cli` is gone from the 0.22.1 env)
 2. Add a swap config to `~/dev/lab/models/vllm-swap.sh`:
    - Use `--served-model-name local` (required for gateway routing)
    - Pick the right tool-call parser:
@@ -66,22 +66,30 @@ If the quick profile looks promising, run the full evaluation:
 cd ~/dev/lab/evals && ./run.sh profile --name full --model local
 ```
 
-This runs:
-- **Claw-eval**: 20 agent tasks (3 trials each, pass^3 scoring)
-- **All 10 custom suites**: coding, instruction_following, reasoning, structured_output, summarization, safety, creative_writing, roleplay, svg_generation, research
+This runs (single trial — **pass^3 dropped 2026-06-29**; full breadth discriminates better than 3× repetition. Use `--trials N` only for a targeted run-to-run consistency check on a small task set):
+- **Claw-eval**: 30 agent tasks, 1 trial
+- **All custom suites**: coding, instruction_following, reasoning, structured_output, summarization, safety, creative_writing, roleplay, svg_generation, research, + protolabs suites
 - **Function calling**: all suites
 
 ## Step 6: Speed Benchmark
 
+**speed-test-v2 is the standard for any number that leaves the lab** (InferenceMAX-style:
+client-side `vllm bench serve`, seeded random dataset, TTFT/TPOT p50/p99, goodput at
+TTFT≤2s+TPOT≤50ms). Single-stream-only numbers are banned from model cards — the dFlash
+lesson (single-stream +43% inverted to 3× slower at the C=4–8 fan-out prod actually runs).
+
 ```bash
-# Uses vLLM /metrics for accurate TTFT, TPOT, and decode tok/s
-bash ~/dev/lab/models/speed-test.sh        # 5 runs, 800 token gen
-bash ~/dev/lab/models/speed-test.sh 10     # 10 runs for more stable numbers
-bash ~/dev/lab/models/speed-test.sh 3 short  # quick 200-token test
+bash ~/dev/lab/models/speed-test-v2.sh quick 8000 <label> [tokenizer-path]  # 2 regimes × C{1,8}, ~10 min
+bash ~/dev/lab/models/speed-test-v2.sh full                                 # 4 regimes × C{1,4,8,16,32}
+bash ~/dev/lab/models/speed-test-v2.sh depth                                # decode@4/16/32/64K (needs 64K server)
+bash ~/dev/lab/models/speed-test.sh        # v1 single-stream — legacy continuity only
 ```
 
-Reports: decode tok/s (1/TPOT), wall tok/s, avg TTFT (ms), avg TPOT (ms).
-All metrics from vLLM's `/metrics` endpoint — not wall-clock estimation.
+- Pass the model dir as 4th arg when the served name isn't a resolvable HF id (bench client needs a tokenizer).
+- **Spec-decode caveat:** MTP/EAGLE acceptance craters on the random-data bench (~31% vs ~76% real text) —
+  the bench *understates* spec-decode speed; measure accept% separately on real prompts and say which is which.
+- **depth tier** needs `--max-model-len ≥ 65536`; pair it with `evals/graders/verify_coherence.py`
+  (same server session) so you never publish a tok/s@64K for a model that's babbling at 64K.
 
 ## Step 7: Report & Decision
 
@@ -117,6 +125,31 @@ Compile results into a comparison table. Decide:
 - MiroThinker (Qwen3 base) — tool calls output as text, no parser matches
 - INT4 on large MoE (122B) — CUDA graph capture crashes
 - Community AWQ quants — often broken weight keys (Llama 4 Scout)
+
+### Eval-vs-baseline comparisons (2026-07-03 lessons — cost a whole night to learn):
+- **Serve config parity before blaming the model.** FC scoring 8% = missing
+  `--tool-call-parser qwen3_xml --enable-auto-tool-choice`. Claw erroring 45/105 = serving at
+  16K context (agentic tool history needs ≥64K). Check `errored` in batch_summary — never let
+  harness errors average into a score.
+- **Paired task sets only.** A "claw 0.776" baseline means nothing until you know its task set
+  (35-task vs 105-task differ wildly). Compare mean over the *intersection*, per-task.
+- **Re-trial outliers ×3 on BOTH sides before believing any delta.** Single-trial small-n suites
+  swing 3× (spec-delta 0.125→0.405; bf16 T12 0.88 single vs 0.70 ×3). The gate verdict uses
+  re-trialed values on both sides.
+- **T28_api_config_audit is excluded from gate scoring** — bimodal judge noise (0.0 in 18/22 runs,
+  random 0.55–0.76 spikes on identical weights). The T28-class concern lives in `safety_agency`
+  (deterministic none_of grader).
+- **Verify judge + harness parity via the runs' snapshotted `config.yaml`s** (judge model/URL) and
+  claw-eval submodule commit dates. Both runs must be graded by the same judge and code.
+- **Steelman before any public claim:** read the actual failing transcript AND the task's grader
+  before naming a failure mode (T12's "quant flips reimbursability judgment" was really "quant
+  misses duplicate detection" — the card would have been wrong).
+
+### Process gotchas:
+- **Kill vLLM by exact PID only** (`ss -tlnp | grep <port>`), then kill the orphaned
+  `VLLM::EngineCore` child separately (it holds ~50GB VRAM after the API server dies).
+  **Never `pkill -f <pattern>`** — the pattern matches your own compound command and kills your shell (twice today).
+- NVFP4/quant serving needs the env stack in `models/serve-nvfp4.sh` — use it, don't hand-type.
 
 ### Port 9100 conflict:
 Claw-eval Gmail mock defaults to port 9100 which conflicts with node-exporter.

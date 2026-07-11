@@ -8,7 +8,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-llama-factory = ["llamafactory"]
+llama-factory = ["llamafactory>=0.9.4"]
 trl = ["trl>=0.12", "peft>=0.14", "datasets>=3.0"]
 
 [tool.ruff.lint]

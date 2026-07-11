@@ -1,0 +1,488 @@
+id: reasoning_v2_machine
+name: Reasoning v2 — machine (solver-verified, seed 20260702)
+category: reasoning
+tests:
+- id: v2_machine_0_easy
+  prompt: 'Execute this register program by hand, instruction by instruction.
+
+    Note: ''mod 100'' is the mathematical modulo — the result is always in 0..99 even for negative inputs
+    (e.g. (-7) mod 100 = 93).
+
+
+    Registers start at R0=4, R1=3, R2=9.
+
+    SUB R2 R0   (R2 = R2 - R0)
+
+    SWP R2 R1   (swap R2 and R1)
+
+    SUB R1 R2   (R1 = R1 - R2)
+
+    MULMOD R1 R2   (R1 = (R1 * R2) mod 100)
+
+    MOV R2 R1   (R2 = R1)
+
+    SWP R0 R1   (swap R0 and R1)
+
+
+    What is the final value of R2?
+
+
+    Work through this step by step, then give your final answer on the last line in exactly this format:
+
+    ANSWER: <answer>'
+  graders:
+  - type: match
+    dimension: reasoning_exact
+    mode: number
+    expected: 6
+    tolerance: 0
+  ground_truth: 6
+  difficulty: easy
+- id: v2_machine_1_easy
+  prompt: 'Execute this register program by hand, instruction by instruction.
+
+    Note: ''mod 100'' is the mathematical modulo — the result is always in 0..99 even for negative inputs
+    (e.g. (-7) mod 100 = 93).
+
+
+    Registers start at R0=2, R1=9, R2=5.
+
+    MULMOD R0 R1   (R0 = (R0 * R1) mod 100)
+
+    MULMOD R0 R2   (R0 = (R0 * R2) mod 100)
+
+    SWP R2 R1   (swap R2 and R1)
+
+    MOV R0 R2   (R0 = R2)
+
+    ADD R0 R2   (R0 = R0 + R2)
+
+    ADD R0 R1   (R0 = R0 + R1)
+
+
+    What is the final value of R0?
+
+
+    Work through this step by step, then give your final answer on the last line in exactly this format:
+
+    ANSWER: <answer>'
+  graders:
+  - type: match
+    dimension: reasoning_exact
+    mode: number
+    expected: 23
+    tolerance: 0
+  ground_truth: 23
+  difficulty: easy
+- id: v2_machine_2_medium
+  prompt: 'Execute this register program by hand, instruction by instruction.
+
+    Note: ''mod 100'' is the mathematical modulo — the result is always in 0..99 even for negative inputs
+    (e.g. (-7) mod 100 = 93).
+
+
+    Registers start at R0=3, R1=4, R2=7.
+
+    SUB R0 R1   (R0 = R0 - R1)
+
+    MULMOD R2 R0   (R2 = (R2 * R0) mod 100)
+
+    MOV R0 R1   (R0 = R1)
+
+    SWP R1 R0   (swap R1 and R0)
+
+    MULMOD R2 R1   (R2 = (R2 * R1) mod 100)
+
+    MULMOD R1 R0   (R1 = (R1 * R0) mod 100)
+
+    ADD R2 R1   (R2 = R2 + R1)
+
+    ADD R0 R1   (R0 = R0 + R1)
+
+    ADD R1 R2   (R1 = R1 + R2)
+
+    SWP R1 R0   (swap R1 and R0)
+
+    MULMOD R0 R1   (R0 = (R0 * R1) mod 100)
+
+    MULMOD R1 R0   (R1 = (R1 * R0) mod 100)
+
+    SUB R0 R1   (R0 = R0 - R1)
+
+    SUB R2 R1   (R2 = R2 - R1)
+
+    SWP R2 R0   (swap R2 and R0)
+
+    ADD R1 R0   (R1 = R1 + R0)
+
+    MULMOD R2 R0   (R2 = (R2 * R0) mod 100)
+
+    ADD R1 R2   (R1 = R1 + R2)
+
+
+    What are the final values of all three registers? Work through this step by step, then give your final
+    answer on the last line in exactly this format:
+
+    ANSWER: R0=<n>, R1=<n>, R2=<n>'
+  graders:
+  - type: match
+    dimension: reg_0
+    mode: regex
+    expected: R0\s*=\s*88\b
+  - type: match
+    dimension: reg_1
+    mode: regex
+    expected: R1\s*=\s*128\b
+  - type: match
+    dimension: reg_2
+    mode: regex
+    expected: R2\s*=\s*40\b
+  ground_truth: R0=88, R1=128, R2=40
+  difficulty: medium
+- id: v2_machine_3_hard
+  prompt: 'Execute this register program by hand, instruction by instruction.
+
+    Note: ''mod 100'' is the mathematical modulo — the result is always in 0..99 even for negative inputs
+    (e.g. (-7) mod 100 = 93).
+
+
+    Registers start at R0=3, R1=9, R2=4.
+
+    MULMOD R2 R1   (R2 = (R2 * R1) mod 100)
+
+    SWP R1 R0   (swap R1 and R0)
+
+    SWP R0 R2   (swap R0 and R2)
+
+    SUB R2 R0   (R2 = R2 - R0)
+
+    ADD R0 R1   (R0 = R0 + R1)
+
+    SWP R1 R2   (swap R1 and R2)
+
+    SUB R2 R1   (R2 = R2 - R1)
+
+    ADD R0 R2   (R0 = R0 + R2)
+
+    ADD R2 R1   (R2 = R2 + R1)
+
+    MOV R0 R1   (R0 = R1)
+
+    MOV R1 R0   (R1 = R0)
+
+    MOV R1 R0   (R1 = R0)
+
+    SWP R0 R1   (swap R0 and R1)
+
+    SWP R2 R0   (swap R2 and R0)
+
+    MOV R0 R2   (R0 = R2)
+
+    MULMOD R0 R1   (R0 = (R0 * R1) mod 100)
+
+    SWP R0 R2   (swap R0 and R2)
+
+    MOV R2 R1   (R2 = R1)
+
+    SWP R0 R1   (swap R0 and R1)
+
+    MOV R2 R0   (R2 = R0)
+
+    MULMOD R2 R0   (R2 = (R2 * R0) mod 100)
+
+    ADD R1 R2   (R1 = R1 + R2)
+
+    MULMOD R0 R2   (R0 = (R0 * R2) mod 100)
+
+    SWP R1 R2   (swap R1 and R2)
+
+    SUB R0 R1   (R0 = R0 - R1)
+
+    SUB R1 R2   (R1 = R1 - R2)
+
+    ADD R2 R1   (R2 = R2 + R1)
+
+    SUB R1 R2   (R1 = R1 - R2)
+
+    SUB R0 R2   (R0 = R0 - R2)
+
+    MOV R1 R2   (R1 = R2)
+
+
+    What are the final values of all three registers? Work through this step by step, then give your final
+    answer on the last line in exactly this format:
+
+    ANSWER: R0=<n>, R1=<n>, R2=<n>'
+  graders:
+  - type: match
+    dimension: reg_0
+    mode: regex
+    expected: R0\s*=\s*-41\b
+  - type: match
+    dimension: reg_1
+    mode: regex
+    expected: R1\s*=\s*29\b
+  - type: match
+    dimension: reg_2
+    mode: regex
+    expected: R2\s*=\s*29\b
+  ground_truth: R0=-41, R1=29, R2=29
+  difficulty: hard
+- id: v2_machine_4_extreme
+  prompt: 'Execute this register program by hand, instruction by instruction.
+
+    Note: ''mod 100'' is the mathematical modulo — the result is always in 0..99 even for negative inputs
+    (e.g. (-7) mod 100 = 93).
+
+
+    Registers start at R0=9, R1=9, R2=5.
+
+    SWP R2 R1   (swap R2 and R1)
+
+    SUB R1 R2   (R1 = R1 - R2)
+
+    ADD R2 R1   (R2 = R2 + R1)
+
+    SWP R1 R0   (swap R1 and R0)
+
+    SUB R0 R2   (R0 = R0 - R2)
+
+    SUB R2 R0   (R2 = R2 - R0)
+
+    SWP R2 R0   (swap R2 and R0)
+
+    MOV R2 R0   (R2 = R0)
+
+    SWP R0 R1   (swap R0 and R1)
+
+    ADD R2 R1   (R2 = R2 + R1)
+
+    MULMOD R1 R0   (R1 = (R1 * R0) mod 100)
+
+    MULMOD R0 R2   (R0 = (R0 * R2) mod 100)
+
+    MULMOD R0 R2   (R0 = (R0 * R2) mod 100)
+
+    ADD R0 R1   (R0 = R0 + R1)
+
+    SWP R1 R2   (swap R1 and R2)
+
+    MOV R0 R1   (R0 = R1)
+
+    SUB R1 R0   (R1 = R1 - R0)
+
+    MULMOD R1 R2   (R1 = (R1 * R2) mod 100)
+
+    SUB R2 R0   (R2 = R2 - R0)
+
+    ADD R0 R1   (R0 = R0 + R1)
+
+    SWP R2 R0   (swap R2 and R0)
+
+    MULMOD R0 R1   (R0 = (R0 * R1) mod 100)
+
+    SUB R2 R1   (R2 = R2 - R1)
+
+    MULMOD R0 R1   (R0 = (R0 * R1) mod 100)
+
+    ADD R1 R2   (R1 = R1 + R2)
+
+    SWP R1 R2   (swap R1 and R2)
+
+    SWP R0 R2   (swap R0 and R2)
+
+    MOV R0 R2   (R0 = R2)
+
+    ADD R0 R2   (R0 = R0 + R2)
+
+    SWP R2 R0   (swap R2 and R0)
+
+    SWP R0 R2   (swap R0 and R2)
+
+    MOV R2 R1   (R2 = R1)
+
+    SUB R2 R0   (R2 = R2 - R0)
+
+    SWP R2 R1   (swap R2 and R1)
+
+    SWP R1 R0   (swap R1 and R0)
+
+    MOV R0 R2   (R0 = R2)
+
+    SWP R2 R1   (swap R2 and R1)
+
+    SUB R0 R1   (R0 = R0 - R1)
+
+    SUB R1 R0   (R1 = R1 - R0)
+
+    MULMOD R2 R1   (R2 = (R2 * R1) mod 100)
+
+    MULMOD R1 R2   (R1 = (R1 * R2) mod 100)
+
+    MOV R0 R1   (R0 = R1)
+
+    SUB R2 R0   (R2 = R2 - R0)
+
+    ADD R1 R0   (R1 = R1 + R0)
+
+    MOV R2 R1   (R2 = R1)
+
+    MOV R2 R1   (R2 = R1)
+
+    ADD R1 R0   (R1 = R1 + R0)
+
+    MOV R1 R2   (R1 = R2)
+
+    MULMOD R2 R0   (R2 = (R2 * R0) mod 100)
+
+    MULMOD R1 R0   (R1 = (R1 * R0) mod 100)
+
+
+    What are the final values of all three registers? Work through this step by step, then give your final
+    answer on the last line in exactly this format:
+
+    ANSWER: R0=<n>, R1=<n>, R2=<n>'
+  graders:
+  - type: match
+    dimension: reg_0
+    mode: regex
+    expected: R0\s*=\s*0\b
+  - type: match
+    dimension: reg_1
+    mode: regex
+    expected: R1\s*=\s*0\b
+  - type: match
+    dimension: reg_2
+    mode: regex
+    expected: R2\s*=\s*0\b
+  ground_truth: R0=0, R1=0, R2=0
+  difficulty: extreme
+- id: v2_machine_5_extreme
+  prompt: 'Execute this register program by hand, instruction by instruction.
+
+    Note: ''mod 100'' is the mathematical modulo — the result is always in 0..99 even for negative inputs
+    (e.g. (-7) mod 100 = 93).
+
+
+    Registers start at R0=2, R1=3, R2=4.
+
+    SWP R0 R1   (swap R0 and R1)
+
+    SUB R1 R0   (R1 = R1 - R0)
+
+    ADD R1 R0   (R1 = R1 + R0)
+
+    SUB R2 R0   (R2 = R2 - R0)
+
+    SUB R2 R1   (R2 = R2 - R1)
+
+    MOV R2 R0   (R2 = R0)
+
+    SWP R0 R1   (swap R0 and R1)
+
+    SUB R2 R0   (R2 = R2 - R0)
+
+    MOV R2 R1   (R2 = R1)
+
+    SWP R2 R0   (swap R2 and R0)
+
+    MOV R1 R0   (R1 = R0)
+
+    MOV R1 R0   (R1 = R0)
+
+    SUB R2 R0   (R2 = R2 - R0)
+
+    MOV R1 R0   (R1 = R0)
+
+    MULMOD R1 R0   (R1 = (R1 * R0) mod 100)
+
+    SWP R1 R0   (swap R1 and R0)
+
+    ADD R0 R2   (R0 = R0 + R2)
+
+    SWP R0 R2   (swap R0 and R2)
+
+    MULMOD R0 R2   (R0 = (R0 * R2) mod 100)
+
+    SWP R2 R0   (swap R2 and R0)
+
+    ADD R1 R0   (R1 = R1 + R0)
+
+    SUB R2 R0   (R2 = R2 - R0)
+
+    MOV R2 R0   (R2 = R0)
+
+    SUB R1 R0   (R1 = R1 - R0)
+
+    SWP R1 R2   (swap R1 and R2)
+
+    MOV R1 R2   (R1 = R2)
+
+    ADD R1 R0   (R1 = R1 + R0)
+
+    ADD R2 R1   (R2 = R2 + R1)
+
+    MULMOD R0 R2   (R0 = (R0 * R2) mod 100)
+
+    SWP R1 R2   (swap R1 and R2)
+
+    SUB R1 R0   (R1 = R1 - R0)
+
+    ADD R0 R2   (R0 = R0 + R2)
+
+    SUB R2 R0   (R2 = R2 - R0)
+
+    ADD R1 R0   (R1 = R1 + R0)
+
+    MULMOD R1 R0   (R1 = (R1 * R0) mod 100)
+
+    SUB R2 R1   (R2 = R2 - R1)
+
+    SWP R1 R0   (swap R1 and R0)
+
+    MULMOD R0 R2   (R0 = (R0 * R2) mod 100)
+
+    SUB R2 R1   (R2 = R2 - R1)
+
+    SUB R1 R2   (R1 = R1 - R2)
+
+    MULMOD R1 R2   (R1 = (R1 * R2) mod 100)
+
+    MULMOD R2 R1   (R2 = (R2 * R1) mod 100)
+
+    MULMOD R1 R0   (R1 = (R1 * R0) mod 100)
+
+    SWP R0 R2   (swap R0 and R2)
+
+    SUB R0 R1   (R0 = R0 - R1)
+
+    ADD R1 R2   (R1 = R1 + R2)
+
+    MOV R2 R0   (R2 = R0)
+
+    MULMOD R0 R2   (R0 = (R0 * R2) mod 100)
+
+    MOV R1 R2   (R1 = R2)
+
+    SUB R1 R0   (R1 = R1 - R0)
+
+
+    What are the final values of all three registers? Work through this step by step, then give your final
+    answer on the last line in exactly this format:
+
+    ANSWER: R0=<n>, R1=<n>, R2=<n>'
+  graders:
+  - type: match
+    dimension: reg_0
+    mode: regex
+    expected: R0\s*=\s*0\b
+  - type: match
+    dimension: reg_1
+    mode: regex
+    expected: R1\s*=\s*-50\b
+  - type: match
+    dimension: reg_2
+    mode: regex
+    expected: R2\s*=\s*-50\b
+  ground_truth: R0=0, R1=-50, R2=-50
+  difficulty: extreme

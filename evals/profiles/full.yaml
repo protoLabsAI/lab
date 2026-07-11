@@ -1,10 +1,15 @@
 # Full Model Evaluation Profile
-# ~90-120 min, 3 trials — comprehensive evaluation for model selection
+# Single-trial comprehensive evaluation for model selection (full breadth, all suites).
 # Usage: ./run.sh profile --name full --model local
+#
+# Trials: 1 by default. pass^3 (3 trials) was dropped from our eval strategy 2026-06-29 —
+# too much compute for too little marginal signal at this breadth; breadth across tasks/suites
+# discriminates models far better than repeating the same task 3x. Override with --trials N
+# (per run) only when you specifically need run-to-run variance on a small task set.
 
 name: "Full Evaluation"
-description: "Comprehensive cross-domain evaluation. 3 trials, pass^3 scoring, all suites."
-trials: 3
+description: "Comprehensive cross-domain evaluation. Single trial, full breadth, all suites."
+trials: 1
 
 # Claw-eval agent tasks — 30 tasks, deterministic slice across all categories
 claw:

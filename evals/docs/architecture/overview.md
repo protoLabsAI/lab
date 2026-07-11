@@ -93,8 +93,10 @@ Agents find valid approaches that eval designers didn't anticipate.
 Checking tool call sequences is brittle. Check the final state instead.
 
 ### Pass^k for consistency
-pass^3 (default) means the agent must succeed in all 3 independent trials.
-This separates reliable capability from lucky runs.
+Available via `--trials N` (pass^k = agent must succeed in all N independent trials) when you
+specifically need run-to-run variance on a small task set. **Not the default** — pass^3 was dropped
+2026-06-29 (too much compute for too little marginal signal; breadth discriminates better). Default
+is single-trial across the full breadth of tasks and suites.
 
 ### Multi-dimensional scoring with partial credit
 Each task scored across multiple dimensions. An agent that gets the right answer

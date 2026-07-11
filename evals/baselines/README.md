@@ -56,6 +56,13 @@ cd evals
 |---|---|---|---|---|---|
 | 2026-06-27 | Ornith-1.0-35B-FP8 (2 replicas) | **0.741** (35/35, 0 errors) | **0.925** | **93%** (50/54) | protolabs/reasoning |
 
+**2026-07-02 — Phase 3 expanded-suite ladder** (`2026-07-02-phase3-ladder/`): first
+baseline on the new deterministic suites (reasoning-v2/code-exec-v2/structured-hard/
+safety-agency), thinking-on at a **fixed 8192-token budget**, across the 35B/9B/4B
+ladder. Reasoning discriminates monotonically (0.882/0.726/0.615); the thinking
+budget — not problem difficulty — is what un-saturated the 35B. See that dir's
+README + `evals/PHASE3_RESULTS.md`.
+
 **2026-06-27 detail** — claw: non-coding (30) **0.751**, coding-agentic T100–104 (5, **sandbox**) **0.68** (3/5 passed: T100/T102/T103 = 1.00; T101/T104 = 0.20). All 35 tasks scored (kb/contacts health-probe fix), 0 grader crashes (reasoning-judge token fix), 0 harness errors. Coding-agentic run via Docker sandbox + 1800s task timeout (see below). _Note:_ an earlier no-sandbox run floored coding-agentic at 0.20 (overall 0.672) — the sandbox is what makes that metric real.
 
 **FC nuance (93% is conservative):** of the 4 FC misses, 2 (`gina_019`/`gina_021`) are the model *correctly* calling `current_time` to ground a relative date ("today"/"Thursday") before the calendar query — the single-call exact-match grader can't credit that. Real FC ≈ **96% (52/54)**. The other 2 (`gina_chain_001` multi-step chain, `gina_disc_001` proactive trigger) are genuine gaps. FC runner now logs `actual_tool_calls`+`expected` (pass `--output-dir`) so misses are self-debuggable.
@@ -137,6 +144,107 @@ The new daily driver benchmarked head-to-head against the prior **smart** lane (
 - **27B+MTP's only win is one-shot coding** (custom 0.950 > 0.925) — but it's the slowest (70 tok/s) and weakest at multi-step agentic. A coder, not a driver.
 - **Gemma-fast earns its name** (149 tok/s, 2× the 27B) with respectable non-coding claw (0.707), but FC drops to 87% and coding-agentic collapses — fine as a latency lane, not as the primary.
 - **Caveats:** single-trial (coding-agentic is noisy — which specific T10x passed differs per model: 27B got T102, Gemma got T100, none cracked T101/T104); Gemma uses the `gemma4` reasoning parser, not Qwen-style `enable_thinking`, so "thinking-on" isn't perfectly apples-to-apples across the three. Run-dirs: `scratchpad/bench-{27b-mtp,gemma-fast}/`.
+
+## Tiny cognitive-core probe — MiniCPM5-1B (2026-07-05)
+
+`openbmb/MiniCPM5-1B` (Q8_0 GGUF, llama.cpp on GPU0 `:8010`, off-gateway; production
+twin-Ornith untouched). Same harness/judge (`local` :8000, thinking-on, 32K ctx),
+full profile, **single-trial**. Ran to test our "sub-4B can't do agentic tool use"
+capability-cliff finding directly.
+
+| Metric | MiniCPM5-1B | Ornith-9B | gemma-4-12B | Ornith-35B |
+|---|:---:|:---:|:---:|:---:|
+| **claw business-agentic (30)** | **0.556** | 0.734 | 0.663 | 0.746 |
+| function-call (54) | 68.5% (37/54) | 93% | 87% | 91% |
+| custom overall (155) | 22% (34/155) | — | — | — |
+| vision | FAIL (text-only) | — | — | — |
+| decode (batch=1, single-stream) | **729 tok/s** (Q8_0/llama.cpp) | ~129 | ~53 | ~208 |
+
+**Read — the cliff is softer than we wrote.** A **1B** at 0.556 business-agentic is
+only ~0.11 behind gemma-**12B** and ~0.18 behind the 9B/35B, at 1/9–1/35 the params.
+It runs real multi-turn tool loops (observed: 5 parallel `contacts_search` with coherent
+planning), so the "cognitive core" agentic claim holds better than [[project_tiny_models_direction]]
+predicted. It's a weak **generalist** — custom 22%, FC 68.5% (single-call precision is the
+1B tax) — but competent enough at *driving tools* to be interesting as an edge agent or
+draft candidate. **Caveats:** single trial; Q8_0/llama.cpp so speed is NOT comparable to
+the vLLM/Blackwell numbers above (different engine); no vision; no MTP head (plain Llama
+arch — NVFP4×MTP multiplication not available). Run-dir:
+`results/minicpm5_full_20260705_220032/`.
+
+### Distillation-base bake-off — vs Qwen3.5-2B (2026-07-06)
+
+Reason we ran MiniCPM: pick the student to distill Ornith into (the "cognitive core"
+tiny-agent play). MiniCPM's blocker is its own vocab → **black-box SFT only** (no logit-KL,
+no MTP head, no NVFP4 stack). Qwen3.5-2B shares Ornith's exact 248K vocab → **white-box
+logit-KL + MTP + NVFP4** all available. Both served text-only, same harness/judge (`local`
+:8000), single-trial. NVFP4 via our sm120 recipe (`experiments/quantize/qwen35_2b_requant.py`,
+dense hybrid-GDN VL adaptation of `a1_requant.py`).
+
+| Model (format)          | claw (30) | FC (54) | custom (155/160) | on-disk | distill stack |
+|---|:---:|:---:|:---:|:---:|---|
+| MiniCPM5-1B (Q8_0)      | 0.556 | 68.5% | 22% | 1.1 GB | black-box SFT only |
+| Qwen3.5-0.8B (NVFP4)    | 0.501 | 72.2% | 21% | 1.2 GB | white-box + MTP + NVFP4 |
+| Qwen3.5-2B (bf16)       | 0.645 | 85.2% | ~44%† | 4.3 GB | white-box + MTP + NVFP4 |
+| **Qwen3.5-2B (NVFP4)**  | **0.642** | **87.0%** | **44%** | **2.8 GB** | white-box + MTP + NVFP4 |
+
+† bf16 custom never got a clean profile number (max-tokens bug, below); NVFP4≈bf16 elsewhere.
+
+**Tiebreaker (0.8B at MiniCPM's footprint):** at ~1.2 GB the Qwen-0.8B and MiniCPM-1B are a
+**wash** — MiniCPM edges claw (0.556 vs 0.501), Qwen edges FC (72 vs 68.5), custom tied (~21%).
+Minimum-footprint does *not* hand Qwen a raw-capability win; MiniCPM's "cognitive core at 1B"
+is real. (0.8B NVFP4 not compared to its own bf16 — extrapolating from the 2B's losslessness;
+a 0.8B is more quant-fragile so its bf16 may be marginally higher.)
+
+**Recommendation — distill Ornith into Qwen3.5-2B (NVFP4), not MiniCPM.** The choice is a
+*student to distill into*, so the post-distillation ceiling is what matters, and that's set by
+(a) base capability and (b) whether white-box logit-KL from the Ornith teacher is available.
+Qwen wins both: same 248K vocab → logit-KL + MTP-head + NVFP4 ladder; MiniCPM's own vocab →
+black-box SFT only. At 2.8 GB the 2B base is far stronger (0.642 claw / 87 FC / 44 custom); at
+1.2 GB the 0.8B merely *matches* MiniCPM but keeps the full distill stack. So **2B if 2.8 GB is
+acceptable, 0.8B if 1.2 GB is a hard ceiling — MiniCPM in neither case** (it's not smaller-and-
+better, and it's a distillation dead-end). Artifacts: `/mnt/models/quantized/Qwen3.5-{2B,0.8B}-NVFP4`.
+Run-dir 0.8B: `results/qwen35-08b-nvfp4_full_20260706_003419/`.
+
+**Speed** (chat 1k/1k, uncontended GPU1 — prod stopped for the run):
+
+| Model (format)            | C1 out tok/s | C8 aggregate | engine |
+|---|:---:|:---:|:---:|
+| MiniCPM5-1B (Q8_0)        | **723** | 2753 | llama.cpp |
+| Qwen3.5-0.8B (NVFP4)      | 553 | **3977** | vLLM |
+| Qwen3.5-2B (NVFP4)        | 390 | 2663 | vLLM |
+
+Qwen NVFP4 via `speed-test-v2 quick` (`vllm bench serve`); MiniCPM via a matched llama-server
+probe reading its own `timings` (vLLM bench 400s on llama-server's `/v1/completions`) — same
+regime + concurrency, slightly different harness, so read as directional.
+
+**The single-stream lead inverts under concurrency — our own dFlash lesson, reproduced.**
+MiniCPM wins C1 decisively (723 vs 553 vs 390 — llama.cpp is leaner at batch=1, and it's a 1B),
+but at **C8 the 0.8B NVFP4 overtakes it** (3977 vs 2753) on vLLM's continuous batching + paged
+KV; the 2B NVFP4 keeps pace with MiniCPM at C8 (2663 vs 2753) despite 2× the params. Real agent
+traffic is C=4–8 fan-out ([[project_dflash_test_candidate]]), so the concurrency column is the one
+that matters for a served agent — and there the Qwen artifacts win or tie. Run-dirs:
+`results/speed-v2/{qwen35-2b,qwen35-08b}-nvfp4-*`, `minicpm5-q8-*` (MiniCPM JSONs empty — bench
+400s; numbers from the matched probe).
+
+**Findings:**
+- **NVFP4 is lossless on the 2B agentically** — claw 0.645→0.642, FC 85.2→87.0 (within
+  single-trial noise). A distilled artifact ships NVFP4 with no agentic penalty.
+- **Qwen-2B dominates MiniCPM on every capability axis** (≈2× custom, +0.09 claw, +18 pts FC)
+  — but is **2.5× the on-disk size even at 4-bit** (2.8 vs 1.1 GB): the 248K-vocab embedding
+  (~1 GB, kept bf16) + vision tower + GDN layers don't quantize. The vocab that *enables*
+  white-box distillation is a standing ~1 GB on-disk tax that NVFP4 does not remove.
+- Decision reframed: not "which is smaller" but **"2.8 GB + full white-box distill stack +
+  higher capability" vs "1.1 GB, black-box-only, weaker."** Qwen wins for a distillation
+  *target*; MiniCPM only if minimum footprint is a hard constraint. 0.8B (same vocab, half
+  the hidden dim → ~0.5 GB embedding) is the tiebreaker — **pending**.
+
+**Harness bug found (fix pending):** `run.sh profile` passes `--max-tokens = max_model_len`
+to `run_custom.py`, so on vLLM every custom request 400s (`requested output == context →
+0 input budget`). llama.cpp silently caps, so MiniCPM was unaffected; vLLM-served models get
+16 phantom 1-second custom FAILs. Workarounds used: serve with `--max-model-len 40960` (output
++ input fits) — the NVFP4 profile above ran clean this way. Real fix = cap `--max-tokens` in
+the profile's custom invocation. Run-dirs: `results/qwen35-2b_full_20260705_224244/` (bf16),
+`results/qwen35-2b-nvfp4_full_20260705_235347/` (NVFP4).
 
 ## Coding-agentic (sandbox) — T100–104
 

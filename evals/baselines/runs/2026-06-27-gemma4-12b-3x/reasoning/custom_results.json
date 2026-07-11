@@ -1,0 +1,262 @@
+{
+  "model": "protolabs/gemma4-12b",
+  "timestamp": "2026-06-28T00:07:03.761168+00:00",
+  "trials": 3,
+  "thinking": true,
+  "suites": {
+    "Reasoning & Logic": {
+      "tasks": [
+        {
+          "task_id": "logic_001",
+          "trials": [
+            {
+              "trial": 1,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "correctness",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 9.2,
+              "turns": 1
+            },
+            {
+              "trial": 2,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "correctness",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 9.33,
+              "turns": 1
+            },
+            {
+              "trial": 3,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "correctness",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 7.98,
+              "turns": 1
+            }
+          ],
+          "all_passed": true,
+          "avg_score": 1.0
+        },
+        {
+          "task_id": "logic_002",
+          "trials": [
+            {
+              "trial": 1,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "correctness",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 74.55,
+              "turns": 1
+            },
+            {
+              "trial": 2,
+              "passed": true,
+              "score": 0.75,
+              "grades": [
+                {
+                  "dimension": "correctness",
+                  "score": 0.75,
+                  "passed": true
+                }
+              ],
+              "duration_s": 73.62,
+              "turns": 1
+            },
+            {
+              "trial": 3,
+              "passed": true,
+              "score": 0.75,
+              "grades": [
+                {
+                  "dimension": "correctness",
+                  "score": 0.75,
+                  "passed": true
+                }
+              ],
+              "duration_s": 73.2,
+              "turns": 1
+            }
+          ],
+          "all_passed": true,
+          "avg_score": 0.8333333333333334
+        },
+        {
+          "task_id": "logic_003",
+          "trials": [
+            {
+              "trial": 1,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "correctness",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 8.14,
+              "turns": 1
+            },
+            {
+              "trial": 2,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "correctness",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 10.28,
+              "turns": 1
+            },
+            {
+              "trial": 3,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "correctness",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 9.34,
+              "turns": 1
+            }
+          ],
+          "all_passed": true,
+          "avg_score": 1.0
+        },
+        {
+          "task_id": "logic_004",
+          "trials": [
+            {
+              "trial": 1,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "correctness",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 9.39,
+              "turns": 1
+            },
+            {
+              "trial": 2,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "correctness",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 11.81,
+              "turns": 1
+            },
+            {
+              "trial": 3,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "correctness",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 9.35,
+              "turns": 1
+            }
+          ],
+          "all_passed": true,
+          "avg_score": 1.0
+        },
+        {
+          "task_id": "logic_005",
+          "trials": [
+            {
+              "trial": 1,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "correctness",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 10.02,
+              "turns": 1
+            },
+            {
+              "trial": 2,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "correctness",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 9.57,
+              "turns": 1
+            },
+            {
+              "trial": 3,
+              "passed": true,
+              "score": 1.0,
+              "grades": [
+                {
+                  "dimension": "correctness",
+                  "score": 1.0,
+                  "passed": true
+                }
+              ],
+              "duration_s": 9.89,
+              "turns": 1
+            }
+          ],
+          "all_passed": true,
+          "avg_score": 1.0
+        }
+      ]
+    }
+  },
+  "summary": {
+    "total_tasks": 5,
+    "passed_tasks": 5,
+    "pass_rate": 1.0
+  }
+}

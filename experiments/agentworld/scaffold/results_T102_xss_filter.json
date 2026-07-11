@@ -1,0 +1,50 @@
+{
+  "task_id": "T102_xss_filter",
+  "results": {
+    "baseline": {
+      "arm": "baseline",
+      "trials": 5,
+      "mean_task_score": 0.677,
+      "mean_completion": 0.596,
+      "pass_rate": 0.6,
+      "scores": [
+        1.0,
+        1.0,
+        0.2,
+        0.984,
+        0.2
+      ]
+    },
+    "cold": {
+      "arm": "cold",
+      "trials": 5,
+      "mean_task_score": 0.2,
+      "mean_completion": 0.0,
+      "pass_rate": 0.0,
+      "scores": [
+        0.2,
+        0.2,
+        0.2,
+        0.2,
+        0.2
+      ]
+    },
+    "sim": {
+      "arm": "sim",
+      "trials": 5,
+      "mean_task_score": 0.669,
+      "mean_completion": 0.586,
+      "pass_rate": 0.6,
+      "scores": [
+        1.0,
+        1.0,
+        0.944,
+        0.2,
+        0.2
+      ]
+    }
+  },
+  "delta_sim_vs_baseline": -0.008,
+  "delta_sim_vs_cold": 0.469,
+  "delta_cold_vs_baseline": -0.477
+}

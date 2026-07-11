@@ -485,6 +485,33 @@ case "$1" in
             --speculative-config '{"method": "mtp", "num_speculative_tokens": 1}' \
             >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
         ;;
+    qwen36-27b-nvfp4)
+        # NVIDIA ModelOpt NVFP4 quant of Qwen3.6-27B (2026-06-30). MIXED_PRECISION:
+        # linear_attn layers FP8, MLP W4A16_NVFP4 (group 16), KV cache FP8. ~22GB.
+        # VLM arch (qwen3_5) → --language-model-only for text serving.
+        #
+        # ⚠️ BLOCKED on pinned vLLM 0.22.1 (2026-07-01): quantized lm_head
+        # (W4A16_NVFP4) → "no module or parameter named 'lm_head.input_scale'
+        # in Qwen3_5ForCausalLM". Model card targets vllm/vllm-openai:NIGHTLY
+        # + `--quantization modelopt`. Also selects FlashInferFP8ScaledMMLinearKernel
+        # for the FP8 linear_attn layers → set VLLM_USE_TRITON_FP8_GEMM=1 (Blackwell
+        # hang, see memory feedback_flashinfer_fp8_matmul). Retry on next vLLM bump
+        # or via the nightly Docker container (DiffusionGemma-style off-pin lane).
+        echo "Starting Qwen3.6-27B NVFP4 (GPU 0, 256K, NVIDIA ModelOpt FP4)..."
+        CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve nvidia/Qwen3.6-27B-NVFP4 \
+            $O3 \
+            --host 0.0.0.0 --port $PORT \
+            --served-model-name local \
+            --max-model-len 262144 \
+            --max-num-seqs 512 \
+            --reasoning-parser qwen3 \
+            --enable-auto-tool-choice --tool-call-parser qwen3_xml \
+            --gpu-memory-utilization 0.90 \
+            --language-model-only \
+            --enable-chunked-prefill \
+            $PREFIX_FLAGS \
+            >> "${LOG_DIR}/vllm-swap.log" 2>&1 &
+        ;;
     qwen36-27b-fp8)
         echo "Starting Qwen3.6-27B FP8 official (GPU 0, 256K, thinking/planning)..."
         CUDA_VISIBLE_DEVICES=0 $VLLM_BIN serve Qwen/Qwen3.6-27B-FP8 \

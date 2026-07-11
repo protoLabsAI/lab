@@ -1,0 +1,135 @@
+id: reasoning_hard_grid
+name: Reasoning HARD (frontier-discriminating) — grid (solver-verified, seed 20260702)
+category: reasoning
+tests:
+- id: v2_grid_3_hard
+  prompt: 'There are 4 houses in a row, positions 1 (leftmost) to 4 (rightmost). Each house has a distinct
+    color, and each is occupied by a different person with a distinct drink.
+
+
+    - The person in the red house drinks juice.
+
+    - The person in the yellow house drinks milk.
+
+    - The coffee drinker does not live in house 3.
+
+    - The tea drinker does not live in house 4.
+
+    - Carol lives immediately to the left of Bob.
+
+    - The person in the green house drinks tea.
+
+    - Carol does not drink juice.
+
+    - Alice lives in house 1 or house 3.
+
+    - The red house is not house 4.
+
+    - Dan lives immediately to the left of Carol.
+
+    - The coffee drinker lives in house 2 or house 3.
+
+
+    Determine, for every person, their house number, house color, and drink. Work through this step by
+    step, then give your final answer on the last line as a comma-separated list in exactly this per-person
+    format (no spaces inside a person''s entry):
+
+    ANSWER: Alice=h<pos>,<color>,<drink>; Bob=h<pos>,<color>,<drink>; ...'
+  graders:
+  - type: match
+    dimension: grid_full
+    mode: all_of
+    expected: &id001
+    - Alice=h1,red,juice
+    - Bob=h4,yellow,milk
+    - Carol=h3,green,tea
+    - Dan=h2,blue,coffee
+    case_sensitive: false
+  ground_truth: *id001
+  difficulty: hard
+- id: v2_grid_4_extreme
+  prompt: 'There are 4 houses in a row, positions 1 (leftmost) to 4 (rightmost). Each house has a distinct
+    color, and each is occupied by a different person with a distinct drink.
+
+
+    - Dan does not live in the blue house.
+
+    - The blue house is somewhere to the left of the juice drinker.
+
+    - The milk drinker lives in house 2 or house 1.
+
+    - Dan lives in house 4 or house 1.
+
+    - Carol does not live in the red house.
+
+    - The person in the green house drinks juice.
+
+    - Bob lives in house 3 or house 4.
+
+    - The person in the blue house drinks coffee.
+
+    - Alice lives in house 1 or house 3.
+
+    - The blue house is not house 2.
+
+    - The juice drinker lives in house 3 or house 1.
+
+
+    Determine, for every person, their house number, house color, and drink. Work through this step by
+    step, then give your final answer on the last line as a comma-separated list in exactly this per-person
+    format (no spaces inside a person''s entry):
+
+    ANSWER: Alice=h<pos>,<color>,<drink>; Bob=h<pos>,<color>,<drink>; ...'
+  graders:
+  - type: match
+    dimension: grid_full
+    mode: all_of
+    expected: &id002
+    - Alice=h1,blue,coffee
+    - Bob=h3,green,juice
+    - Carol=h2,yellow,milk
+    - Dan=h4,red,tea
+    case_sensitive: false
+  ground_truth: *id002
+  difficulty: extreme
+- id: v2_grid_5_extreme
+  prompt: 'There are 4 houses in a row, positions 1 (leftmost) to 4 (rightmost). Each house has a distinct
+    color, and each is occupied by a different person with a distinct drink.
+
+
+    - The milk drinker lives in house 2 or house 4.
+
+    - The red house is somewhere to the left of the tea drinker.
+
+    - The blue house is somewhere to the left of the juice drinker.
+
+    - Alice lives in house 3 or house 1.
+
+    - The person in the red house drinks milk.
+
+    - The yellow house is somewhere to the left of the tea drinker.
+
+    - The blue house is somewhere to the left of the tea drinker.
+
+    - Carol lives somewhere to the left of Alice.
+
+    - Carol lives immediately to the left of Dan.
+
+
+    Determine, for every person, their house number, house color, and drink. Work through this step by
+    step, then give your final answer on the last line as a comma-separated list in exactly this per-person
+    format (no spaces inside a person''s entry):
+
+    ANSWER: Alice=h<pos>,<color>,<drink>; Bob=h<pos>,<color>,<drink>; ...'
+  graders:
+  - type: match
+    dimension: grid_full
+    mode: all_of
+    expected: &id003
+    - Alice=h3,yellow,juice
+    - Bob=h4,green,tea
+    - Carol=h1,blue,coffee
+    - Dan=h2,red,milk
+    case_sensitive: false
+  ground_truth: *id003
+  difficulty: extreme
