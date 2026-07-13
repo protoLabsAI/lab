@@ -1,0 +1,88 @@
+model:
+  model_path: /mnt/data/models-cold/LTX-2.3/ltx-2.3-22b-distilled-1.1.safetensors
+  text_encoder_path: /mnt/models/gemma-3-12b
+  training_mode: lora
+  load_checkpoint: null
+lora:
+  rank: 16
+  alpha: 16
+  dropout: 0.0
+  target_modules:
+  - to_k
+  - to_q
+  - to_v
+  - to_out.0
+training_strategy:
+  name: text_to_video
+  first_frame_conditioning_p: 0.5
+  with_audio: false
+  audio_latents_dir: audio_latents
+optimization:
+  learning_rate: 1e-4
+  steps: 50
+  batch_size: 1
+  gradient_accumulation_steps: 1
+  max_grad_norm: 1.0
+  optimizer_type: adamw8bit
+  scheduler_type: linear
+  scheduler_params: {}
+  enable_gradient_checkpointing: true
+acceleration:
+  mixed_precision_mode: bf16
+  quantization: int8-quanto
+  load_text_encoder_in_8bit: false
+data:
+  preprocessed_data_root: /mnt/data/ltx2-lora/preprocessed
+  num_dataloader_workers: 1
+validation:
+  prompts:
+  - A woman with long brown hair sits at a wooden desk in a cozy home office, typing
+    on a laptop while occasionally glancing at notes beside her. Soft natural light
+    streams through a large window, casting warm shadows across the room. She pauses
+    to take a sip from a ceramic mug, then continues working with focused concentration.
+    The audio captures the gentle clicking of keyboard keys, the soft rustle of papers,
+    and ambient room tone with occasional distant bird chirps from outside.
+  - A chef in a white uniform stands in a professional kitchen, carefully plating
+    a gourmet dish with precise movements. Steam rises from freshly cooked vegetables
+    as he arranges them with tweezers. The stainless steel surfaces gleam under bright
+    overhead lights, and various pots simmer on the stove behind him. The audio features
+    the sizzling of pans, the clinking of utensils against plates, and the ambient
+    hum of kitchen ventilation.
+  negative_prompt: worst quality, inconsistent motion, blurry, jittery, distorted
+  images: null
+  video_dims:
+  - 576
+  - 576
+  - 89
+  frame_rate: 25.0
+  seed: 42
+  inference_steps: 30
+  interval: null
+  videos_per_prompt: 1
+  guidance_scale: 4.0
+  stg_scale: 1.0
+  stg_blocks:
+  - 29
+  stg_mode: stg_av
+  generate_audio: true
+  skip_initial_validation: true
+checkpoints:
+  interval: 25
+  keep_last_n: -1
+  precision: bfloat16
+flow_matching:
+  timestep_sampling_mode: shifted_logit_normal
+  timestep_sampling_params: {}
+hub:
+  push_to_hub: false
+  hub_model_id: null
+wandb:
+  enabled: false
+  project: ltx-2-trainer
+  entity: null
+  tags:
+  - ltx2
+  - lora
+  log_validation_videos: true
+seed: 42
+output_dir: /mnt/data/ltx2-lora/outputs/toy-smoke
