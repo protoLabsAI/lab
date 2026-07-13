@@ -1,0 +1,58 @@
+[
+ {
+  "label": "fp4_768x512",
+  "wall_s": 13.5,
+  "peak_vram_mb": 41069,
+  "staged_mb": null,
+  "best_s_per_it": null,
+  "out": "output_D_00003_.mp4"
+ },
+ {
+  "label": "fp4_1280x704",
+  "wall_s": 34.5,
+  "peak_vram_mb": 43757,
+  "staged_mb": null,
+  "best_s_per_it": null,
+  "out": "output_D_00004_.mp4"
+ },
+ {
+  "label": "bf16_768x512",
+  "wall_s": 33.2,
+  "peak_vram_mb": 63341,
+  "staged_mb": null,
+  "best_s_per_it": null,
+  "out": "output_D_00005_.mp4"
+ },
+ {
+  "label": "bf16_1280x704",
+  "wall_s": 48.3,
+  "peak_vram_mb": 65869,
+  "staged_mb": null,
+  "best_s_per_it": null,
+  "out": "output_D_00006_.mp4"
+ },
+ {
+  "label": "fp4_dog",
+  "wall_s": 48.0,
+  "peak_vram_mb": 59597,
+  "staged_mb": null,
+  "best_s_per_it": null,
+  "out": "output_D_00007_.mp4"
+ },
+ {
+  "label": "fp4_tokyo",
+  "wall_s": 36.3,
+  "peak_vram_mb": 43661,
+  "staged_mb": null,
+  "best_s_per_it": null,
+  "out": "output_D_00008_.mp4"
+ },
+ {
+  "label": "fp4_bread",
+  "wall_s": 37.5,
+  "peak_vram_mb": 43661,
+  "staged_mb": null,
+  "best_s_per_it": null,
+  "out": "output_D_00009_.mp4"
+ }
+]
