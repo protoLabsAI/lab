@@ -64,12 +64,34 @@ def stop():
 def list_loras():
     return ["(none / base)"] + sorted(f.name for f in LORA_DIR.glob("*.safetensors")) if LORA_DIR.exists() else ["(none / base)"]
 
-def _build(prompt, seed, lora, strength, w, h):
+def _upload_image(path):
+    """POST an image to ComfyUI /upload/image; return the stored filename for LoadImage."""
+    import mimetypes, uuid
+    data = open(path, "rb").read()
+    name = f"ref_{uuid.uuid4().hex[:12]}{Path(path).suffix or '.png'}"
+    boundary = "----lorastudio" + uuid.uuid4().hex
+    ct = mimetypes.guess_type(path)[0] or "image/png"
+    body = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"image\"; filename=\"{name}\"\r\n"
+            f"Content-Type: {ct}\r\n\r\n").encode() + data + \
+           (f"\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"overwrite\"\r\n\r\ntrue\r\n"
+            f"--{boundary}--\r\n").encode()
+    req = urllib.request.Request(f"{COMFY}/upload/image", body,
+                                 {"Content-Type": f"multipart/form-data; boundary={boundary}"})
+    return json.load(urllib.request.urlopen(req)).get("name", name)
+
+def _build(prompt, seed, lora, strength, w, h, ref_image=None, ref_strength=0.7):
     api = json.load(open(BASE_API)); api.pop("4823", None)          # distilled-only
     if prompt.strip():
         api["2483"]["inputs"]["text"] = prompt
     api["4832"]["inputs"]["noise_seed"] = int(seed)
     api["3059"]["inputs"]["width"] = int(w); api["3059"]["inputs"]["height"] = int(h)
+    # reference image (I2V first-frame conditioning): flip bypass off + feed the image
+    if ref_image and "2004" in api and "4977" in api:
+        fname = _upload_image(ref_image)
+        api["2004"]["inputs"]["image"] = fname
+        api["4977"]["inputs"]["value"] = False                      # bypass off -> I2V
+        if "3159" in api:
+            api["3159"]["inputs"]["strength"] = float(ref_strength)
     if lora and lora != "(none / base)":
         ckpt = next(n for n, v in api.items() if v["class_type"] == "CheckpointLoaderSimple")
         guiders = [(n, inp) for n, v in api.items() for inp, val in v["inputs"].items()
@@ -100,24 +122,26 @@ def _check_base():
         return "⚠️ No base T2V graph yet — run one LTX-2.3 T2V in ComfyUI once (seeds base_api.json), then retry."
     return None
 
-def generate(prompt, lora, strength, seed, w, h):
+def generate(prompt, lora, strength, seed, w, h, ref_image, ref_strength):
     err = _check_base()
     if err: return None, err
     try:
-        v = _run(_build(prompt, seed, lora, strength, w, h))
-        return v, (f"✅ {lora} @ str {strength}, seed {seed}" if v else "❌ no output (check ComfyUI log)")
+        v = _run(_build(prompt, seed, lora, strength, w, h, ref_image, ref_strength))
+        mode = "I2V" if ref_image else "T2V"
+        return v, (f"✅ {mode} · {lora} @ str {strength}, seed {seed}" if v else "❌ no output (check ComfyUI log)")
     except Exception as e:
         return None, f"❌ {e}"
 
-def compare(prompt, lora, strength, seed, w, h):
+def compare(prompt, lora, strength, seed, w, h, ref_image, ref_strength):
     err = _check_base()
     if err: return None, None, err
     if not lora or lora == "(none / base)":
         return None, None, "pick a LoRA to compare against base"
     try:
-        base = _run(_build(prompt, seed, "(none / base)", 0, w, h))
-        withl = _run(_build(prompt, seed, lora, strength, w, h))
-        return base, withl, f"✅ same seed {seed}: base vs {lora}@{strength}"
+        base = _run(_build(prompt, seed, "(none / base)", 0, w, h, ref_image, ref_strength))
+        withl = _run(_build(prompt, seed, lora, strength, w, h, ref_image, ref_strength))
+        mode = "I2V" if ref_image else "T2V"
+        return base, withl, f"✅ {mode}, same seed {seed}: base vs {lora}@{strength}"
     except Exception as e:
         return None, None, f"❌ {e}"
 
@@ -162,6 +186,8 @@ with gr.Blocks(title="LTX-2.3 Video LoRA Studio") as demo:
                 with gr.Row():
                     g_w = gr.Number(value=768, label="Width", precision=0)
                     g_h = gr.Number(value=448, label="Height", precision=0)
+                g_ref = gr.Image(type="filepath", label="Reference image (first frame — optional → I2V)", height=180)
+                g_refstr = gr.Slider(0.0, 1.0, value=0.7, step=0.05, label="First-frame strength (I2V anchor)")
                 with gr.Row():
                     g_gen = gr.Button("Generate", variant="primary")
                     g_cmp = gr.Button("Compare vs base")
@@ -172,8 +198,8 @@ with gr.Blocks(title="LTX-2.3 Video LoRA Studio") as demo:
                     g_base = gr.Video(label="Base (no LoRA)", autoplay=True)
                     g_with = gr.Video(label="With LoRA", autoplay=True)
         g_refresh.click(lambda: gr.update(choices=list_loras()), None, g_lora)
-        g_gen.click(generate, [g_prompt, g_lora, g_strength, g_seed, g_w, g_h], [g_video, g_status])
-        g_cmp.click(compare, [g_prompt, g_lora, g_strength, g_seed, g_w, g_h], [g_base, g_with, g_status])
+        g_gen.click(generate, [g_prompt, g_lora, g_strength, g_seed, g_w, g_h, g_ref, g_refstr], [g_video, g_status])
+        g_cmp.click(compare, [g_prompt, g_lora, g_strength, g_seed, g_w, g_h, g_ref, g_refstr], [g_base, g_with, g_status])
 
 if __name__ == "__main__":
     demo.queue().launch(server_name="0.0.0.0", server_port=7862, show_error=True)
