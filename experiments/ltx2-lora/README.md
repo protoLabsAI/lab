@@ -18,6 +18,17 @@ of clips; get a `<style>.safetensors` LoRA symlinked into ComfyUI `loras/` plus 
 
 Work dir defaults to `/mnt/data/video-lora/<style>/`. The manual stages below are what it automates.
 
+## Gradio app (train + generate + compare in the browser)
+
+```bash
+~/dev/LTX-2/.venv/bin/python experiments/ltx2-lora/app.py     # UI on http://protolabs:7862
+```
+
+**Train tab** — upload clips (or point at a folder), set style/rank/steps/bucket, streams the pipeline log.
+**Generate & Compare tab** — pick any trained LoRA from the dropdown (↻ refresh), enter a prompt, **Generate**
+a video and see it inline, or **Compare vs base** to A/B base-vs-LoRA at the same seed side-by-side. Talks to
+ComfyUI on :8188 (must be up); needs `base_api.json` seeded once by any fp4 T2V run in the UI.
+
 ---
 
 ## Manual pipeline (what the orchestrator runs)
