@@ -23,7 +23,7 @@ Env:  COMFY_URL (default http://127.0.0.1:8188), COMFY_OUTPUT_DIR (/mnt/data/ltx
 from __future__ import annotations
 import os, sys, json, time, uuid, asyncio, pathlib
 from typing import Any, Optional
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request
+from fastapi import FastAPI, HTTPException, UploadFile, File, Request
 from fastapi.responses import JSONResponse, Response
 
 # co-located protoBanana checkout provides the reusable ComfyUI client
@@ -122,14 +122,25 @@ def _find_output(entry: dict[str, Any]) -> Optional[dict[str, str]]:
 # ---- the three contract endpoints -----------------------------------------------
 @app.post("/v1/videos")
 async def create_video(request: Request,
-                       input_reference: Optional[UploadFile] = File(None),
-                       model: Optional[str] = Form(None),
-                       prompt: Optional[str] = Form(None)):
-    # accept both JSON and multipart (input_reference forces multipart)
-    if input_reference is None and request.headers.get("content-type", "").startswith("application/json"):
+                       input_reference: Optional[UploadFile] = File(None)):
+    # accept both JSON and multipart (input_reference forces multipart).
+    # multipart: pull ALL contract fields from the form (not just model/prompt) so an
+    # I2V request doesn't silently drop seconds/size/seed/negative_prompt/extra_body.
+    if request.headers.get("content-type", "").startswith("application/json"):
         body = await request.json()
     else:
-        body = {"model": model, "prompt": prompt}
+        form = await request.form()
+        body = {k: v for k, v in form.multi_items() if k != "input_reference"}
+        # scalars that must be numeric downstream
+        for k in ("seconds", "seed"):
+            if k in body and body[k] not in (None, ""):
+                body[k] = float(body[k]) if k == "seconds" else int(body[k])
+        # extra_body arrives as a JSON string over multipart
+        if isinstance(body.get("extra_body"), str):
+            try:
+                body["extra_body"] = json.loads(body["extra_body"])
+            except json.JSONDecodeError:
+                raise HTTPException(400, "extra_body must be valid JSON")
     prompt = body.get("prompt")
     if not prompt:
         raise HTTPException(400, "prompt is required")
