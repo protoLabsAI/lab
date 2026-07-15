@@ -30,6 +30,11 @@ from __future__ import annotations
 import argparse, json, os, subprocess, sys, time, warnings
 
 warnings.filterwarnings("ignore")
+# GPU1. GPU0 is the 3-lane vLLM fleet and is packed solid (~93G of 94.9G) — a bare device="cuda"
+# lands there and OOMs on a 20MiB alloc. Every other proto_* script pins this; this one didn't.
+os.environ.setdefault("CUDA_VISIBLE_DEVICES", "1")
+os.environ.setdefault("HF_HOME", "/mnt/models/huggingface")
+os.environ.setdefault("PYTORCH_ALLOC_CONF", "expandable_segments:True")
 import numpy as np
 
 sys.path.insert(0, "/home/ava/dev/lab/infra/video-bridge")
@@ -143,6 +148,100 @@ def scene_prompt(base: str, scene: int) -> str:
     return f"{base}, {SHOTS[scene % len(SHOTS)]}"
 
 
+# --- ABSTRACT MODE -------------------------------------------------------------------------
+# Literal music-video imagery reads as cheese (verified by eye on v3: "cinematic music video,
+# 90s hip-hop soul aesthetic" + shot language = stock-footage energy). a2v conditions on vibe
+# and texture, NOT narrative — it has no idea what the lyrics mean and cannot stage a scene. So
+# stop asking it to. Instead: take the lyrics actually sung in each window and abstract them
+# into texture/colour/motion. Plays to what the model does well and dodges the uncanny middle.
+#
+# Needs lyrics mapped to TIME. acestep-transcriber emits [Verse]/[Chorus] tags with NO
+# timestamps, so Whisper (which returns them) does the timing while the 11B stays the
+# authority on content.
+
+ABSTRACT_SYS = (
+    "You write ABSTRACT visual prompts for an experimental music video. Given a fragment of "
+    "lyrics, respond with ONE prompt of purely abstract imagery evoking its FEELING.\n"
+    "RULES: no people, no faces, no hands, no text or letters, no literal depiction of objects "
+    "named in the lyrics, no narrative or story. Only: texture, colour, material, light, motion, "
+    "scale. Think camera-less film, macro fluid, smoke, refraction, grain, decay, crystal, "
+    "liquid metal, fibre, ink.\n"
+    "Under 22 words. No preamble, no quotes, no explanation — output the prompt only."
+)
+
+
+def transcribe_timed(path: str) -> list[dict]:
+    """Whisper with timestamps -> [{start,end,text}]. Timing only; the 11B owns the words."""
+    import torch
+    from transformers import pipeline
+    print("  loading whisper-large-v3-turbo for TIMED lyrics ...")
+    # NO chunk_length_s, and WORD-level timestamps.
+    #   * chunk_length_s=30 (copied from proto_label_taste.py, where only the TEXT matters)
+    #     produced a single chunk spanning 0.0->45.0s — so seven consecutive 8s segments all
+    #     inherited the same lyric. Whisper itself warns: "Using chunk_length_s is very
+    #     experimental with seq2seq models... use the model's generate method directly."
+    #     Dropping it gives 38 chunks, median 3.4s, none >20s.
+    #   * word level goes further: 332 chunks at 0.2s median, so any window maps exactly.
+    asr = pipeline("automatic-speech-recognition", model="openai/whisper-large-v3-turbo",
+                   dtype=torch.float16, device="cuda")
+    out = asr(path, return_timestamps="word",
+              generate_kwargs={"language": "en", "task": "transcribe"})
+    rows = []
+    for c in out.get("chunks", []) or []:
+        ts = c.get("timestamp") or (None, None)
+        if ts[0] is None:
+            continue
+        rows.append({"start": float(ts[0]), "end": float(ts[1] if ts[1] is not None else ts[0] + 2),
+                     "text": (c.get("text") or "").strip()})
+    del asr
+    torch.cuda.empty_cache()
+    print(f"  timed lyric chunks: {len(rows)}")
+    return rows
+
+
+def lyrics_in(rows: list[dict], a: float, b: float) -> str:
+    """Lyrics sung during [a,b) — any chunk that overlaps the window."""
+    return " ".join(r["text"] for r in rows if r["end"] > a and r["start"] < b).strip()
+
+
+def llm_abstract(lyric: str, url: str, model: str) -> str | None:
+    """Lyrics -> abstract imagery prompt.
+
+    enable_thinking=False is LOAD-BEARING. The `fast` lane is a thinking model: with thinking on
+    it NEVER terminates for this task — measured finish_reason='length' with content=None at
+    max_tokens=60 AND at 600, burning the entire budget mid-thought. Off: finish='stop', 22
+    tokens, clean prose. (Our "no thinking-off evals" rule is about EVALS, where it robs
+    reasoning models. This is a prompt-writer; thinking is pure waste.)
+
+    Failures are LOUD. The first version returned None on empty content and the caller silently
+    fell back to the template — so every segment got generic shot-language and the run LOOKED
+    fine. That is the same dead-path-looking-alive failure as everything else today.
+    """
+    import urllib.request
+    body = {"model": model, "temperature": 0.9, "max_tokens": 80,
+            "chat_template_kwargs": {"enable_thinking": False},
+            "messages": [{"role": "system", "content": ABSTRACT_SYS},
+                         {"role": "user", "content": f"Lyrics: {lyric}"}]}
+    try:
+        r = urllib.request.Request(f"{url}/chat/completions", data=json.dumps(body).encode(),
+                                   headers={"Content-Type": "application/json"})
+        d = json.load(urllib.request.urlopen(r, timeout=90))
+        ch = d["choices"][0]
+        msg = ch["message"]
+        t = (msg.get("content") or "").strip()
+        if not t:
+            # thinking-model trap: everything landed in reasoning_content, or the budget ran out
+            rc = (msg.get("reasoning_content") or "").strip()
+            print(f"    [LLM EMPTY] finish={ch.get('finish_reason')} "
+                  f"tokens={d.get('usage',{}).get('completion_tokens')} "
+                  f"reasoning_content={'yes' if rc else 'no'} -> falling back to template")
+            return None
+        return t.strip('"').split("\n")[0].strip() or None
+    except Exception as e:
+        print(f"    [LLM ERROR] {type(e).__name__}: {e} -> falling back to template")
+        return None
+
+
 def submit(wf: dict) -> str:
     import urllib.request
     r = urllib.request.Request(f"{COMFY}/prompt",
@@ -173,6 +272,12 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=0, help="only first N segments (probe)")
     ap.add_argument("--out", default="/mnt/data/acestep-lora/music-video")
     ap.add_argument("--dry-run", action="store_true", help="plan only, generate nothing")
+    ap.add_argument("--abstract", action="store_true",
+                    help="derive each segment's prompt from the lyrics ACTUALLY SUNG in that "
+                         "window (Whisper timing + LLM abstraction). Literal music-video "
+                         "imagery reads as cheese; a2v does vibe, not narrative.")
+    ap.add_argument("--llm-url", default="http://localhost:8040/v1")
+    ap.add_argument("--llm-model", default="fast")
     args = ap.parse_args()
 
     os.makedirs(args.out, exist_ok=True)
@@ -194,6 +299,29 @@ def main() -> int:
         d = s["end"] - s["start"]
         print(f"    seg{i:02d} scene{s['scene']}  {s['start']:7.2f} -> {s['end']:7.2f}  "
               f"({d:.2f}s, {inject.snap_frames(d, FPS)} frames)")
+    # ABSTRACT: prompt per segment from the lyrics sung in that exact window
+    if args.abstract:
+        print("\n  --abstract: timing lyrics with whisper, abstracting with the LLM ...")
+        rows = transcribe_timed(args.audio)
+        for i, s in enumerate(segs):
+            lyr = lyrics_in(rows, s["start"], s["end"])
+            s["lyric"] = lyr
+            # <3 words = an instrumental passage, not a lyric. Whisper stretches a lone word
+            # across a vocal-less intro (the first "So" spans 0->12.3s here); abstracting a
+            # single word gives the LLM nothing to work with.
+            if len(lyr.split()) < 3:
+                s["prompt"] = (f"{args.prompt}, abstract instrumental passage, "
+                               f"{SHOTS[s['scene'] % len(SHOTS)].split(',')[0]}")
+                print(f"    seg{i:02d} [instrumental: {lyr[:20]!r}]")
+                continue
+            p = llm_abstract(lyr, args.llm_url, args.llm_model)
+            s["prompt"] = f"{p}, abstract, no people, no text" if p else \
+                          f"{args.prompt}, {SHOTS[s['scene'] % len(SHOTS)]}"
+            print(f"    seg{i:02d} “{lyr[:44]}…”\n           -> {s['prompt'][:88]}")
+    else:
+        for s in segs:
+            s["prompt"] = scene_prompt(args.prompt, s["scene"])
+
     est = len(segs) * 25
     print(f"\n  est. generate time: ~{est//60}m{est%60:02d}s at ~25s/segment")
     if args.dry_run:
@@ -209,7 +337,8 @@ def main() -> int:
            "-i", args.audio, "-c:a", "pcm_s16le", "-ar", "44100", "-ac", "2",
            "-map_metadata", "-1", f"{COMFY_INPUT}/{wav}", "-y")
         wf, meta = inject.build_a2v_workflow(
-            scene_prompt(args.prompt, s["scene"]), audio_filename=wav, audio_seconds=d,
+            s.get("prompt") or scene_prompt(args.prompt, s["scene"]),
+            audio_filename=wav, audio_seconds=d,
             size=args.size, seed=args.seed + i, negative_prompt=args.negative)
         wf[inject.N_LOADAUD]["inputs"]["audio"] = wav
 
