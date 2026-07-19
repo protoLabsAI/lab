@@ -1,0 +1,343 @@
+{
+  "1241": {
+    "inputs": {
+      "frame_rate": [
+        "4978",
+        0
+      ],
+      "positive": [
+        "2483",
+        0
+      ],
+      "negative": [
+        "2612",
+        0
+      ]
+    },
+    "class_type": "LTXVConditioning",
+    "_meta": {
+      "title": "LTXVConditioning"
+    }
+  },
+  "2483": {
+    "inputs": {
+      "text": [
+        "9002",
+        0
+      ],
+      "clip": [
+        "4960",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Positive Prompt)"
+    }
+  },
+  "2612": {
+    "inputs": {
+      "text": "pc game, console game, video game, cartoon, childish, ugly",
+      "clip": [
+        "4960",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Negative Prompt)"
+    }
+  },
+  "3059": {
+    "inputs": {
+      "width": 1280,
+      "height": 704,
+      "length": [
+        "4979",
+        0
+      ],
+      "batch_size": 1
+    },
+    "class_type": "EmptyLTXVLatentVideo",
+    "_meta": {
+      "title": "EmptyLTXVLatentVideo"
+    }
+  },
+  "3940": {
+    "inputs": {
+      "ckpt_name": "ltx-2.3-22b-distilled-1.1-fp4.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": {
+      "title": "Load Checkpoint"
+    }
+  },
+  "3980": {
+    "inputs": {
+      "frames_number": [
+        "4979",
+        0
+      ],
+      "frame_rate": [
+        "4985",
+        0
+      ],
+      "batch_size": 1,
+      "audio_vae": [
+        "4010",
+        0
+      ]
+    },
+    "class_type": "LTXVEmptyLatentAudio",
+    "_meta": {
+      "title": "LTXV Empty Latent Audio"
+    }
+  },
+  "4010": {
+    "inputs": {
+      "ckpt_name": "ltx-2.3-22b-distilled-1.1-fp4.safetensors"
+    },
+    "class_type": "LTXVAudioVAELoader",
+    "_meta": {
+      "title": "Load LTXV Audio VAE"
+    }
+  },
+  "4528": {
+    "inputs": {
+      "video_latent": [
+        "3059",
+        0
+      ],
+      "audio_latent": [
+        "3980",
+        0
+      ]
+    },
+    "class_type": "LTXVConcatAVLatent",
+    "_meta": {
+      "title": "LTXVConcatAVLatent"
+    }
+  },
+  "4828": {
+    "inputs": {
+      "cfg": 1.0,
+      "model": [
+        "3940",
+        0
+      ],
+      "positive": [
+        "1241",
+        0
+      ],
+      "negative": [
+        "1241",
+        1
+      ]
+    },
+    "class_type": "CFGGuider",
+    "_meta": {
+      "title": "CFG Guider"
+    }
+  },
+  "4829": {
+    "inputs": {
+      "noise": [
+        "4832",
+        0
+      ],
+      "guider": [
+        "4828",
+        0
+      ],
+      "sampler": [
+        "4831",
+        0
+      ],
+      "sigmas": [
+        "4971",
+        0
+      ],
+      "latent_image": [
+        "4528",
+        0
+      ]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": {
+      "title": "SamplerCustomAdvanced"
+    }
+  },
+  "4831": {
+    "inputs": {
+      "sampler_name": "euler_ancestral_cfg_pp"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {
+      "title": "KSamplerSelect"
+    }
+  },
+  "4832": {
+    "inputs": {
+      "noise_seed": 7
+    },
+    "class_type": "RandomNoise",
+    "_meta": {
+      "title": "RandomNoise"
+    }
+  },
+  "4845": {
+    "inputs": {
+      "av_latent": [
+        "4829",
+        0
+      ]
+    },
+    "class_type": "LTXVSeparateAVLatent",
+    "_meta": {
+      "title": "LTXVSeparateAVLatent"
+    }
+  },
+  "4848": {
+    "inputs": {
+      "samples": [
+        "4845",
+        1
+      ],
+      "audio_vae": [
+        "4010",
+        0
+      ]
+    },
+    "class_type": "LTXVAudioVAEDecode",
+    "_meta": {
+      "title": "LTXV Audio VAE Decode"
+    }
+  },
+  "4849": {
+    "inputs": {
+      "fps": [
+        "4978",
+        0
+      ],
+      "bit_depth": 8,
+      "images": [
+        "4982",
+        0
+      ],
+      "audio": [
+        "4848",
+        0
+      ]
+    },
+    "class_type": "CreateVideo",
+    "_meta": {
+      "title": "Create Video"
+    }
+  },
+  "4852": {
+    "inputs": {
+      "filename_prefix": "protolab-nodes/t2v-enhanced",
+      "format": "auto",
+      "codec": "auto",
+      "video": [
+        "4849",
+        0
+      ]
+    },
+    "class_type": "SaveVideo",
+    "_meta": {
+      "title": "Save Video"
+    }
+  },
+  "4960": {
+    "inputs": {
+      "text_encoder": "gemma_3_12B_it_fp8_scaled.safetensors",
+      "ckpt_name": "ltx-2.3-22b-distilled-1.1-fp4.safetensors",
+      "device": "default"
+    },
+    "class_type": "LTXAVTextEncoderLoader",
+    "_meta": {
+      "title": "LTXV Audio Text Encoder Loader"
+    }
+  },
+  "4971": {
+    "inputs": {
+      "sigmas": "1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0"
+    },
+    "class_type": "ManualSigmas",
+    "_meta": {
+      "title": "ManualSigmas"
+    }
+  },
+  "4978": {
+    "inputs": {
+      "value": 24.0
+    },
+    "class_type": "PrimitiveFloat",
+    "_meta": {
+      "title": "fps"
+    }
+  },
+  "4979": {
+    "inputs": {
+      "value": 121
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "number of frames"
+    }
+  },
+  "4982": {
+    "inputs": {
+      "horizontal_tiles": 2,
+      "vertical_tiles": 2,
+      "overlap": 6,
+      "last_frame_fix": false,
+      "working_device": "auto",
+      "working_dtype": "auto",
+      "vae": [
+        "3940",
+        2
+      ],
+      "latents": [
+        "4845",
+        0
+      ]
+    },
+    "class_type": "LTXVTiledVAEDecode",
+    "_meta": {
+      "title": "\ud83c\udd5b\ud83c\udd63\ud83c\udd67 LTXV Tiled VAE Decode"
+    }
+  },
+  "4985": {
+    "inputs": {
+      "a": [
+        "4978",
+        0
+      ]
+    },
+    "class_type": "LTXFloatToInt",
+    "_meta": {
+      "title": "\ud83c\udd5b\ud83c\udd63\ud83c\udd67 Float To Int"
+    }
+  },
+  "9001": {
+    "class_type": "ProtoLTXPromptEnhancer",
+    "inputs": {
+      "mode": "t2v",
+      "idea": "an old fisherman repairs a net on a misty pier at dawn, seagulls calling, slow pan right ending on his weathered hands",
+      "model": "protolabs/fast",
+      "temperature": 0.7,
+      "seed": 7
+    }
+  },
+  "9002": {
+    "class_type": "ProtoShowText",
+    "inputs": {
+      "text": [
+        "9001",
+        0
+      ]
+    }
+  }
+}
