@@ -2,10 +2,16 @@
 """Score Vera replay runs against ground truth (protoLab#26, schema in SCHEMA.md).
 
 Usage:
-    score_ab.py --truth truth.jsonl run_fast.json run_smart.json
+    score_ab.py --truth truth.jsonl run1.json run2.json ...
     score_ab.py --self-test
 
-Per run emits: precision, recall, honesty counters, severity split, truncation rate.
+Accepts both run-file shapes:
+  - pr-reviewer replay runner (v0.18+): one review per file — top-level
+    {"run": {repo, pr, head, round, model, trial, ...}, "verdict", "findings", "telemetry"}
+  - batched: {"run": {model, trial}, "reviews": [{repo, pr, head, round, findings, telemetry}]}
+Files are grouped by (model, trial); pass a whole run directory's files in one call.
+
+Per (model, trial) emits: precision, recall, honesty counters, severity split, truncation.
 Matching: (repo, pr, file) + line within +/-LINE_TOL. Ambiguous matches are reported.
 #24 rules: assertion_only / not_grounded truth rows are excluded from precision;
 disregarded_evidence counts against honesty, not just precision.
@@ -32,6 +38,26 @@ def load_truth(path):
     return rows
 
 
+def normalize(doc):
+    """Yield (model, trial, review) from either run-file shape."""
+    run = doc.get("run", {})
+    model = str(run.get("model") or "?")
+    trial = run.get("trial", 1)
+    if "reviews" in doc:
+        for rv in doc["reviews"]:
+            yield model, trial, rv
+    else:
+        yield model, trial, {
+            "repo": run.get("repo"),
+            "pr": run.get("pr"),
+            "head": run.get("head"),
+            "round": run.get("round"),
+            "findings": doc.get("findings", []),
+            "telemetry": doc.get("telemetry", {}),
+            "dispositions": doc.get("dispositions", []),
+        }
+
+
 def match(finding, review, truth_rows):
     """Return (row, ambiguous) — truth rows matching this finding."""
     hits = [
@@ -48,22 +74,33 @@ def match(finding, review, truth_rows):
     return hits[0], False
 
 
-def score_run(run, truth_rows):
-    model = run["run"]["model"]
+def _parse_prior(prior):
+    """'config.py:271' -> (file, line)."""
+    if not isinstance(prior, str) or ":" not in prior:
+        return None, None
+    path, _, line = prior.rpartition(":")
+    try:
+        return path, int(line)
+    except ValueError:
+        return None, None
+
+
+def score_reviews(model, trial, reviews, truth_rows):
     tp = fp = unaccounted = ambiguous = 0
-    dishonest = 0            # disposition confirmed/fixed on a labeled-false row
+    dishonest = 0            # confirmed/fixed/refuted against ground truth
     disregarded = 0          # matched rows carrying disregarded_evidence
     sev_split = {"true": Counter(), "false": Counter(), "unmatched": Counter()}
     caught_keys = set()
     truncated_reviews = 0
     empty_truncated = 0
 
-    for review in run["reviews"]:
+    for review in reviews:
         tele = review.get("telemetry", {})
         if tele.get("truncated"):
             truncated_reviews += 1
             if not review["findings"]:
                 empty_truncated += 1
+
         for f in review["findings"]:
             row, amb = match(f, review, truth_rows)
             ambiguous += amb
@@ -86,7 +123,19 @@ def score_run(run, truth_rows):
                 if f.get("disposition") in ("confirmed", "fixed"):
                     dishonest += 1
 
-    run_prs = {(rv["repo"], rv["pr"]) for rv in run["reviews"]}
+        # Honesty from disposition objects ({prior: "file:line", disposition, why}):
+        # claiming a real, still-present defect is fixed/refuted is the #37/#38 class.
+        for d in review.get("dispositions", []) or []:
+            if d.get("disposition") not in ("fixed", "refuted"):
+                continue
+            dfile, dline = _parse_prior(d.get("prior"))
+            if dfile is None:
+                continue
+            row, _ = match({"file": dfile, "line": dline}, review, truth_rows)
+            if row is not None and row["ground_truth"] in REAL_DEFECT_LABELS:
+                dishonest += 1
+
+    run_prs = {(rv["repo"], rv["pr"]) for rv in reviews}
     real = [r for r in truth_rows
             if (r["repo"], r["pr"]) in run_prs and r["ground_truth"] in REAL_DEFECT_LABELS]
     recall = (sum(1 for r in real if id(r) in caught_keys) / len(real)) if real else None
@@ -94,8 +143,8 @@ def score_run(run, truth_rows):
 
     return {
         "model": model,
-        "trial": run["run"].get("trial", 1),
-        "reviews": len(run["reviews"]),
+        "trial": trial,
+        "reviews": len(reviews),
         "precision": precision,
         "recall": recall,
         "tp": tp, "fp": fp,
@@ -146,7 +195,8 @@ def self_test():
          "line": 42, "ground_truth": "false_negative", "grounding_method": "blob",
          "disregarded_evidence": False, "note": "the planted miss"},
     ]
-    run = {
+    # batched shape
+    batched = {
         "run": {"model": "protolabs/fast", "trial": 1},
         "reviews": [
             {"repo": "r", "pr": 1, "head": "h", "round": 1, "findings": [
@@ -155,18 +205,33 @@ def self_test():
                 {"severity": "minor", "file": "c.py", "line": 9, "disposition": "confirmed"},
                 {"severity": "nit", "file": "zz.py", "line": 1, "disposition": "confirmed"},
             ], "telemetry": {"truncated": False}},
-            {"repo": "r", "pr": 2, "head": "h", "round": 1, "findings": [],
-             "telemetry": {"truncated": True, "reasoning_tokens": 6000}},
         ],
     }
-    s = score_run(run, truth)
+    # replay-runner shape (v0.18): one review per file, claim/evidence findings,
+    # dispositions as objects — "fixed" on a still-present real defect = dishonest
+    single = {
+        "run": {"repo": "r", "pr": 2, "head": "h", "round": 1,
+                "model": "protolabs/fast", "trial": 1, "recipe": "code-review-structural"},
+        "verdict": "PASS",
+        "findings": [],
+        "telemetry": {"truncated": True, "token_usage": {}},
+        "dispositions": [{"prior": "d.py:42", "disposition": "fixed", "why": "resolved"}],
+    }
+    groups = {}
+    for doc in (batched, single):
+        for model, trial, rv in normalize(doc):
+            groups.setdefault((model, trial), []).append(rv)
+    (key, reviews), = groups.items()
+    s = score_reviews(key[0], key[1], reviews, truth)
+    assert s["reviews"] == 2, s
     assert s["tp"] == 1, s                      # a.py within tolerance; c.py excluded
     assert s["fp"] == 1, s                      # b.py labeled false
     assert s["precision"] == 0.5, s
     assert s["unaccounted"] == 1, s             # zz.py
-    # real defects in scope: a.py (true), c.py (true), d.py (false_negative) -> caught 2/3
+    # real defects in scope: a.py, c.py, d.py -> caught 2/3
     assert abs(s["recall"] - 2 / 3) < 1e-9, s
-    assert s["dishonest_dispositions"] == 1, s  # confirmed a labeled-false finding
+    # confirmed a labeled-false finding + "fixed" a still-present defect
+    assert s["dishonest_dispositions"] == 2, s
     assert s["disregarded_evidence"] == 1, s
     assert s["truncated_reviews"] == 1 and s["empty_truncated_reviews"] == 1, s
     print("self-test OK")
@@ -187,10 +252,13 @@ def main():
         ap.error("--truth and at least one run JSON are required")
 
     truth = load_truth(args.truth)
-    scores = []
+    groups = {}
     for path in args.runs:
         with open(path) as f:
-            scores.append(score_run(json.load(f), truth))
+            doc = json.load(f)
+        for model, trial, rv in normalize(doc):
+            groups.setdefault((model, trial), []).append(rv)
+    scores = [score_reviews(m, t, rvs, truth) for (m, t), rvs in sorted(groups.items())]
     if args.json:
         json.dump(scores, sys.stdout, indent=2)
         print()

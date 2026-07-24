@@ -1,55 +1,66 @@
 # Replay-run output contract
 
-What the plugin-side replay runner (qaEngineer / pr-reviewer-plugin) must emit per run, and
-what `score_ab.py` consumes. One JSON file per (model, trial).
+Reconciled 2026-07-24 against the **shipped runner** (pr-reviewer#39, v0.18.0/v0.19.0
+`replay.py`) — where this document and the implementation disagreed, the implementation won.
+`score_ab.py` consumes this shape natively (and still accepts the older batched
+`{"run", "reviews": [...]}` shape).
 
-## Run JSON
+## Run JSON — one review per file, as the runner emits
 
 ```json
 {
   "run": {
+    "repo": "protoLabsAI/protoAgent",
+    "pr": 2208,
+    "head": "<reviewed sha — pinned, from replay_manifest.jsonl, verbatim>",
+    "round": 1,
+    "recipe": "code-review-structural",
     "model": "protolabs/fast",
-    "panel_version": "qaEngineer v0.8.0",
     "trial": 1,
-    "started": "2026-07-24T05:00:00Z"
+    "stamp": "<runner timestamp>"
   },
-  "reviews": [
+  "verdict": "FAIL",
+  "findings": [
     {
-      "repo": "protoLabsAI/protoAgent",
-      "pr": 2208,
-      "head": "<reviewed sha — pinned, not PR tip>",
-      "round": 1,
-      "findings": [
-        {
-          "severity": "major",
-          "file": "src/agent/loop.py",
-          "line": 142,
-          "title": "event loop blocked by sync call",
-          "body": "…",
-          "disposition": "confirmed"
-        }
-      ],
-      "telemetry": {
-        "grounding_checked": 3,
-        "unaccounted": 0,
-        "converge_reason": "stable",
-        "output_tokens": 1234,
-        "reasoning_tokens": 5678,
-        "truncated": false
-      }
+      "file": "operator_api/config_routes.py",
+      "line": 271,
+      "severity": "major",
+      "claim": "sync _apply_settings_changes blocks the event loop",
+      "evidence": "…"
     }
-  ]
+  ],
+  "telemetry": {
+    "failed_steps": 0,
+    "truncated": false,
+    "confined": 0,
+    "grounding_checked": 3,
+    "grounding_downgraded": 0,
+    "converge_reason": "stable",
+    "converge_notes": 0,
+    "dispositions": 2,
+    "unaccounted_priors": 0,
+    "step_seconds": {},
+    "token_usage": {}
+  }
 }
 ```
 
-Notes:
-- `head` must be the SHA from `replay_manifest.jsonl`, verbatim — ground-truth labels are
-  only valid against the blob they were graded on (protoLab#24 rule).
-- `telemetry` mirrors pr-reviewer-plugin#34 fields plus token accounting. `truncated` is
-  true when the finder hit its output budget before emitting a final answer — the scorer
-  treats `findings=[] && truncated` as a harness failure, not a clean pass.
-- `disposition` ∈ `confirmed` / `refuted` / `fixed` / `unverified` — as the panel posted it,
-  so false `fixed`/`refuted` can be scored against ground truth (the honesty axis).
+Scorer field usage: findings `file`/`line`/`severity` (matching + severity split);
+`telemetry.truncated` (`findings=[] && truncated` scores as a harness failure, not a clean
+pass — the `fast` 6k-reasoning-tokens incident); `run.model`/`run.trial` (grouping). `claim`/
+`evidence` are carried for human review, not scored on.
+
+## ⚠️ Open ask on the runner (the one gap found in reconciliation)
+
+`telemetry.dispositions` is a **count**; the disposition objects
+(`{"prior": "file.py:271", "disposition": "fixed|refuted|…", "why": "…"}`) are dropped.
+The honesty axis — false `fixed`/`refuted` on a still-present defect, the
+pr-reviewer-plugin#37/#38 class that caused the original incident — **cannot be scored from
+a count**. Runner should emit the objects as a top-level `"dispositions": [...]` array;
+`score_ab.py` already consumes that field.
+
+`token_usage` is `{}` unless the host runner surfaces usage — fine, but the truncation flag
+must remain accurate without it.
 
 ## Ground truth JSONL
 
@@ -63,3 +74,4 @@ One row per labeled finding, protoLab#24 schema:
 
 `ground_truth` ∈ `true` / `false` / `false_negative` / `true_unverified` / `unverified`.
 `false_negative` rows are defects the panel is *expected* to find — they drive recall.
+Rows with `grounding_method` ∈ `assertion_only`/`not_grounded` are excluded from precision.
