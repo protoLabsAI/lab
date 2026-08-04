@@ -895,7 +895,7 @@ def agent(obs):
         remaining_drain = drain.get(item, 0) * max(0, 28 - day)
         # visible opponent supply for this item (their farm is public)
         opp_supply = _opp_capacity(farms, player).get(item, 0)
-        race = excess > remaining_drain * 0.8 or opp_supply >= 4
+        race = excess > remaining_drain * _k("RACE_DRAIN", 0.8) or opp_supply >= _k("RACE_OPP", 4)
         if race:
             # glut won't clear / opponent will flood: take today's price now
             market.append(["SELL", item, n])
@@ -905,7 +905,7 @@ def agent(obs):
         allowance = drain.get(item, 0) * 1.3 + 4
         already = st_sold.get(item, 0)
         k = int(max(0, allowance - already))
-        floor = MARKET_PARAMS[item]["base"] * max(0.15, 0.55 - 0.015 * day)
+        floor = MARKET_PARAMS[item]["base"] * max(0.15, _k("FLOOR_A", 0.55) - _k("FLOOR_B", 0.015) * day)
         kk = 0
         while kk < min(n, k) and _price(item, inv0 + kk) >= floor:
             kk += 1

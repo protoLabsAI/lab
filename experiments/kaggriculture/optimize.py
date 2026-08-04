@@ -16,14 +16,20 @@ SEEDS = [(3000 + i, i % 2 == 1) for i in range(24)]
 N_PROCS = min(24, (os.cpu_count() or 8) - 2)
 
 SPACE = {  # name: (default, min, max, is_int)
-    "STRAW_SCALE": (1.0, 0.5, 1.4, False),
-    "MELON_SCALE": (1.0, 0.5, 1.6, False),
-    "WHEAT_SCALE": (1.0, 0.4, 2.5, False),
-    "COW_SCALE": (1.0, 0.6, 1.5, False),
-    "SHEEP_SCALE": (1.0, 0.6, 1.5, False),
-    "RUNWAY": (400, 200, 700, True),
+    "STRAW_SCALE": (1.0, 0.4, 1.3, False),
+    "MELON_SCALE": (1.0, 0.5, 2.4, False),
+    "WHEAT_SCALE": (1.0, 0.4, 3.0, False),
+    "COW_SCALE": (1.0, 0.6, 1.9, False),
+    "SHEEP_SCALE": (1.0, 0.6, 1.9, False),
+    "RUNWAY": (400, 150, 700, True),
     "MAX_HANDS": (14, 12, 16, True),
     "LIQ_DAY": (28, 26, 28, True),
+    "CURVE_LEAD": (0, 0, 2, True),
+    "ANIMAL_LEAD": (0, 0, 4, True),
+    "RACE_DRAIN": (0.8, 0.3, 1.5, False),
+    "RACE_OPP": (4, 2, 12, True),
+    "FLOOR_A": (0.55, 0.3, 0.8, False),
+    "FLOOR_B": (0.015, 0.0, 0.03, False),
 }
 
 
@@ -70,6 +76,10 @@ def main():
     log = open(os.path.join(HERE, "opt_log.jsonl"), "a")
 
     best_cfg = {k: v[0] for k, v in SPACE.items()}
+    bp = os.path.join(HERE, "best_cfg.json")
+    if os.path.exists(bp):
+        prev = json.load(open(bp)).get("cfg", {})
+        best_cfg.update({k: v for k, v in prev.items() if k in SPACE})
 
     res = evaluate(best_cfg, "base")
     best = res["margin"]
@@ -79,11 +89,11 @@ def main():
 
     # seeded candidates from expert-schedule study
     seeded = [
-        {"STRAW_SCALE": 0.8},
-        {"MELON_SCALE": 1.3},
-        {"WHEAT_SCALE": 1.8},
-        {"COW_SCALE": 1.25, "SHEEP_SCALE": 1.25},
-        {"STRAW_SCALE": 0.7, "MELON_SCALE": 1.4, "WHEAT_SCALE": 1.6},
+        {"RACE_OPP": 8},
+        {"FLOOR_A": 0.7, "FLOOR_B": 0.01},
+        {"RACE_DRAIN": 1.3},
+        {"FLOOR_A": 0.4, "RACE_OPP": 3},
+        {"RACE_OPP": 12, "FLOOR_A": 0.65},
     ]
     i = 0
     while time.time() < deadline:
