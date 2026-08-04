@@ -4,16 +4,18 @@ Two-player turn-based farming sim: 720 turns (30 days × 24), most coins wins.
 Elo-style ladder, final Bradley-Terry tournament. Top-10 pays $5k each.
 https://www.kaggle.com/competitions/kaggriculture
 
-## Status (2026-08-04)
+## Status (2026-08-04 EOD)
 
-`agents/v4.py` — day-route planner, best local agent:
+**ON THE LADDER**: v5 + v5b submitted (rating 600 -> 713 in first hours).
+`agents/v5.py` — best agent (bundled tile-chain routing, town-drain sell
+pacing, smart watering, endgame sweep):
 
 | matchup | result |
 |---|---|
-| vs `starter` | 10-0, mean $61k (starter $3.5k) |
-| vs `pass` (solo econ) | $54-85k depending on seed |
-| vs `opponents/sey_v7.py` (public v18 expert-replay, ~LB top-10 proxy) | 0-10 — they hold ~$170k |
-| mirror v4 vs v4 | clean, no crashes, ~$57-61k each |
+| vs `pass` (solo econ) | $113-119k |
+| vs `agents/v4.py` | 6-0, ~$103k vs $58k |
+| vs `opponents/sey_v7.py` (public v18 expert-replay) | 0-10 — they hold ~$165k adversarially |
+| mirror v5 vs v5 | clean, ~4% seat noise |
 
 **Gap to close: ~2.8×.** The public leader replays embedded 719-action expert
 schedules (Kaito Fukami "v18 closed loop", Apache-2.0, mirrors top players'
