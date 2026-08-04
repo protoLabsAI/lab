@@ -42,7 +42,7 @@ def play(args):
     os.environ["KAGG_CFG"] = cfg_path
     from kaggle_environments import make
     env = make("kaggriculture", configuration={"episodeSteps": 720, "seed": seed})
-    a, b = os.path.join(HERE, "agents/v6.py"), os.path.join(HERE, "opponents/sey_v7.py")
+    a, b = os.path.join(HERE, "agents/v7.py"), os.path.join(HERE, "opponents/sey_v7.py")
     pair = [b, a] if swap else [a, b]
     env.run(pair)
     r = [s.reward or 0.0 for s in env.steps[-1]]
@@ -80,6 +80,8 @@ def main():
     log = open(os.path.join(HERE, "opt_log.jsonl"), "a")
 
     best_cfg = {k: v[0] for k, v in SPACE.items()}
+    if os.path.exists(os.path.join(HERE, "sweep/combo.json")):
+        best_cfg.update(json.load(open(os.path.join(HERE, "sweep/combo.json"))))
     res = evaluate(best_cfg, "base")
     best = res["margin"]
     print(f"baseline margin={best:.0f} our={res['our_mean']:.0f} wins={res['wins']}/{res['n']}", flush=True)
