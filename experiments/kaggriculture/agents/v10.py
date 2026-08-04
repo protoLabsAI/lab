@@ -382,13 +382,14 @@ def _placement_chains(sv, shed, open_shed):
 
 
 def _route_units(units, hour, jobs, plant_jobs, place_chains, fert_pairs):
-    """Bundle jobs per tile (one unit does all ops on a tile), route chains
-    greedily by priority. fert_pairs: {animal_tile: straw_tile} appended to
-    the animal's bundle as COLLECT -> FERTILIZE."""
+    """Bundle jobs per tile, route chains greedily by priority, then improve
+    each unit's route with nearest-neighbor reordering inside contiguous
+    same-priority runs (travel shrinks; priority order preserved)."""
     budget_turns = max(1, TPD - hour - 1)
-    routes = [[] for _ in units]
+    blocks = [[] for _ in units]  # per-unit: (prio_class, chain)
     loads = [0.0] * len(units)
     positions = [tuple(p) for p in units]
+    prio_now = [0.0]
 
     def assign_chain(chain, force=False):
         best, best_cost = None, None
@@ -403,17 +404,16 @@ def _route_units(units, hour, jobs, plant_jobs, place_chains, fert_pairs):
             if not force:
                 return False
             best = min(range(len(units)), key=lambda ui: loads[ui])
+        blocks[best].append((prio_now[0], list(chain)))
         for tile, opa in chain:
             loads[best] += _dist(positions[best], tile) + 1
-            routes[best].append((tile, opa))
             positions[best] = tile
         return True
 
-    # 1) placement chains (time-critical)
+    prio_now[0] = -1.0
     for chain in place_chains:
         assign_chain(chain, force=True)
 
-    # 2) per-tile bundles
     groups = {}
     for prio, tile, opa in jobs:
         groups.setdefault(tile, []).append((prio, opa))
@@ -431,15 +431,34 @@ def _route_units(units, hour, jobs, plant_jobs, place_chains, fert_pairs):
     urgent = [b for b in bundles if b[0] <= 2.5]
     rest = [b for b in bundles if b[0] > 2.5]
     for prio, chain in urgent:
+        prio_now[0] = 1.0
         assign_chain(chain, force=prio <= 0)
-
-    # 3) plant compounds
+    prio_now[0] = 2.0
     for tile, crop in plant_jobs:
         assign_chain([(tile, ("PLANT", crop)), (tile, ("WATER", None))])
-
-    # 4) leftovers
+    prio_now[0] = 3.0
     for prio, chain in rest:
         assign_chain(chain)
+
+    # within-run NN improvement: reorder blocks inside same-priority runs
+    routes = [[] for _ in units]
+    for ui in range(len(units)):
+        pos = tuple(units[ui])
+        route = []
+        i = 0
+        blist = blocks[ui]
+        while i < len(blist):
+            j = i
+            while j < len(blist) and blist[j][0] == blist[i][0]:
+                j += 1
+            run = [c for _, c in blist[i:j]]
+            while run:
+                nxt = min(run, key=lambda c: _dist(pos, c[0][0]))
+                run.remove(nxt)
+                route.extend(nxt)
+                pos = nxt[-1][0]
+            i = j
+        routes[ui] = route
     return routes
 
 
