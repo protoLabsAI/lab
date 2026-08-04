@@ -138,11 +138,21 @@ REF_CURVE = {
 
 
 def _ref(day):
+    day = day + _k("CURVE_LEAD", 0)  # build the curve N days early
     best = None
     for d in sorted(REF_CURVE):
         if d <= day:
             best = REF_CURVE[d]
     base = dict(best or REF_CURVE[0])
+    alead = _k("ANIMAL_LEAD", 0)
+    if alead:
+        d2 = day + alead
+        b2 = None
+        for d in sorted(REF_CURVE):
+            if d <= d2:
+                b2 = REF_CURVE[d]
+        if b2:
+            base["COW"], base["SHEEP"] = b2["COW"], b2["SHEEP"]
     # curve-scaling knobs for margin optimization
     base["STRAWBERRY"] = int(round(base["STRAWBERRY"] * _k("STRAW_SCALE", 1.0)))
     base["MELON"] = int(round(base["MELON"] * _k("MELON_SCALE", 1.0)))
@@ -794,6 +804,19 @@ def agent(obs):
             market.append(["BUY_LAND"])
             money -= cost
 
+    # wheat corner v2: their buy schedule is price-insensitive; ours isn't.
+    # Accumulate cheap early, sell into the pumped price their buys create.
+    c2_units = _k("CORNER2", 0)
+    if c2_units and 1 <= day <= 8 and len(market) < 9:
+        wp = _price("WHEAT", inv_mkt.get("WHEAT", I0) - 1)
+        stock = shed.get("WHEAT", 0) + sum(iv.get("WHEAT", 0) for iv in inventories)
+        if wp <= _k("CORNER2_BUYCAP", 0) and stock < c2_units + feed_reserve:
+            n_buy = min(c2_units + feed_reserve - stock,
+                        int(max(0, money * 0.4 - 150) // wp), 15)
+            if n_buy > 0:
+                market.append(["BUY_PRODUCT", "WHEAT", n_buy])
+                money -= n_buy * wp
+
     # 4) seeds: buy toward the reference curve (2-day lookahead)
     if day < LIQ_DAY - 2 and len(market) < 8:
         ref_now = _ref(day)
@@ -829,6 +852,9 @@ def agent(obs):
         n = shed[item]
         if item == "WHEAT" and active_animals > 0 and day < LAST_DAY:
             n = max(0, n - (feed_reserve if not liquidation else active_animals))
+        if item == "WHEAT" and _k("CORNER2", 0) and not liquidation and day < 26:
+            if _price("WHEAT", inv_mkt.get("WHEAT", I0)) < _k("CORNER2_ASK", 54):
+                continue  # hold the corner until their buys pump the price
         if item == "WHEAT" and not liquidation and shed_total < 70:
             if _price("WHEAT", inv_mkt.get("WHEAT", I0)) < 32:
                 continue  # hold: log-above curve means selling later loses nothing
