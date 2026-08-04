@@ -209,8 +209,10 @@ def _build_day_jobs(sv, day, liquidation):
         if t.get("fertilizer_available") and not liquidation:
             jobs.append((3, (x, y), ("COLLECT_FERTILIZER", None)))
         if t["yield_units"] > 0:
-            prio = 0.5 if day >= LAST_DAY - 1 else (
-                1 if t["yield_units"] >= a["max_held"] - 1 else 2)
+            next_prod = 1 + t.get("pending_care_bonus", 0)
+            overflow = t["yield_units"] + next_prod > a["max_held"]
+            prio = 0.5 if (day >= LAST_DAY - 1 or overflow) else (
+                1 if t["yield_units"] >= 3 else 2)
             jobs.append((prio, (x, y), ("HARVEST", None)))
 
     for x, y in sv["weeds"]:
@@ -725,6 +727,30 @@ def agent(obs):
             market.append(["BUY_LAND"])
             money -= 4000
 
+    # 4a) animals before seeds early (they out-earn crops 2:1 on capital)
+    if (1 <= day <= ANIMAL_LAST_BUY and hour <= 6
+            and n_animals + total_unhoused < MAX_ANIMALS and len(market) < 9):
+        n_sheep = sum(1 for _, _, t in sv["animals"] if t["animal"] == "SHEEP") + unhoused.get("SHEEP", 0)
+        for _ in range(3):
+            if n_animals + total_unhoused >= MAX_ANIMALS or len(market) >= 9:
+                break
+            choice = None
+            if _price("WOOL", inv_mkt.get("WOOL", I0)) >= 130 and n_sheep < 5 and day <= 16:
+                choice = "SHEEP"
+            elif _price("MILK", inv_mkt.get("MILK", I0)) >= 100 and day <= 14:
+                choice = "COW"
+            elif _price("EGG", inv_mkt.get("EGG", I0)) >= 45 and day <= 16:
+                choice = "GOOSE"
+            gate = 250 if day <= 10 else 800
+            if choice and money - ANIMALS[choice]["cost"] > gate:
+                market.append(["BUY_ANIMAL", choice, 1])
+                money -= ANIMALS[choice]["cost"]
+                total_unhoused += 1
+                if choice == "SHEEP":
+                    n_sheep += 1
+            else:
+                break
+
     # 4) seeds
     if day < LIQ_DAY - 2 and len(market) < 8:
         want = {}
@@ -750,6 +776,13 @@ def agent(obs):
                 money -= 80 * n
                 room -= n
                 spendable -= 80 * n
+        if room > 0 and 3 <= day <= 8 and n_straw + seeds.get("STRAWBERRY", 0) < 20:
+            drip = min(room, 4, max(0, money - 250) // 100)
+            if drip > 0:
+                market.append(["BUY_SEED", "STRAWBERRY", drip])
+                money -= 100 * drip
+                room -= drip
+                spendable = max(0, spendable - 100 * drip)
         if room > 0 and day <= LAST_PLANT["STRAWBERRY"] and n_straw + seeds.get("STRAWBERRY", 0) < STRAW_CAP:
             n = min(room, STRAW_CAP - n_straw - seeds.get("STRAWBERRY", 0), 14,
                     int(spendable * 0.8) // 100)
@@ -776,29 +809,6 @@ def agent(obs):
             if n > 0 and len(market) < 9:
                 market.append(["BUY_SEED", crop, n])
                 money -= CROPS[crop]["seed"] * n
-
-    # 5) animals last (only truly spare cash)
-    if (1 <= day <= ANIMAL_LAST_BUY and hour <= 6
-            and n_animals + total_unhoused < MAX_ANIMALS and len(market) < 9):
-        n_sheep = sum(1 for _, _, t in sv["animals"] if t["animal"] == "SHEEP") + unhoused.get("SHEEP", 0)
-        for _ in range(3):
-            if n_animals + total_unhoused >= MAX_ANIMALS or len(market) >= 9:
-                break
-            choice = None
-            if _price("WOOL", inv_mkt.get("WOOL", I0)) >= 130 and n_sheep < 5 and day <= 16:
-                choice = "SHEEP"
-            elif _price("MILK", inv_mkt.get("MILK", I0)) >= 100 and day <= 14:
-                choice = "COW"
-            elif _price("EGG", inv_mkt.get("EGG", I0)) >= 45 and day <= 16:
-                choice = "GOOSE"
-            if choice and money - ANIMALS[choice]["cost"] > 500:
-                market.append(["BUY_ANIMAL", choice, 1])
-                money -= ANIMALS[choice]["cost"]
-                total_unhoused += 1
-                if choice == "SHEEP":
-                    n_sheep += 1
-            else:
-                break
 
     # sells: pace premium items to town drain, dump glut-resistant staples
     drain = _town_drain_per_day(obs.get("town", {}).get("unlocked_shops", []), day)
