@@ -78,7 +78,7 @@ LIQ_DAY = 28
 MAX_ANIMALS = 14
 ANIMAL_LAST_BUY = 16
 STRAW_CAP = 45
-MELON_CAP = 12
+MELON_CAP = 16
 SELL_FLOOR_FRAC = 0.30
 FEED_STOP = {"GOOSE": 28, "COW": 28, "SHEEP": 28}
 
@@ -735,7 +735,7 @@ def agent(obs):
                 want["WHEAT"] = want.get("WHEAT", 0) + n
                 room -= n
                 spendable -= n * 10
-        if room > 0 and 10 <= day <= LAST_PLANT["CARROT"] and spendable >= 20:
+        if room > 0 and 3 <= day <= LAST_PLANT["CARROT"] and spendable >= 20:
             want["CARROT"] = min(room, spendable // 20)
         for crop, n in want.items():
             if n > 0 and len(market) < 9:
