@@ -16,24 +16,14 @@ SEEDS = [(3000 + i, i % 2 == 1) for i in range(24)]
 N_PROCS = min(24, (os.cpu_count() or 8) - 2)
 
 SPACE = {  # name: (default, min, max, is_int)
-    "MAX_HANDS": (14, 11, 16, True),
-    "MAX_ANIMALS": (14, 10, 18, True),
-    "ANIMAL_LAST_BUY": (16, 10, 20, True),
-    "STRAW_CAP": (45, 32, 55, True),
-    "LIQ_DAY": (28, 26, 28, True),
-    "OPEN_HIRES": (4, 3, 6, True),
-    "OPEN_COWS": (3, 1, 4, True),
-    "OPEN_SHEEP": (1, 0, 3, True),
-    "OPEN_MELON": (7, 5, 12, True),
-    "OPEN_WHEAT": (10, 6, 20, True),
-    "OPEN_FEED": (6, 4, 16, True),
-    "MELON_ROLL": (8, 5, 14, True),
-    "WOOL_FLOOR": (130, 90, 160, True),
-    "MILK_FLOOR": (100, 70, 130, True),
-    "SHEEP_CAP": (5, 3, 8, True),
-    "ANIMAL_GATE": (250, 100, 900, True),
+    "STRAW_SCALE": (1.0, 0.5, 1.4, False),
+    "MELON_SCALE": (1.0, 0.5, 1.6, False),
+    "WHEAT_SCALE": (1.0, 0.4, 2.5, False),
+    "COW_SCALE": (1.0, 0.6, 1.5, False),
+    "SHEEP_SCALE": (1.0, 0.6, 1.5, False),
     "RUNWAY": (400, 200, 700, True),
-    "BURST": (3, 2, 5, True),
+    "MAX_HANDS": (14, 12, 16, True),
+    "LIQ_DAY": (28, 26, 28, True),
 }
 
 
@@ -42,7 +32,7 @@ def play(args):
     os.environ["KAGG_CFG"] = cfg_path
     from kaggle_environments import make
     env = make("kaggriculture", configuration={"episodeSteps": 720, "seed": seed})
-    a, b = os.path.join(HERE, "agents/v7.py"), os.path.join(HERE, "opponents/sey_v7.py")
+    a, b = os.path.join(HERE, "agents/v10.py"), os.path.join(HERE, "opponents/sey_v7.py")
     pair = [b, a] if swap else [a, b]
     env.run(pair)
     r = [s.reward or 0.0 for s in env.steps[-1]]
@@ -80,8 +70,7 @@ def main():
     log = open(os.path.join(HERE, "opt_log.jsonl"), "a")
 
     best_cfg = {k: v[0] for k, v in SPACE.items()}
-    if os.path.exists(os.path.join(HERE, "sweep/combo.json")):
-        best_cfg.update(json.load(open(os.path.join(HERE, "sweep/combo.json"))))
+
     res = evaluate(best_cfg, "base")
     best = res["margin"]
     print(f"baseline margin={best:.0f} our={res['our_mean']:.0f} wins={res['wins']}/{res['n']}", flush=True)
@@ -90,11 +79,11 @@ def main():
 
     # seeded candidates from expert-schedule study
     seeded = [
-        {"OPEN_MELON": 11, "OPEN_WHEAT": 11, "SHEEP_CAP": 6, "BURST": 4},
-        {"OPEN_SHEEP": 2, "OPEN_COWS": 2, "ANIMAL_GATE": 150},
-        {"STRAW_CAP": 40, "MELON_ROLL": 11, "RUNWAY": 300},
-        {"OPEN_FEED": 14, "MAX_ANIMALS": 16, "SHEEP_CAP": 7},
-        {"OPEN_HIRES": 5, "OPEN_WHEAT": 16, "RUNWAY": 250},
+        {"STRAW_SCALE": 0.8},
+        {"MELON_SCALE": 1.3},
+        {"WHEAT_SCALE": 1.8},
+        {"COW_SCALE": 1.25, "SHEEP_SCALE": 1.25},
+        {"STRAW_SCALE": 0.7, "MELON_SCALE": 1.4, "WHEAT_SCALE": 1.6},
     ]
     i = 0
     while time.time() < deadline:
