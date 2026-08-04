@@ -20,7 +20,7 @@ import math
 import json as _json
 import os as _os
 
-_BAKED = {"MAX_HANDS": 14, "MAX_ANIMALS": 13, "ANIMAL_LAST_BUY": 16, "STRAW_CAP": 36, "LIQ_DAY": 28, "OPEN_HIRES": 4, "OPEN_COWS": 3, "OPEN_SHEEP": 1, "OPEN_MELON": 7, "OPEN_WHEAT": 10, "OPEN_FEED": 6, "MELON_ROLL": 11, "WOOL_FLOOR": 146, "MILK_FLOOR": 93, "SHEEP_CAP": 6, "ANIMAL_GATE": 208, "RUNWAY": 400, "BURST": 3}
+_BAKED = {"STRAW_SCALE": 0.8413716484597732, "MELON_SCALE": 1.5017098633961907, "WHEAT_SCALE": 1.0, "COW_SCALE": 1.1784658783798048, "SHEEP_SCALE": 1.2918498394278237, "RUNWAY": 255, "MAX_HANDS": 15, "LIQ_DAY": 28}
 _cfg_path = _os.environ.get("KAGG_CFG")
 try:
     _CFG = _json.load(open(_cfg_path)) if _cfg_path else dict(_BAKED)
