@@ -337,7 +337,7 @@ def _route_units(units, hour, jobs, plant_jobs, place_chains, fert_pairs):
             d = _dist(positions[ui], chain[0][0])
             if not force and loads[ui] + d + len(chain) > budget_turns:
                 continue
-            cost = loads[ui] + d
+            cost = 2.0 * d + 0.6 * loads[ui]
             if best is None or cost < best_cost:
                 best, best_cost = ui, cost
         if best is None:
