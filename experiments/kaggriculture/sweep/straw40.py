@@ -95,7 +95,7 @@ HIRE_COST_CAP = 250
 LIQ_DAY = 28
 MAX_ANIMALS = 14
 ANIMAL_LAST_BUY = 16
-STRAW_CAP = 45
+STRAW_CAP = 40
 MELON_CAP = 16
 SELL_FLOOR_FRAC = 0.30
 FEED_STOP = {"GOOSE": 28, "COW": 28, "SHEEP": 28}
@@ -274,14 +274,11 @@ def _fert_pairs(sv, day, liquidation):
         age = day - t["planted_day"]
         remaining = LAST_DAY - day
         if c["ongoing"] and age >= c["first"] - 3 and remaining >= 2:
-            done = max(0, (age - c["first"]) // max(1, c["interval"]) + 1) if age >= c["first"] else 0
-            if c["max_yield"] - done >= 2:
-                targets.append((x, y))
+            targets.append((x, y))
         elif t["crop"] == "MELON" and 2 <= age <= 9:
             targets.append((x, y))
     pairs = {}
     used = set()
-    sources = sources[:8]
     for s in sources:
         best = None
         for tgt in targets:
@@ -814,9 +811,6 @@ def agent(obs):
         n = shed[item]
         if item == "WHEAT" and active_animals > 0 and day < LAST_DAY:
             n = max(0, n - (feed_reserve if not liquidation else active_animals))
-        if item == "WHEAT" and not liquidation and shed_total < 70:
-            if _price("WHEAT", inv_mkt.get("WHEAT", I0)) < 32:
-                continue  # hold: log-above curve means selling later loses nothing
         if item == "FERTILIZER" and not liquidation:
             n = max(0, n - 4)  # keep a few for application
         if n <= 0:
@@ -835,7 +829,7 @@ def agent(obs):
         remaining_drain = drain.get(item, 0) * max(0, 28 - day)
         # visible opponent supply for this item (their farm is public)
         opp_supply = _opp_capacity(farms, player).get(item, 0)
-        race = excess > remaining_drain * 0.8 or opp_supply >= 4
+        race = excess > remaining_drain * 0.8 or opp_supply >= 8
         if race:
             # glut won't clear / opponent will flood: take today's price now
             market.append(["SELL", item, n])
@@ -845,7 +839,7 @@ def agent(obs):
         allowance = drain.get(item, 0) * 1.3 + 4
         already = st_sold.get(item, 0)
         k = int(max(0, allowance - already))
-        floor = MARKET_PARAMS[item]["base"] * max(0.15, 0.55 - 0.015 * day)
+        floor = MARKET_PARAMS[item]["base"] * max(0.25, 0.65 - 0.015 * day)
         kk = 0
         while kk < min(n, k) and _price(item, inv0 + kk) >= floor:
             kk += 1
