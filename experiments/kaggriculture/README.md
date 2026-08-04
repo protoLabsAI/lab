@@ -4,23 +4,39 @@ Two-player turn-based farming sim: 720 turns (30 days × 24), most coins wins.
 Elo-style ladder, final Bradley-Terry tournament. Top-10 pays $5k each.
 https://www.kaggle.com/competitions/kaggriculture
 
-## Status (2026-08-04 EOD)
+## Status (2026-08-04 end of day 1)
 
-**ON THE LADDER**: v5 + v5b submitted (rating 600 -> 713 in first hours).
-`agents/v5.py` — best agent (bundled tile-chain routing, town-drain sell
-pacing, smart watering, endgame sweep):
+**ON THE LADDER**: 600 -> ~940 rating in one evening, 12-3 (80%) vs live field.
+`agents/v10.py` = flagship (reference-curve planner + NN-reordered routes +
+r138 optimizer config baked): **solo $162.9k/$169.3k records**, mirror clean.
 
 | matchup | result |
 |---|---|
-| vs `pass` (solo econ) | $113-119k |
-| vs `agents/v4.py` | 6-0, ~$103k vs $58k |
-| vs `opponents/sey_v7.py` (public v18 expert-replay) | 0-10 — they hold ~$165k adversarially |
-| mirror v5 vs v5 | clean, ~4% seat noise |
+| vs `pass` (solo) | $162.9k / $169.3k (records) |
+| vs live ladder field | 12-3, wins mostly 2-4x |
+| vs `opponents/sey_v7.py` (top-cluster proxy) | margin -$25.5k (from -$42k), 0-for-all |
+| mirror | $122.6k / $121.1k clean |
 
-**Gap to close: ~2.8×.** The public leader replays embedded 719-action expert
-schedules (Kaito Fukami "v18 closed loop", Apache-2.0, mirrors top players'
-public episodes) reaching ~$170-190k. Same tile counts as us — the gap is
-yield/tile (their fertilize+care discipline) and sell quality, not scale.
+**Margin plateau #2 at -25.5k.** Day-1 findings, in order of importance:
+1. The ENTIRE top cluster (~3055 rating) runs ONE convergent build (8/10 top
+   players byte-identical: 46 straw / 8 cow / 10 melon @ d15; sources in
+   `replays/sources/`). Mutual top margins are $1-7k — execution-decided.
+2. Our REF_CURVE matches their build; remaining gap = executor efficiency.
+   NN route reorder freed moves 58%->51%; optimizer converted the freed
+   capacity to farm scale (melon x1.5, sheep x1.3, 15 hands) = r138.
+3. Exhausted (all tested, all at/below plateau): curve scales beyond r138,
+   time-shifts, sell-policy knobs (race-always is optimal vs strong opps),
+   wheat corner/warfare (they're market-makers, near-flat exposure), fert
+   loop in v10 (no slack), goose/carrot pivots, radial dispatch, cluster
+   placement.
+4. Next real step: executor generation 3 — behavior-level imitation of the
+   convergent build's unit actions, or exact-schedule execution with
+   closed-loop repair (what the v18-family does). The margin is pure
+   execution now.
+
+Portfolio: `agents/v9.py` (adaptive fert loop, weak-field band) + `agents/v10.py`
+(top band). Optimizer `optimize.py` runs continuously (`opt_log_run*.jsonl`);
+ship automation via in-session cron at 00:08 UTC daily-reset.
 
 ## Architecture (v4)
 
