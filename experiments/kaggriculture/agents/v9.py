@@ -485,6 +485,16 @@ def agent(obs):
     feed_animals = active_animals + total_unhoused
     feed_reserve = feed_animals * 2 + 2 if feed_animals else 0
 
+    # opponent strength (public farm + money): gates the fert-investment loop
+    opp_strong = False
+    for _pid, _f2 in enumerate(farms):
+        if _pid == player:
+            continue
+        _opp_tiles = sum(1 for _row in _f2.get("tiles", []) for _t in _row
+                         if isinstance(_t, dict) and (_t.get("kind") == "PLANT" or _t.get("animal")))
+        if day >= 7 and (_opp_tiles >= 33 or _f2.get("money", 0) > money * 1.5 + 3000):
+            opp_strong = True
+
     st = _STATE.setdefault(player, {})
     if st.get("day") != day:
         st.clear()
@@ -501,7 +511,7 @@ def agent(obs):
         fpairs = _fert_pairs(sv, day, liquidation)
         # shed-fert chains: apply purchased fertilizer to uncovered producers
         shed_fert = shed.get("FERTILIZER", 0)
-        if shed_fert >= 2 and not liquidation and day < LIQ_DAY - 1:
+        if shed_fert >= 2 and not liquidation and day < LIQ_DAY - 1 and not opp_strong:
             paired = set(fpairs.values())
             targets = []
             for x, y, t in sv["plants"]:
@@ -764,8 +774,9 @@ def agent(obs):
             market.append(["BUY_LAND"])
             money -= 4000
 
-    # 4pre) buy fertilizer for strawberry coverage (ROI ~4x when applied)
-    if 8 <= day <= 24 and len(market) < 9:
+    # 4pre) buy fertilizer for strawberry coverage (ROI ~4x when applied).
+    # Only against weak opponents (opp_strong computed before route build).
+    if 8 <= day <= 24 and len(market) < 9 and not opp_strong:
         fp = _price("FERTILIZER", inv_mkt.get("FERTILIZER", I0) - 1)
         n_prod_straw = sum(1 for _, _, t in sv["plants"]
                            if t["crop"] == "STRAWBERRY"
@@ -880,7 +891,8 @@ def agent(obs):
             if _price("WHEAT", inv_mkt.get("WHEAT", I0)) < 32:
                 continue  # hold: log-above curve means selling later loses nothing
         if item == "FERTILIZER" and not liquidation:
-            n = max(0, n - (8 if day >= 8 else 2))  # keep stock for application
+            keep_f = (8 if day >= 8 and not opp_strong else 2)
+            n = max(0, n - keep_f)  # keep stock for application
         if n <= 0:
             continue
         if liquidation or day == LAST_DAY or shed_total > 80:
