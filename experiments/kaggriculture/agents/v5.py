@@ -54,6 +54,24 @@ SHOPS = {
 }
 
 
+def _opp_capacity(farms, player):
+    """Visible opponent production capacity in units/product (rough)."""
+    cap = {}
+    for pid, farm in enumerate(farms):
+        if pid == player:
+            continue
+        for row in farm.get("tiles", []):
+            for t in row:
+                if not isinstance(t, dict):
+                    continue
+                if t.get("kind") == "PLANT":
+                    cap[t["crop"]] = cap.get(t["crop"], 0) + 1
+                elif t.get("animal"):
+                    prod = ANIMALS[t["animal"]]["product"]
+                    cap[prod] = cap.get(prod, 0) + 2
+    return cap
+
+
 def _town_drain_per_day(unlocked_shops, day):
     """Units/day the town removes from market inventory, per product."""
     drain = {p: 0.0 for p in MARKET_PARAMS}
@@ -805,13 +823,23 @@ def agent(obs):
         if above in ("log", "log10"):
             market.append(["SELL", item, n])        # glut barely moves price
             continue
-        # premium/pace-sensitive: sell up to (town drain + backlog share) per day
+        inv0 = inv_mkt.get(item, I0)
+        # will this glut ever clear? remaining town drain vs current excess
+        excess = max(0, inv0 - I0) + n
+        remaining_drain = drain.get(item, 0) * max(0, 28 - day)
+        # visible opponent supply for this item (their farm is public)
+        opp_supply = _opp_capacity(farms, player).get(item, 0)
+        race = excess > remaining_drain * 0.8 or opp_supply >= 8
+        if race:
+            # glut won't clear / opponent will flood: take today's price now
+            market.append(["SELL", item, n])
+            st_sold[item] = st_sold.get(item, 0) + n
+            continue
+        # monopoly-ish: pace to town drain, hold above a decaying floor
         allowance = drain.get(item, 0) * 1.3 + 4
         already = st_sold.get(item, 0)
         k = int(max(0, allowance - already))
-        # never sell below a decaying floor
         floor = MARKET_PARAMS[item]["base"] * max(0.25, 0.65 - 0.015 * day)
-        inv0 = inv_mkt.get(item, I0)
         kk = 0
         while kk < min(n, k) and _price(item, inv0 + kk) >= floor:
             kk += 1

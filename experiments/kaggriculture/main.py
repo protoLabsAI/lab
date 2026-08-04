@@ -54,6 +54,24 @@ SHOPS = {
 }
 
 
+def _opp_capacity(farms, player):
+    """Visible opponent production capacity in units/product (rough)."""
+    cap = {}
+    for pid, farm in enumerate(farms):
+        if pid == player:
+            continue
+        for row in farm.get("tiles", []):
+            for t in row:
+                if not isinstance(t, dict):
+                    continue
+                if t.get("kind") == "PLANT":
+                    cap[t["crop"]] = cap.get(t["crop"], 0) + 1
+                elif t.get("animal"):
+                    prod = ANIMALS[t["animal"]]["product"]
+                    cap[prod] = cap.get(prod, 0) + 2
+    return cap
+
+
 def _town_drain_per_day(unlocked_shops, day):
     """Units/day the town removes from market inventory, per product."""
     drain = {p: 0.0 for p in MARKET_PARAMS}
@@ -218,12 +236,15 @@ def _plan_planting(sv, day, seeds, n_animals_total):
             continue
         crop = None
         wheat_cap = 12 if day <= 14 else 10**6
-        if (budget.get("WHEAT", 0) > 0 and day <= LAST_PLANT["WHEAT"]
-                and counts.get("WHEAT", 0) < wheat_cap):
-            crop = "WHEAT"
-        elif (budget.get("STRAWBERRY", 0) > 0 and day <= LAST_PLANT["STRAWBERRY"]
+        if (budget.get("MELON", 0) > 0 and day <= LAST_PLANT["MELON"]
+                and counts.get("MELON", 0) < 8):
+            crop = "MELON"
+        elif (budget.get("STRAWBERRY", 0) > 0 and 3 <= day <= LAST_PLANT["STRAWBERRY"]
                 and counts.get("STRAWBERRY", 0) < STRAW_CAP):
             crop = "STRAWBERRY"
+        elif (budget.get("WHEAT", 0) > 0 and day <= LAST_PLANT["WHEAT"]
+                and counts.get("WHEAT", 0) < wheat_cap):
+            crop = "WHEAT"
         elif (budget.get("MELON", 0) > 0 and day <= LAST_PLANT["MELON"]
                 and counts.get("MELON", 0) < MELON_CAP):
             crop = "MELON"
@@ -642,11 +663,10 @@ def agent(obs):
     market = []
 
     if day == 0 and hour == 0:
-        market = [["HIRE"], ["HIRE"], ["HIRE"], ["HIRE"], ["HIRE"],
-                  ["BUY_LAND"],
-                  ["BUY_ANIMAL", "COW", 2],
-                  ["BUY_SEED", "MELON", 6], ["BUY_SEED", "WHEAT", 20],
-                  ["BUY_PRODUCT", "WHEAT", 5]]
+        market = [["HIRE"], ["HIRE"], ["HIRE"], ["HIRE"],
+                  ["BUY_ANIMAL", "COW", 3], ["BUY_ANIMAL", "SHEEP", 1],
+                  ["BUY_SEED", "MELON", 7], ["BUY_SEED", "WHEAT", 10],
+                  ["BUY_PRODUCT", "WHEAT", 6]]
         return {"farmer": actions[0], "hands": actions[1:], "market": market}
 
     # ---- budget envelopes: feed -> hires -> land -> seeds -> animals ----
@@ -690,11 +710,14 @@ def agent(obs):
 
     # 3) land (needs crew to work it)
     n_extra = len(farm.get("unlocked_quadrants", ["NW"])) - 1
-    if hour <= 2 and day >= 1 and n_units >= 5:
+    if hour <= 4 and day >= 2:
         land_prices = [1000, 2000, 4000]
-        if n_extra < 2 and day <= 16 and money - land_prices[n_extra] > (200 if n_extra == 0 else 800):
+        if n_extra == 0 and day <= 16 and money > 1300:
             market.append(["BUY_LAND"])
-            money -= land_prices[n_extra]
+            money -= 1000
+        elif n_extra == 1 and day >= 4 and day <= 16 and money > 2700:
+            market.append(["BUY_LAND"])
+            money -= 2000
         elif n_extra == 2 and 6 <= day <= 14 and money > 6000:
             market.append(["BUY_LAND"])
             money -= 4000
@@ -708,13 +731,22 @@ def agent(obs):
         n_straw = sum(1 for _, _, t in sv["plants"] if t["crop"] == "STRAWBERRY")
         n_melon = sum(1 for _, _, t in sv["plants"] if t["crop"] == "MELON")
         n_wheatp = sum(1 for _, _, t in sv["plants"] if t["crop"] == "WHEAT")
+        wheat_reserve_frac = 0.35 if 3 <= day <= 12 else 1.0
         if room > 0 and day <= LAST_PLANT["WHEAT"]:
-            n = min(room, max(0, 12 - n_wheatp - seeds.get("WHEAT", 0)), spendable // 10)
+            n = min(room, max(0, 12 - n_wheatp - seeds.get("WHEAT", 0)),
+                    int(spendable * wheat_reserve_frac) // 10)
             if n > 0:
                 market.append(["BUY_SEED", "WHEAT", n])
                 money -= 10 * n
                 room -= n
                 spendable -= 10 * n
+        if room > 0 and day <= LAST_PLANT["MELON"] and n_melon + seeds.get("MELON", 0) < 8:
+            n = min(room, 8 - n_melon - seeds.get("MELON", 0), int(spendable * 0.5) // 80)
+            if n > 0:
+                market.append(["BUY_SEED", "MELON", n])
+                money -= 80 * n
+                room -= n
+                spendable -= 80 * n
         if room > 0 and day <= LAST_PLANT["STRAWBERRY"] and n_straw + seeds.get("STRAWBERRY", 0) < STRAW_CAP:
             n = min(room, STRAW_CAP - n_straw - seeds.get("STRAWBERRY", 0), 14,
                     int(spendable * 0.8) // 100)
@@ -750,7 +782,7 @@ def agent(obs):
             if n_animals + total_unhoused >= MAX_ANIMALS or len(market) >= 9:
                 break
             choice = None
-            if _price("WOOL", inv_mkt.get("WOOL", I0)) >= 130 and n_sheep < 6 and day <= 16:
+            if _price("WOOL", inv_mkt.get("WOOL", I0)) >= 130 and n_sheep < 5 and day <= 16:
                 choice = "SHEEP"
             elif _price("MILK", inv_mkt.get("MILK", I0)) >= 100 and day <= 14:
                 choice = "COW"
@@ -791,13 +823,23 @@ def agent(obs):
         if above in ("log", "log10"):
             market.append(["SELL", item, n])        # glut barely moves price
             continue
-        # premium/pace-sensitive: sell up to (town drain + backlog share) per day
+        inv0 = inv_mkt.get(item, I0)
+        # will this glut ever clear? remaining town drain vs current excess
+        excess = max(0, inv0 - I0) + n
+        remaining_drain = drain.get(item, 0) * max(0, 28 - day)
+        # visible opponent supply for this item (their farm is public)
+        opp_supply = _opp_capacity(farms, player).get(item, 0)
+        race = excess > remaining_drain * 0.8 or opp_supply >= 8
+        if race:
+            # glut won't clear / opponent will flood: take today's price now
+            market.append(["SELL", item, n])
+            st_sold[item] = st_sold.get(item, 0) + n
+            continue
+        # monopoly-ish: pace to town drain, hold above a decaying floor
         allowance = drain.get(item, 0) * 1.3 + 4
         already = st_sold.get(item, 0)
         k = int(max(0, allowance - already))
-        # never sell below a decaying floor
         floor = MARKET_PARAMS[item]["base"] * max(0.25, 0.65 - 0.015 * day)
-        inv0 = inv_mkt.get(item, I0)
         kk = 0
         while kk < min(n, k) and _price(item, inv0 + kk) >= floor:
             kk += 1
