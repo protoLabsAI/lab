@@ -20,7 +20,7 @@ import math
 import json as _json
 import os as _os
 
-_BAKED = {"STRAW_SCALE": 0.8413716484597732, "MELON_SCALE": 1.5017098633961907, "WHEAT_SCALE": 1.0, "COW_SCALE": 1.1784658783798048, "SHEEP_SCALE": 1.2918498394278237, "RUNWAY": 255, "MAX_HANDS": 15, "LIQ_DAY": 28, "PORT_SHIFT": 0.15, "WHEAT_WAVE": 23, "SPREAD": 0, "SELL_FIRST": 1, "OROPT": 1}
+_BAKED = {"STRAW_SCALE": 0.8413716484597732, "MELON_SCALE": 1.5017098633961907, "WHEAT_SCALE": 3.0, "COW_SCALE": 1.1784658783798048, "SHEEP_SCALE": 1.2918498394278237, "RUNWAY": 255, "MAX_HANDS": 15, "LIQ_DAY": 28, "PORT_SHIFT": 0.15, "WHEAT_WAVE": 23, "SPREAD": 0, "SELL_FIRST": 1, "OROPT": 1, "WHEAT_HOLD": 0, "SELL_ALL": 1}
 _cfg_path = _os.environ.get("KAGG_CFG")
 try:
     # MERGE over the baked config - an override file must not silently
@@ -1151,7 +1151,7 @@ def agent(obs):
             if _price("WHEAT", inv_mkt.get("WHEAT", I0)) < _k("CORNER2_ASK", 54):
                 continue  # hold the corner until their buys pump the price
         if item == "WHEAT" and not liquidation and shed_total < 70:
-            if _price("WHEAT", inv_mkt.get("WHEAT", I0)) < 32:
+            if _price("WHEAT", inv_mkt.get("WHEAT", I0)) < _k("WHEAT_HOLD", 32):
                 continue  # hold: log-above curve means selling later loses nothing
         if item == "FERTILIZER" and not liquidation:
             n = max(0, n - 4)  # keep a few for application
