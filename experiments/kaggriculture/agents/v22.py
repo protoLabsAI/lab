@@ -739,6 +739,18 @@ def agent(obs):
 
     routes = st.setdefault("routes", {})
     actions = [None] * n_units
+
+    if _k("REPLAN", 1):
+        # Drop stale single-job routes each turn; keep only multi-stop chains
+        # (pickup->build->place, collect->fertilize) which must stay coherent.
+        for _ui in list(routes):
+            r = routes[_ui]
+            if len(r) <= 1:
+                routes[_ui] = []
+            else:
+                tiles_in = {t for t, _ in r}
+                if len(tiles_in) <= 1:
+                    routes[_ui] = []
     seeds_live = dict(seeds)
 
     # ---- unit control ----
@@ -872,12 +884,12 @@ def agent(obs):
         carrying = sum(inv.values())
         d_home = _dist(pos, nearest_shed(pos))
         must_go = hour >= TPD - d_home - 3
-        if carrying > 0 and (day == LAST_DAY or must_go or carrying >= _k("CARRY", 14)):
+        if carrying > 0 and (day == LAST_DAY or must_go or carrying >= 14):
             actions[ui] = _go_or_do(pos, nearest_shed(pos), ["DROP"])
             continue
-        # Opportunistic work: the day's routes are static, so a unit that
-        # finishes early would idle while newly-ripened work sits unserved.
-        # Claim the nearest still-valid job no one else is handling.
+        # Greedy live assignment: with REPLAN on, this is the primary
+        # scheduler rather than a fallback - every free unit re-picks the best
+        # job available RIGHT NOW, so sequencing never goes stale.
         claimed = set()
         for r in routes.values():
             for tile, _opa in r:
@@ -898,7 +910,7 @@ def agent(obs):
             d = _dist(pos, jtile)
             if hour + d + 1 + min(_dist(jtile, s) for s in open_shed) > TPD - 1:
                 continue
-            score = jprio * 4 + d
+            score = jprio * _k("PRIO_W", 4.0) + d * _k("DIST_W", 1.0)
             if best is None or score < best[0]:
                 best = (score, jtile, jopa)
         if best is not None:
