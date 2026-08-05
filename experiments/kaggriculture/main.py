@@ -17,6 +17,20 @@ Economy: day-0 all-in opening, strawberry wave + rolling melons + wheat fill,
 cows+sheep to 13, land NE+SW (SE if rich), 12 hands, liquidation day 28+.
 """
 import math
+import json as _json
+import os as _os
+
+_BAKED = {"STRAW_SCALE": 0.8413716484597732, "MELON_SCALE": 1.5017098633961907, "WHEAT_SCALE": 1.0, "COW_SCALE": 1.1784658783798048, "SHEEP_SCALE": 1.2918498394278237, "RUNWAY": 255, "MAX_HANDS": 15, "LIQ_DAY": 28}
+_cfg_path = _os.environ.get("KAGG_CFG")
+try:
+    _CFG = _json.load(open(_cfg_path)) if _cfg_path else dict(_BAKED)
+except Exception:
+    _CFG = dict(_BAKED)
+
+
+def _k(name, default):
+    return _CFG.get(name, default)
+
 
 CROPS = {
     "WHEAT":      {"seed": 10,  "first": 2,  "max_day": 4,  "interval": 0, "max_yield": 6, "ongoing": False},
@@ -90,15 +104,63 @@ LAST_PLANT = {"WHEAT": 25, "CARROT": 26, "MELON": 18, "STRAWBERRY": 16, "TOMATO"
 TPD = 24
 LAST_DAY = 29
 
-MAX_HANDS = 14
+MAX_HANDS = _k("MAX_HANDS", 14)
 HIRE_COST_CAP = 250
-LIQ_DAY = 28
-MAX_ANIMALS = 14
-ANIMAL_LAST_BUY = 16
-STRAW_CAP = 45
+LIQ_DAY = _k("LIQ_DAY", 28)
+MAX_ANIMALS = _k("MAX_ANIMALS", 14)
+ANIMAL_LAST_BUY = _k("ANIMAL_LAST_BUY", 16)
+STRAW_CAP = _k("STRAW_CAP", 45)
 MELON_CAP = 16
 SELL_FLOOR_FRAC = 0.30
 FEED_STOP = {"GOOSE": 28, "COW": 28, "SHEEP": 28}
+
+# Per-day build targets decoded from the V17 expert schedule (Apache-2.0
+# public lineage): tile counts to steer toward, not hard caps.
+REF_CURVE = {
+    0:  {"WHEAT": 11, "MELON": 7,  "STRAWBERRY": 0,  "COW": 3, "SHEEP": 1, "QUADS": 1},
+    2:  {"WHEAT": 11, "MELON": 8,  "STRAWBERRY": 0,  "COW": 3, "SHEEP": 1, "QUADS": 1},
+    4:  {"WHEAT": 12, "MELON": 11, "STRAWBERRY": 2,  "COW": 3, "SHEEP": 1, "QUADS": 1},
+    5:  {"WHEAT": 12, "MELON": 11, "STRAWBERRY": 3,  "COW": 4, "SHEEP": 2, "QUADS": 1},
+    6:  {"WHEAT": 10, "MELON": 11, "STRAWBERRY": 4,  "COW": 5, "SHEEP": 2, "QUADS": 1},
+    7:  {"WHEAT": 9,  "MELON": 11, "STRAWBERRY": 6,  "COW": 5, "SHEEP": 2, "QUADS": 2},
+    8:  {"WHEAT": 8,  "MELON": 11, "STRAWBERRY": 17, "COW": 5, "SHEEP": 6, "QUADS": 2},
+    9:  {"WHEAT": 8,  "MELON": 11, "STRAWBERRY": 21, "COW": 6, "SHEEP": 6, "QUADS": 2},
+    10: {"WHEAT": 6,  "MELON": 10, "STRAWBERRY": 24, "COW": 8, "SHEEP": 6, "QUADS": 3},
+    11: {"WHEAT": 5,  "MELON": 9,  "STRAWBERRY": 32, "COW": 8, "SHEEP": 6, "QUADS": 3},
+    12: {"WHEAT": 4,  "MELON": 8,  "STRAWBERRY": 39, "COW": 8, "SHEEP": 6, "QUADS": 3},
+    13: {"WHEAT": 4,  "MELON": 10, "STRAWBERRY": 44, "COW": 8, "SHEEP": 6, "QUADS": 3},
+    15: {"WHEAT": 3,  "MELON": 10, "STRAWBERRY": 42, "COW": 8, "SHEEP": 6, "QUADS": 3},
+    18: {"WHEAT": 4,  "MELON": 9,  "STRAWBERRY": 40, "COW": 8, "SHEEP": 6, "QUADS": 3},
+    21: {"WHEAT": 5,  "MELON": 8,  "STRAWBERRY": 36, "COW": 8, "SHEEP": 6, "QUADS": 3},
+    24: {"WHEAT": 5,  "MELON": 4,  "STRAWBERRY": 30, "COW": 8, "SHEEP": 6, "QUADS": 3},
+    26: {"WHEAT": 32, "MELON": 0,  "STRAWBERRY": 20, "COW": 8, "SHEEP": 6, "QUADS": 3},
+}
+
+
+def _ref(day):
+    day = day + _k("CURVE_LEAD", 0)  # build the curve N days early
+    best = None
+    for d in sorted(REF_CURVE):
+        if d <= day:
+            best = REF_CURVE[d]
+    base = dict(best or REF_CURVE[0])
+    alead = _k("ANIMAL_LEAD", 0)
+    if alead:
+        d2 = day + alead
+        b2 = None
+        for d in sorted(REF_CURVE):
+            if d <= d2:
+                b2 = REF_CURVE[d]
+        if b2:
+            base["COW"], base["SHEEP"] = b2["COW"], b2["SHEEP"]
+    # curve-scaling knobs for margin optimization
+    base["STRAWBERRY"] = int(round(base["STRAWBERRY"] * _k("STRAW_SCALE", 1.0)))
+    base["MELON"] = int(round(base["MELON"] * _k("MELON_SCALE", 1.0)))
+    base["WHEAT"] = int(round(base["WHEAT"] * _k("WHEAT_SCALE", 1.0)))
+    base["COW"] = int(round(base["COW"] * _k("COW_SCALE", 1.0)))
+    base["SHEEP"] = int(round(base["SHEEP"] * _k("SHEEP_SCALE", 1.0)))
+    return base
+
 
 _STATE = {}
 
@@ -209,8 +271,10 @@ def _build_day_jobs(sv, day, liquidation):
         if t.get("fertilizer_available") and not liquidation:
             jobs.append((3, (x, y), ("COLLECT_FERTILIZER", None)))
         if t["yield_units"] > 0:
-            prio = 0.5 if day >= LAST_DAY - 1 else (
-                1 if t["yield_units"] >= a["max_held"] - 1 else 2)
+            next_prod = 1 + t.get("pending_care_bonus", 0)
+            overflow = t["yield_units"] + next_prod > a["max_held"]
+            prio = 0.5 if (day >= LAST_DAY - 1 or overflow) else (
+                1 if t["yield_units"] >= 3 else 2)
             jobs.append((prio, (x, y), ("HARVEST", None)))
 
     for x, y in sv["weeds"]:
@@ -220,43 +284,35 @@ def _build_day_jobs(sv, day, liquidation):
 
 
 def _plan_planting(sv, day, seeds, n_animals_total):
-    """(tile, crop) planting assignments, nearest tiles first."""
-    if day >= LIQ_DAY - 1:
+    """Plant toward the reference build curve (largest deficit first)."""
+    if day > 26:
         return []
+    ref = _ref(day)
+    counts = {}
+    for _, _, t in sv["plants"]:
+        counts[t["crop"]] = counts.get(t["crop"], 0) + 1
     budget = {c: seeds.get(c, 0) for c in CROPS}
-    counts = {
-        "STRAWBERRY": sum(1 for _, _, t in sv["plants"] if t["crop"] == "STRAWBERRY"),
-        "MELON": sum(1 for _, _, t in sv["plants"] if t["crop"] == "MELON"),
-    }
-    counts["WHEAT"] = sum(1 for _, _, t in sv["plants"] if t["crop"] == "WHEAT")
-    out = []
-    reserve_inner = n_animals_total < MAX_ANIMALS and day <= ANIMAL_LAST_BUY
-    for (x, y) in sorted(sv["empty"], key=lambda p: _dist(p, (4.5, 4.5))):
-        if reserve_inner and _dist((x, y), (4.5, 4.5)) <= 1.5:
+    deficits = []
+    for crop in ("STRAWBERRY", "MELON", "WHEAT"):
+        if day > LAST_PLANT.get(crop, 26):
             continue
-        crop = None
-        wheat_cap = 12 if day <= 14 else 10**6
-        if (budget.get("MELON", 0) > 0 and day <= LAST_PLANT["MELON"]
-                and counts.get("MELON", 0) < 8):
-            crop = "MELON"
-        elif (budget.get("STRAWBERRY", 0) > 0 and 3 <= day <= LAST_PLANT["STRAWBERRY"]
-                and counts.get("STRAWBERRY", 0) < STRAW_CAP):
-            crop = "STRAWBERRY"
-        elif (budget.get("WHEAT", 0) > 0 and day <= LAST_PLANT["WHEAT"]
-                and counts.get("WHEAT", 0) < wheat_cap):
-            crop = "WHEAT"
-        elif (budget.get("MELON", 0) > 0 and day <= LAST_PLANT["MELON"]
-                and counts.get("MELON", 0) < MELON_CAP):
-            crop = "MELON"
-        elif budget.get("WHEAT", 0) > 0 and day <= LAST_PLANT["WHEAT"]:
-            crop = "WHEAT"
-        elif budget.get("CARROT", 0) > 0 and day <= LAST_PLANT["CARROT"]:
-            crop = "CARROT"
-        if crop is None:
-            break
-        budget[crop] -= 1
-        counts[crop] = counts.get(crop, 0) + 1
-        out.append(((x, y), crop))
+        d = ref.get(crop, 0) - counts.get(crop, 0)
+        if d > 0 and budget.get(crop, 0) > 0:
+            deficits.append((d, crop))
+    deficits.sort(reverse=True)
+    out = []
+    reserve_inner = n_animals_total < (ref.get("COW", 0) + ref.get("SHEEP", 0)) and day <= 12
+    empties = sorted(sv["empty"], key=lambda p: _dist(p, (4.5, 4.5)))
+    ei = 0
+    for d, crop in deficits:
+        take = min(d, budget.get(crop, 0))
+        while take > 0 and ei < len(empties):
+            x, y = empties[ei]
+            ei += 1
+            if reserve_inner and _dist((x, y), (4.5, 4.5)) <= 1.5:
+                continue
+            out.append(((x, y), crop))
+            take -= 1
     return out
 
 
@@ -326,13 +382,14 @@ def _placement_chains(sv, shed, open_shed):
 
 
 def _route_units(units, hour, jobs, plant_jobs, place_chains, fert_pairs):
-    """Bundle jobs per tile (one unit does all ops on a tile), route chains
-    greedily by priority. fert_pairs: {animal_tile: straw_tile} appended to
-    the animal's bundle as COLLECT -> FERTILIZE."""
+    """Bundle jobs per tile, route chains greedily by priority, then improve
+    each unit's route with nearest-neighbor reordering inside contiguous
+    same-priority runs (travel shrinks; priority order preserved)."""
     budget_turns = max(1, TPD - hour - 1)
-    routes = [[] for _ in units]
+    blocks = [[] for _ in units]  # per-unit: (prio_class, chain)
     loads = [0.0] * len(units)
     positions = [tuple(p) for p in units]
+    prio_now = [0.0]
 
     def assign_chain(chain, force=False):
         best, best_cost = None, None
@@ -347,17 +404,16 @@ def _route_units(units, hour, jobs, plant_jobs, place_chains, fert_pairs):
             if not force:
                 return False
             best = min(range(len(units)), key=lambda ui: loads[ui])
+        blocks[best].append((prio_now[0], list(chain)))
         for tile, opa in chain:
             loads[best] += _dist(positions[best], tile) + 1
-            routes[best].append((tile, opa))
             positions[best] = tile
         return True
 
-    # 1) placement chains (time-critical)
+    prio_now[0] = -1.0
     for chain in place_chains:
         assign_chain(chain, force=True)
 
-    # 2) per-tile bundles
     groups = {}
     for prio, tile, opa in jobs:
         groups.setdefault(tile, []).append((prio, opa))
@@ -375,15 +431,34 @@ def _route_units(units, hour, jobs, plant_jobs, place_chains, fert_pairs):
     urgent = [b for b in bundles if b[0] <= 2.5]
     rest = [b for b in bundles if b[0] > 2.5]
     for prio, chain in urgent:
+        prio_now[0] = 1.0
         assign_chain(chain, force=prio <= 0)
-
-    # 3) plant compounds
+    prio_now[0] = 2.0
     for tile, crop in plant_jobs:
         assign_chain([(tile, ("PLANT", crop)), (tile, ("WATER", None))])
-
-    # 4) leftovers
+    prio_now[0] = 3.0
     for prio, chain in rest:
         assign_chain(chain)
+
+    # within-run NN improvement: reorder blocks inside same-priority runs
+    routes = [[] for _ in units]
+    for ui in range(len(units)):
+        pos = tuple(units[ui])
+        route = []
+        i = 0
+        blist = blocks[ui]
+        while i < len(blist):
+            j = i
+            while j < len(blist) and blist[j][0] == blist[i][0]:
+                j += 1
+            run = [c for _, c in blist[i:j]]
+            while run:
+                nxt = min(run, key=lambda c: _dist(pos, c[0][0]))
+                run.remove(nxt)
+                route.extend(nxt)
+                pos = nxt[-1][0]
+            i = j
+        routes[ui] = route
     return routes
 
 
@@ -666,10 +741,12 @@ def agent(obs):
     market = []
 
     if day == 0 and hour == 0:
-        market = [["HIRE"], ["HIRE"], ["HIRE"], ["HIRE"],
-                  ["BUY_ANIMAL", "COW", 3], ["BUY_ANIMAL", "SHEEP", 1],
-                  ["BUY_SEED", "MELON", 7], ["BUY_SEED", "WHEAT", 10],
-                  ["BUY_PRODUCT", "WHEAT", 6]]
+        market = ([["HIRE"]] * _k("OPEN_HIRES", 4) +
+                  [["BUY_ANIMAL", "COW", _k("OPEN_COWS", 3)],
+                   ["BUY_ANIMAL", "SHEEP", _k("OPEN_SHEEP", 1)],
+                   ["BUY_SEED", "MELON", _k("OPEN_MELON", 7)],
+                   ["BUY_SEED", "WHEAT", _k("OPEN_WHEAT", 10)],
+                   ["BUY_PRODUCT", "WHEAT", _k("OPEN_FEED", 6)]])
         return {"farmer": actions[0], "hands": actions[1:], "market": market}
 
     # ---- budget envelopes: feed -> hires -> land -> seeds -> animals ----
@@ -725,80 +802,60 @@ def agent(obs):
             market.append(["BUY_LAND"])
             money -= 4000
 
-    # 4) seeds
-    if day < LIQ_DAY - 2 and len(market) < 8:
-        want = {}
-        room = max(0, len(sv["empty"]) - sum(seeds.get(c, 0) for c in CROPS))
-        runway = 400 if day <= 9 else 200
-        spendable = max(0, money - runway)
-        n_straw = sum(1 for _, _, t in sv["plants"] if t["crop"] == "STRAWBERRY")
-        n_melon = sum(1 for _, _, t in sv["plants"] if t["crop"] == "MELON")
-        n_wheatp = sum(1 for _, _, t in sv["plants"] if t["crop"] == "WHEAT")
-        wheat_reserve_frac = 0.35 if 3 <= day <= 12 else 1.0
-        if room > 0 and day <= LAST_PLANT["WHEAT"]:
-            n = min(room, max(0, 12 - n_wheatp - seeds.get("WHEAT", 0)),
-                    int(spendable * wheat_reserve_frac) // 10)
-            if n > 0:
-                market.append(["BUY_SEED", "WHEAT", n])
-                money -= 10 * n
-                room -= n
-                spendable -= 10 * n
-        if room > 0 and day <= LAST_PLANT["MELON"] and n_melon + seeds.get("MELON", 0) < 8:
-            n = min(room, 8 - n_melon - seeds.get("MELON", 0), int(spendable * 0.5) // 80)
-            if n > 0:
-                market.append(["BUY_SEED", "MELON", n])
-                money -= 80 * n
-                room -= n
-                spendable -= 80 * n
-        if room > 0 and day <= LAST_PLANT["STRAWBERRY"] and n_straw + seeds.get("STRAWBERRY", 0) < STRAW_CAP:
-            n = min(room, STRAW_CAP - n_straw - seeds.get("STRAWBERRY", 0), 14,
-                    int(spendable * 0.8) // 100)
-            if n > 0:
-                want["STRAWBERRY"] = n
-                room -= n
-                spendable -= n * 100
-        if room > 0 and day <= LAST_PLANT["MELON"] and n_melon + seeds.get("MELON", 0) < MELON_CAP:
-            n = min(room, MELON_CAP - n_melon - seeds.get("MELON", 0), 6,
-                    int(spendable * 0.6) // 80)
-            if n > 0:
-                want["MELON"] = n
-                room -= n
-                spendable -= n * 80
-        if room > 0 and day <= LAST_PLANT["WHEAT"]:
-            n = min(room, spendable // 10)
-            if n > 0:
-                want["WHEAT"] = want.get("WHEAT", 0) + n
-                room -= n
-                spendable -= n * 10
-        if room > 0 and 3 <= day <= LAST_PLANT["CARROT"] and spendable >= 20:
-            want["CARROT"] = min(room, spendable // 20)
-        for crop, n in want.items():
-            if n > 0 and len(market) < 9:
-                market.append(["BUY_SEED", crop, n])
-                money -= CROPS[crop]["seed"] * n
-
-    # 5) animals last (only truly spare cash)
-    if (1 <= day <= ANIMAL_LAST_BUY and hour <= 6
-            and n_animals + total_unhoused < MAX_ANIMALS and len(market) < 9):
-        n_sheep = sum(1 for _, _, t in sv["animals"] if t["animal"] == "SHEEP") + unhoused.get("SHEEP", 0)
-        for _ in range(3):
-            if n_animals + total_unhoused >= MAX_ANIMALS or len(market) >= 9:
-                break
-            choice = None
-            if _price("WOOL", inv_mkt.get("WOOL", I0)) >= 130 and n_sheep < 5 and day <= 16:
-                choice = "SHEEP"
-            elif _price("MILK", inv_mkt.get("MILK", I0)) >= 100 and day <= 14:
-                choice = "COW"
-            elif _price("EGG", inv_mkt.get("EGG", I0)) >= 45 and day <= 16:
-                choice = "GOOSE"
-            if choice and money - ANIMALS[choice]["cost"] > 500:
-                market.append(["BUY_ANIMAL", choice, 1])
-                money -= ANIMALS[choice]["cost"]
+    # 4a) animals + land toward the reference curve
+    if day <= 16 and hour <= 8 and len(market) < 9:
+        ref_now = _ref(day)
+        n_cow = sum(1 for _, _, t in sv["animals"] if t["animal"] == "COW") + unhoused.get("COW", 0)
+        n_sheep2 = sum(1 for _, _, t in sv["animals"] if t["animal"] == "SHEEP") + unhoused.get("SHEEP", 0)
+        for kind, have, target in (("COW", n_cow, ref_now.get("COW", 0)),
+                                   ("SHEEP", n_sheep2, ref_now.get("SHEEP", 0))):
+            need = max(0, target - have)
+            while need > 0 and len(market) < 9 and money - ANIMALS[kind]["cost"] > 150:
+                market.append(["BUY_ANIMAL", kind, 1])
+                money -= ANIMALS[kind]["cost"]
                 total_unhoused += 1
-                if choice == "SHEEP":
-                    n_sheep += 1
-            else:
-                break
+                need -= 1
+    ref_q = _ref(day).get("QUADS", 1)
+    n_extra2 = len(farm.get("unlocked_quadrants", ["NW"])) - 1
+    if n_extra2 + 1 < ref_q and hour <= 8 and len(market) < 9 and n_extra2 < 3:
+        cost = [1000, 2000, 4000][n_extra2]
+        if money - cost > 150:
+            market.append(["BUY_LAND"])
+            money -= cost
+
+    # wheat corner v2: their buy schedule is price-insensitive; ours isn't.
+    # Accumulate cheap early, sell into the pumped price their buys create.
+    c2_units = _k("CORNER2", 0)
+    if c2_units and 1 <= day <= 8 and len(market) < 9:
+        wp = _price("WHEAT", inv_mkt.get("WHEAT", I0) - 1)
+        stock = shed.get("WHEAT", 0) + sum(iv.get("WHEAT", 0) for iv in inventories)
+        if wp <= _k("CORNER2_BUYCAP", 0) and stock < c2_units + feed_reserve:
+            n_buy = min(c2_units + feed_reserve - stock,
+                        int(max(0, money * 0.4 - 150) // wp), 15)
+            if n_buy > 0:
+                market.append(["BUY_PRODUCT", "WHEAT", n_buy])
+                money -= n_buy * wp
+
+    # 4) seeds: buy toward the reference curve (2-day lookahead)
+    if day < LIQ_DAY - 2 and len(market) < 8:
+        ref_now = _ref(day)
+        ref_ahead = _ref(min(26, day + 2))
+        counts_now = {}
+        for _, _, t in sv["plants"]:
+            counts_now[t["crop"]] = counts_now.get(t["crop"], 0) + 1
+        spendable = max(0, money - (250 if day <= 9 else 200))
+        for crop in ("STRAWBERRY", "MELON", "WHEAT"):
+            if day > LAST_PLANT.get(crop, 26) or len(market) >= 9:
+                continue
+            target = max(ref_now.get(crop, 0), ref_ahead.get(crop, 0))
+            have = counts_now.get(crop, 0) + seeds.get(crop, 0)
+            need = max(0, target - have)
+            cost = CROPS[crop]["seed"]
+            n = min(need, spendable // cost, 14)
+            if n > 0:
+                market.append(["BUY_SEED", crop, n])
+                money -= cost * n
+                spendable -= cost * n
 
     # sells: pace premium items to town drain, dump glut-resistant staples
     drain = _town_drain_per_day(obs.get("town", {}).get("unlocked_shops", []), day)
@@ -814,6 +871,9 @@ def agent(obs):
         n = shed[item]
         if item == "WHEAT" and active_animals > 0 and day < LAST_DAY:
             n = max(0, n - (feed_reserve if not liquidation else active_animals))
+        if item == "WHEAT" and _k("CORNER2", 0) and not liquidation and day < 26:
+            if _price("WHEAT", inv_mkt.get("WHEAT", I0)) < _k("CORNER2_ASK", 54):
+                continue  # hold the corner until their buys pump the price
         if item == "WHEAT" and not liquidation and shed_total < 70:
             if _price("WHEAT", inv_mkt.get("WHEAT", I0)) < 32:
                 continue  # hold: log-above curve means selling later loses nothing
@@ -835,7 +895,7 @@ def agent(obs):
         remaining_drain = drain.get(item, 0) * max(0, 28 - day)
         # visible opponent supply for this item (their farm is public)
         opp_supply = _opp_capacity(farms, player).get(item, 0)
-        race = excess > remaining_drain * 0.8 or opp_supply >= 4
+        race = excess > remaining_drain * _k("RACE_DRAIN", 0.8) or opp_supply >= _k("RACE_OPP", 4)
         if race:
             # glut won't clear / opponent will flood: take today's price now
             market.append(["SELL", item, n])
@@ -845,7 +905,7 @@ def agent(obs):
         allowance = drain.get(item, 0) * 1.3 + 4
         already = st_sold.get(item, 0)
         k = int(max(0, allowance - already))
-        floor = MARKET_PARAMS[item]["base"] * max(0.15, 0.55 - 0.015 * day)
+        floor = MARKET_PARAMS[item]["base"] * max(0.15, _k("FLOOR_A", 0.55) - _k("FLOOR_B", 0.015) * day)
         kk = 0
         while kk < min(n, k) and _price(item, inv0 + kk) >= floor:
             kk += 1
