@@ -23,7 +23,11 @@ import os as _os
 _BAKED = {"STRAW_SCALE": 0.8413716484597732, "MELON_SCALE": 1.5017098633961907, "WHEAT_SCALE": 1.0, "COW_SCALE": 1.1784658783798048, "SHEEP_SCALE": 1.2918498394278237, "RUNWAY": 255, "MAX_HANDS": 15, "LIQ_DAY": 28}
 _cfg_path = _os.environ.get("KAGG_CFG")
 try:
-    _CFG = _json.load(open(_cfg_path)) if _cfg_path else dict(_BAKED)
+    # MERGE over the baked config - an override file must not silently
+    # revert every other tuned value to its default.
+    _CFG = dict(_BAKED)
+    if _cfg_path:
+        _CFG.update(_json.load(open(_cfg_path)))
 except Exception:
     _CFG = dict(_BAKED)
 

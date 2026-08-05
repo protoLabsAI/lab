@@ -882,8 +882,24 @@ def agent(obs):
             if a and a[0] in ("WATER", "HARVEST", "FEED", "CARE",
                               "COLLECT_FERTILIZER", "FERTILIZE", "DIG", "PLANT"):
                 claimed.add(tuple(units[uj]))
+        # 97% of idle unit-turns have an unwatered plant available. Smart-
+        # watering deliberately drops maintenance waterings from the job list
+        # (they don't pay for a routed stop), but for a unit that would
+        # otherwise PASS they are free yield insurance and free fertiliser
+        # doubling. Idle-only, so routed work is never displaced.
+        spare = list(jobs)
+        if _k("IDLE_WATER", 1):
+            listed = {j[1] for j in jobs if j[2][0] == "WATER"}
+            for sx, sy, stile in sv["plants"]:
+                if stile["watered_today"] or (sx, sy) in listed or (sx, sy) in claimed:
+                    continue
+                c2 = CROPS.get(stile["crop"])
+                if not c2:
+                    continue
+                # value it, then let the normal scan rank it against real jobs
+                spare.append((-_k("IDLE_WATER_V", 12.0), (sx, sy), ("WATER", None)))
         best = None
-        for jprio, jtile, jopa in jobs:
+        for jprio, jtile, jopa in spare:
             if jtile in claimed:
                 continue
             if not _stop_valid(jopa[0], jopa[1], tiles[jtile[1]][jtile[0]], day):
@@ -1048,7 +1064,7 @@ def agent(obs):
         counts_now = {}
         for _, _, t in sv["plants"]:
             counts_now[t["crop"]] = counts_now.get(t["crop"], 0) + 1
-        spendable = max(0, money - (_k("RESERVE_E", 250) if day <= 9 else _k("RESERVE_L", 200)))
+        spendable = max(0, money - (250 if day <= 9 else 200))
         for crop in ("STRAWBERRY", "MELON", "WHEAT"):
             if day > LAST_PLANT.get(crop, 26) or len(market) >= 9:
                 continue
