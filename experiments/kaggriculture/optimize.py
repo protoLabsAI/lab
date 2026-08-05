@@ -12,24 +12,25 @@ import time
 from concurrent.futures import ProcessPoolExecutor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SEEDS = [(3000 + i, i % 2 == 1) for i in range(24)]
+SEEDS = [(31000 + i, i % 2 == 1) for i in range(24)]
 N_PROCS = min(24, (os.cpu_count() or 8) - 2)
 
 SPACE = {  # name: (default, min, max, is_int)
-    "STRAW_SCALE": (1.0, 0.4, 1.3, False),
-    "MELON_SCALE": (1.0, 0.5, 2.4, False),
-    "WHEAT_SCALE": (1.0, 0.4, 3.0, False),
-    "COW_SCALE": (1.0, 0.6, 1.9, False),
-    "SHEEP_SCALE": (1.0, 0.6, 1.9, False),
-    "RUNWAY": (400, 150, 700, True),
-    "MAX_HANDS": (14, 12, 16, True),
+    "WHEAT_SCALE": (3.0, 1.0, 5.0, False),
+    "STRAW_SCALE": (0.841, 0.4, 1.4, False),
+    "MELON_SCALE": (1.502, 0.6, 2.4, False),
+    "COW_SCALE": (1.178, 0.6, 2.0, False),
+    "SHEEP_SCALE": (1.292, 0.4, 2.0, False),
+    "MAX_HANDS": (15, 12, 16, True),
+    "PORT_SHIFT": (0.15, 0.0, 0.5, False),
+    "WHEAT_WAVE": (23, 18, 27, True),
+    "SB_LAST": (16, 14, 24, True),
+    "CARRY": (14, 4, 24, True),
+    "RESERVE_E": (250, 100, 1500, True),
+    "RESERVE_L": (200, 100, 1500, True),
+    "OROPT_PASSES": (3, 1, 6, True),
+    "URGENT_V": (120.0, 40.0, 400.0, False),
     "LIQ_DAY": (28, 26, 28, True),
-    "CURVE_LEAD": (0, 0, 2, True),
-    "ANIMAL_LEAD": (0, 0, 4, True),
-    "RACE_DRAIN": (0.8, 0.3, 1.5, False),
-    "RACE_OPP": (4, 2, 12, True),
-    "FLOOR_A": (0.55, 0.3, 0.8, False),
-    "FLOOR_B": (0.015, 0.0, 0.03, False),
 }
 
 
@@ -38,7 +39,7 @@ def play(args):
     os.environ["KAGG_CFG"] = cfg_path
     from kaggle_environments import make
     env = make("kaggriculture", configuration={"episodeSteps": 720, "seed": seed})
-    a, b = os.path.join(HERE, "agents/v10.py"), os.path.join(HERE, "opponents/sey_v7.py")
+    a, b = os.path.join(HERE, "agents/v23.py"), os.path.join(HERE, "opponents/sey_v7.py")
     pair = [b, a] if swap else [a, b]
     env.run(pair)
     r = [s.reward or 0.0 for s in env.steps[-1]]
@@ -89,11 +90,11 @@ def main():
 
     # seeded candidates from expert-schedule study
     seeded = [
-        {"RACE_OPP": 8},
-        {"FLOOR_A": 0.7, "FLOOR_B": 0.01},
-        {"RACE_DRAIN": 1.3},
-        {"FLOOR_A": 0.4, "RACE_OPP": 3},
-        {"RACE_OPP": 12, "FLOOR_A": 0.65},
+        {"WHEAT_SCALE": 3.5, "MELON_SCALE": 1.9},
+        {"COW_SCALE": 1.7, "SHEEP_SCALE": 1.7},
+        {"STRAW_SCALE": 1.2, "WHEAT_SCALE": 2.0},
+        {"CARRY": 24, "RESERVE_E": 800},
+        {"OROPT_PASSES": 6, "MAX_HANDS": 16},
     ]
     i = 0
     while time.time() < deadline:
