@@ -20,7 +20,7 @@ import math
 import json as _json
 import os as _os
 
-_BAKED = {"STRAW_SCALE": 0.8413716484597732, "MELON_SCALE": 1.5017098633961907, "WHEAT_SCALE": 1.0, "COW_SCALE": 1.1784658783798048, "SHEEP_SCALE": 1.2918498394278237, "RUNWAY": 255, "MAX_HANDS": 15, "LIQ_DAY": 28, "PORT_SHIFT": 0.15, "WHEAT_WAVE": 23}
+_BAKED = {"STRAW_SCALE": 0.8413716484597732, "MELON_SCALE": 1.5017098633961907, "WHEAT_SCALE": 1.0, "COW_SCALE": 1.1784658783798048, "SHEEP_SCALE": 1.2918498394278237, "RUNWAY": 255, "MAX_HANDS": 15, "LIQ_DAY": 28}
 _cfg_path = _os.environ.get("KAGG_CFG")
 try:
     _CFG = _json.load(open(_cfg_path)) if _cfg_path else dict(_BAKED)
@@ -340,60 +340,124 @@ def _survey(farm):
     return out
 
 
-def _build_day_jobs(sv, day, liquidation):
-    """Single-stop jobs: (prio, tile, op). PLANT handled separately as chains."""
+
+# ---------------------------------------------------------------------------
+# LAYER 2 - VALUE-BASED TASK SCORING
+# Jobs priced in expected dollars instead of hand-tuned priority integers, so
+# task order tracks the market for free: harvesting is urgent when the price
+# is high and can wait when the market is flooded, with no rule saying so.
+# ---------------------------------------------------------------------------
+
+def _fc_at(fc, item, day, d):
+    path = fc.get(item)
+    if not path:
+        return MARKET_PARAMS[item]["base"] if item in MARKET_PARAMS else 0.0
+    return path[max(0, min(len(path) - 1, d - day))]
+
+
+def _plant_remaining_value(t, day, fc):
+    c = CROPS.get(t.get("crop"))
+    if not c:
+        return 0.0
+    age = day - t["planted_day"]
+    if c["ongoing"]:
+        done = max(0, (age - c["first"]) // max(1, c["interval"]) + 1) if age >= c["first"] else 0
+        left = max(0, c["max_yield"] - done)
+        return sum(1.35 * _fc_at(fc, t["crop"], day, day + (k + 1) * c["interval"])
+                   for k in range(left))
+    units, at_age = ONESHOT.get(t["crop"], (c["max_yield"] * 0.7, c["max_day"]))
+    if age >= at_age:
+        return t.get("yield_units", 0) * _fc_at(fc, t["crop"], day, day)
+    return units * _fc_at(fc, t["crop"], day, day + (at_age - age))
+
+
+def _animal_remaining_value(t, day, fc):
+    a = ANIMALS[t["animal"]]
+    n = max(0, LAST_DAY - day) // max(1, a["interval"])
+    return sum((1 + a["interval"]) * _fc_at(fc, a["product"], day, day + (k + 1) * a["interval"])
+               for k in range(n))
+
+
+def _job_value(kind, t, day, hour, fc, liquidation):
+    if kind == "WATER":
+        c = CROPS.get(t.get("crop"))
+        if not c:
+            return 0.0
+        if t["consecutive_unwatered"] >= 1:
+            return _plant_remaining_value(t, day, fc)
+        age = day - t["planted_day"]
+        if c["ongoing"]:
+            nxt = day + 1 - t["planted_day"] - c["first"]
+            produces = nxt >= 0 and nxt % max(1, c["interval"]) == 0
+            fert = t.get("fertilized_until_day", -1) >= day
+            return _fc_at(fc, t["crop"], day, day + 1) if (produces and fert) else 0.0
+        window = (c["max_day"] + 1) // 2
+        if window <= age <= c["max_day"]:
+            bonus = 2 if t.get("fertilized_until_day", -1) >= day else 1
+            return bonus * _fc_at(fc, t["crop"], day, day + max(0, c["max_day"] - age))
+        return 0.0
+    if kind == "HARVEST":
+        if t.get("kind") == "PLANT":
+            return t.get("yield_units", 0) * _fc_at(fc, t["crop"], day, day)
+        a = ANIMALS[t["animal"]]
+        v = t.get("yield_units", 0) * _fc_at(fc, a["product"], day, day)
+        if t.get("yield_units", 0) >= a["max_held"] - 1:
+            v *= 1.6
+        return v
+    if kind == "FEED":
+        if t["consecutive_unfed"] >= 1:
+            return _animal_remaining_value(t, day, fc)
+        a = ANIMALS[t["animal"]]
+        return (1 + a["interval"]) * _fc_at(fc, a["product"], day, day + 1) / max(1, a["interval"])
+    if kind == "CARE":
+        a = ANIMALS[t["animal"]]
+        return _fc_at(fc, a["product"], day, day + a["interval"]) / max(1, a["interval"])
+    if kind == "COLLECT_FERTILIZER":
+        return _fc_at(fc, "FERTILIZER", day, day) * 0.9
+    if kind == "DIG":
+        return 40.0 if day <= 20 else 5.0
+    return 0.0
+
+
+def _build_day_jobs(sv, day, liquidation, hour=0, fc=None):
+    """Jobs priced in dollars. prio = -value so the existing router (lower =
+    more urgent) sorts by money with no further changes."""
+    fc = fc or {}
     jobs = []
+    def add(val, xy, opa):
+        jobs.append((-val, xy, opa))
     for x, y, t in sv["plants"]:
         c = CROPS.get(t["crop"])
         if c is None:
             continue
         age = day - t["planted_day"]
         if not t["watered_today"] and not (day == LAST_DAY and age < c["first"]):
-            streak = t["consecutive_unwatered"]
-            if c["ongoing"]:
-                # base yield is water-independent; water for survival and for
-                # the fertilizer doubling on production eves
-                produces_tonight = (day + 1 - t["planted_day"] - c["first"]) >= 0 and \
-                    (day + 1 - t["planted_day"] - c["first"]) % max(1, c["interval"]) == 0
-                fertd = t.get("fertilized_until_day", -1) >= day
-                need = streak >= 1 or (produces_tonight and fertd)
-            else:
-                window_start = (c["max_day"] + 1) // 2
-                in_window = window_start <= age <= c["max_day"]
-                need = streak >= 1 or in_window
-            if need:
-                jobs.append((0 if streak >= 1 else 1, (x, y), ("WATER", None)))
+            v = _job_value("WATER", t, day, hour, fc, liquidation)
+            if v > 1.0:
+                add(v, (x, y), ("WATER", None))
         if c["ongoing"]:
-            if t["yield_units"] >= 2 or (t["yield_units"] > 0 and (
-                    liquidation or day >= LAST_DAY - 1)):
-                jobs.append((2, (x, y), ("HARVEST", None)))
+            if t["yield_units"] >= 2 or (t["yield_units"] > 0 and
+                                         (liquidation or day >= LAST_DAY - 1)):
+                add(_job_value("HARVEST", t, day, hour, fc, liquidation), (x, y), ("HARVEST", None))
         else:
             ready_age = HARVEST_AGE.get(t["crop"], c["max_day"])
-            if t["yield_units"] > 0 and age >= c["first"] and (
-                    age >= ready_age or day == LAST_DAY):
-                # mature one-time crops decay fast: harvesting beats watering
-                jobs.append((0.5 if age >= ready_age else 2, (x, y), ("HARVEST", None)))
+            if t["yield_units"] > 0 and age >= c["first"] and (age >= ready_age or day == LAST_DAY):
+                add(_job_value("HARVEST", t, day, hour, fc, liquidation), (x, y), ("HARVEST", None))
     for x, y, t in sv["animals"]:
-        a = ANIMALS[t["animal"]]
         active = day <= FEED_STOP.get(t["animal"], 27)
         if active and not t["fed_today"]:
-            jobs.append((0, (x, y), ("FEED", None)))
+            add(_job_value("FEED", t, day, hour, fc, liquidation), (x, y), ("FEED", None))
         if active and not t["cared_today"]:
-            jobs.append((2, (x, y), ("CARE", None)))
-        if t.get("fertilizer_available") and not liquidation:
-            jobs.append((3, (x, y), ("COLLECT_FERTILIZER", None)))
+            add(_job_value("CARE", t, day, hour, fc, liquidation), (x, y), ("CARE", None))
         if t["yield_units"] > 0:
-            next_prod = 1 + t.get("pending_care_bonus", 0)
-            overflow = t["yield_units"] + next_prod > a["max_held"]
-            prio = 0.5 if (day >= LAST_DAY - 1 or overflow) else (
-                1 if t["yield_units"] >= 3 else 2)
-            jobs.append((prio, (x, y), ("HARVEST", None)))
-
+            add(_job_value("HARVEST", t, day, hour, fc, liquidation), (x, y), ("HARVEST", None))
+        if t.get("fertilizer_available") and not liquidation:
+            add(_job_value("COLLECT_FERTILIZER", t, day, hour, fc, liquidation),
+                (x, y), ("COLLECT_FERTILIZER", None))
     for x, y in sv["weeds"]:
         if day <= LAST_DAY - 4:
-            jobs.append((2.5 if day <= 22 else 4, (x, y), ("DIG", None)))
+            add(_job_value("DIG", None, day, hour, fc, liquidation), (x, y), ("DIG", None))
     return jobs
-
 
 
 def _crop_value(crop, day, fc, horizon_end=LAST_DAY):
@@ -435,33 +499,15 @@ def _plan_planting(sv, day, seeds, n_animals_total, fc=None):
     for _, _, t in sv["plants"]:
         counts[t["crop"]] = counts.get(t["crop"], 0) + 1
     budget = {c: seeds.get(c, 0) for c in CROPS}
-    # LAYER 1 - ROLLING PORTFOLIO. Re-allocate tiles between crops by their
-    # forecast harvest-date value, bounded so we stay near the (validated)
-    # reference mix rather than chasing noise.
-    # LATE WHEAT WAVE. Wheat is $10, first-yields in 2 days, peaks at 4, and
-    # its glut curve is log (effectively bottomless). Late season we have spare
-    # cash and idle crew but no time for anything slower, so every free tile
-    # goes to wheat. The leader runs 31 wheat tiles on d26; we ran 3.
-    wave = _k("WHEAT_WAVE", 20) <= day <= LAST_PLANT["WHEAT"]
-    cand = [c for c in ("STRAWBERRY", "MELON", "WHEAT") if day <= LAST_PLANT.get(c, 26)]
-    vals = {c: max(0.0, _crop_value(c, day, fc)) for c in cand} if fc else {}
-    tgt = dict(ref)
-    if vals and sum(vals.values()) > 0:
-        shift = _k("PORT_SHIFT", 0.35)
-        pool = sum(ref.get(c, 0) for c in cand)
-        if pool > 0:
-            share = {c: vals[c] / sum(vals.values()) for c in cand}
-            for c in cand:
-                base_t = ref.get(c, 0)
-                want = share[c] * pool
-                tgt[c] = int(round(base_t + shift * (want - base_t)))
-    if wave:
-        tgt["WHEAT"] = counts.get("WHEAT", 0) + len(sv["empty"])
     deficits = []
-    for crop in cand:
-        d = tgt.get(crop, 0) - counts.get(crop, 0)
+    for crop in ("STRAWBERRY", "MELON", "WHEAT"):
+        if day > LAST_PLANT.get(crop, 26):
+            continue
+        d = ref.get(crop, 0) - counts.get(crop, 0)
         if d > 0 and budget.get(crop, 0) > 0:
-            deficits.append((vals.get(crop, 0.0), d, crop))
+            v = _crop_value(crop, day, fc) if fc else 0.0
+            deficits.append((v, d, crop))
+    # plant the crop whose FORECAST harvest-date value is highest first
     deficits.sort(reverse=True)
     deficits = [(d, crop) for _v, d, crop in deficits]
     out = []
@@ -592,11 +638,12 @@ def _route_units(units, hour, jobs, plant_jobs, place_chains, fert_pairs):
         bundles.append((lst[0][0], chain))
     bundles.sort(key=lambda b: b[0])
 
-    urgent = [b for b in bundles if b[0] <= 2.5]
-    rest = [b for b in bundles if b[0] > 2.5]
+    URGENT_V = -_k("URGENT_V", 120.0)
+    urgent = [b for b in bundles if b[0] <= URGENT_V]
+    rest = [b for b in bundles if b[0] > URGENT_V]
     for prio, chain in urgent:
         prio_now[0] = 1.0
-        assign_chain(chain, force=prio <= 0)
+        assign_chain(chain, force=prio <= -_k("FORCE_V", 900.0))
     prio_now[0] = 2.0
     for tile, crop in plant_jobs:
         assign_chain([(tile, ("PLANT", crop)), (tile, ("WATER", None))])
@@ -718,7 +765,7 @@ def agent(obs):
     _shops = obs.get("town", {}).get("unlocked_shops", [])
     st["fc"] = _price_forecast(farms, day, inv_mkt, _shops,
                                _update_bias(st, day, inv_mkt, _shops, farms))
-    jobs = _build_day_jobs(sv, day, liquidation)
+    jobs = _build_day_jobs(sv, day, liquidation, hour, st["fc"])
     if st.get("crew") != n_units or st.get("n_anim") != n_animals:
         st["crew"] = n_units
         st["n_anim"] = n_animals
@@ -889,7 +936,7 @@ def agent(obs):
             d = _dist(pos, jtile)
             if hour + d + 1 + min(_dist(jtile, s) for s in open_shed) > TPD - 1:
                 continue
-            score = jprio * 4 + d
+            score = jprio * 0.02 + d
             if best is None or score < best[0]:
                 best = (score, jtile, jopa)
         if best is not None:
@@ -1049,23 +1096,10 @@ def agent(obs):
             if day > LAST_PLANT.get(crop, 26) or len(market) >= 9:
                 continue
             target = max(ref_now.get(crop, 0), ref_ahead.get(crop, 0))
-            _fc = st.get("fc")
-            if _fc:
-                _vals = {c: max(0.0, _crop_value(c, day, _fc))
-                         for c in ("STRAWBERRY", "MELON", "WHEAT")
-                         if day <= LAST_PLANT.get(c, 26)}
-                if crop in _vals and sum(_vals.values()) > 0:
-                    _pool = sum(ref_now.get(c, 0) for c in _vals)
-                    _want = _vals[crop] / sum(_vals.values()) * _pool
-                    target = int(round(target + _k("PORT_SHIFT", 0.35) * (_want - target)))
             have = counts_now.get(crop, 0) + seeds.get(crop, 0)
             need = max(0, target - have)
             cost = CROPS[crop]["seed"]
-            cap = 14
-            if crop == "WHEAT" and _k("WHEAT_WAVE", 20) <= day <= LAST_PLANT["WHEAT"]:
-                need = max(need, len(sv["empty"]) - seeds.get("WHEAT", 0))
-                cap = 40
-            n = min(need, spendable // cost, cap)
+            n = min(need, spendable // cost, 14)
             if n > 0:
                 market.append(["BUY_SEED", crop, n])
                 money -= cost * n

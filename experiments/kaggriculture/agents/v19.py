@@ -20,7 +20,7 @@ import math
 import json as _json
 import os as _os
 
-_BAKED = {"STRAW_SCALE": 0.8413716484597732, "MELON_SCALE": 1.5017098633961907, "WHEAT_SCALE": 1.0, "COW_SCALE": 1.1784658783798048, "SHEEP_SCALE": 1.2918498394278237, "RUNWAY": 255, "MAX_HANDS": 15, "LIQ_DAY": 28, "PORT_SHIFT": 0.15, "WHEAT_WAVE": 23}
+_BAKED = {"STRAW_SCALE": 0.8413716484597732, "MELON_SCALE": 1.5017098633961907, "WHEAT_SCALE": 1.0, "COW_SCALE": 1.1784658783798048, "SHEEP_SCALE": 1.2918498394278237, "RUNWAY": 255, "MAX_HANDS": 15, "LIQ_DAY": 28, "PORT_SHIFT": 0.15}
 _cfg_path = _os.environ.get("KAGG_CFG")
 try:
     _CFG = _json.load(open(_cfg_path)) if _cfg_path else dict(_BAKED)
@@ -438,11 +438,6 @@ def _plan_planting(sv, day, seeds, n_animals_total, fc=None):
     # LAYER 1 - ROLLING PORTFOLIO. Re-allocate tiles between crops by their
     # forecast harvest-date value, bounded so we stay near the (validated)
     # reference mix rather than chasing noise.
-    # LATE WHEAT WAVE. Wheat is $10, first-yields in 2 days, peaks at 4, and
-    # its glut curve is log (effectively bottomless). Late season we have spare
-    # cash and idle crew but no time for anything slower, so every free tile
-    # goes to wheat. The leader runs 31 wheat tiles on d26; we ran 3.
-    wave = _k("WHEAT_WAVE", 20) <= day <= LAST_PLANT["WHEAT"]
     cand = [c for c in ("STRAWBERRY", "MELON", "WHEAT") if day <= LAST_PLANT.get(c, 26)]
     vals = {c: max(0.0, _crop_value(c, day, fc)) for c in cand} if fc else {}
     tgt = dict(ref)
@@ -455,8 +450,6 @@ def _plan_planting(sv, day, seeds, n_animals_total, fc=None):
                 base_t = ref.get(c, 0)
                 want = share[c] * pool
                 tgt[c] = int(round(base_t + shift * (want - base_t)))
-    if wave:
-        tgt["WHEAT"] = counts.get("WHEAT", 0) + len(sv["empty"])
     deficits = []
     for crop in cand:
         d = tgt.get(crop, 0) - counts.get(crop, 0)
@@ -1061,11 +1054,7 @@ def agent(obs):
             have = counts_now.get(crop, 0) + seeds.get(crop, 0)
             need = max(0, target - have)
             cost = CROPS[crop]["seed"]
-            cap = 14
-            if crop == "WHEAT" and _k("WHEAT_WAVE", 20) <= day <= LAST_PLANT["WHEAT"]:
-                need = max(need, len(sv["empty"]) - seeds.get("WHEAT", 0))
-                cap = 40
-            n = min(need, spendable // cost, cap)
+            n = min(need, spendable // cost, 14)
             if n > 0:
                 market.append(["BUY_SEED", crop, n])
                 money -= cost * n
