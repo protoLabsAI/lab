@@ -104,7 +104,8 @@ def _town_drain_per_day(unlocked_shops, day):
             drain[p] += center * (24 / 12)
     return drain
 HARVEST_AGE = {"WHEAT": 4, "CARROT": 3, "MELON": 10}
-LAST_PLANT = {"WHEAT": 25, "CARROT": 26, "MELON": 18, "STRAWBERRY": 16, "TOMATO": 18}
+LAST_PLANT = {"WHEAT": 25, "CARROT": 26, "MELON": 18,
+              "STRAWBERRY": _k("SB_LAST", 16), "TOMATO": 18}
 TPD = 24
 LAST_DAY = 29
 
