@@ -374,9 +374,9 @@ def _build_day_jobs(sv, day, liquidation):
             if need:
                 jobs.append((0 if streak >= 1 else 1, (x, y), ("WATER", None)))
         if c["ongoing"]:
-            if t["yield_units"] >= 2 or (t["yield_units"] > 0 and (
+            if t["yield_units"] >= _k("H_CROP", 2) or (t["yield_units"] > 0 and (
                     liquidation or day >= LAST_DAY - 1)):
-                jobs.append((2, (x, y), ("HARVEST", None)))
+                jobs.append((_k("H_PRIO", 2), (x, y), ("HARVEST", None)))
         else:
             ready_age = HARVEST_AGE.get(t["crop"], c["max_day"])
             if t["yield_units"] > 0 and age >= c["first"] and (
@@ -394,7 +394,8 @@ def _build_day_jobs(sv, day, liquidation):
             jobs.append((3, (x, y), ("COLLECT_FERTILIZER", None)))
         if t["yield_units"] > 0:
             next_prod = 1 + t.get("pending_care_bonus", 0)
-            overflow = t["yield_units"] + next_prod > a["max_held"]
+            overflow = (t["yield_units"] + next_prod > a["max_held"]
+                        or t["yield_units"] >= _k("H_ANIM", 99))
             prio = 0.5 if (day >= LAST_DAY - 1 or overflow) else (
                 1 if t["yield_units"] >= 3 else 2)
             jobs.append((prio, (x, y), ("HARVEST", None)))
