@@ -39,6 +39,14 @@ INPUT_DIR = pathlib.Path(os.environ.get("COMFY_INPUT_DIR", os.path.expanduser("~
 JOB_STORE = pathlib.Path(os.environ.get("JOB_STORE", "/mnt/data/ltx-out/video-bridge/jobs.json"))
 MODEL_PREFIX = os.environ.get("MODEL_PREFIX", "protolabs/ltx2")
 _VIDEO_EXTS = (".mp4", ".webm", ".mov", ".mkv", ".gif", ".avi", ".m4v")
+_AUDIO_EXTS = (".wav", ".mp3", ".flac", ".m4a", ".ogg", ".oga", ".opus", ".aac")
+
+
+def _probe_audio_duration(path: pathlib.Path) -> float:
+    out = subprocess.check_output(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+         "-of", "default=nw=1:nk=1", str(path)], text=True).strip()
+    return float(out)
 
 
 def _probe_video(path: pathlib.Path) -> tuple[int, int, int]:
@@ -172,6 +180,9 @@ async def create_video(request: Request,
         raise HTTPException(400, "prompt is required")
     model = body.get("model") or f"{MODEL_PREFIX}-distilled"
     extra = body.get("extra_body") or {}
+    # model-family routing: `protolabs/minimax-h3*` -> MiniMax H3 graphs (native AV);
+    # everything else stays on the LTX-2.3 path.
+    h3 = "h3" in model.lower()
 
     # Mode routing on the reference upload(s):
     #   input_reference image + last_frame image -> FLF (first->last frame interpolation)
@@ -180,10 +191,12 @@ async def create_video(request: Request,
     #   no reference                             -> T2V
     ref_name = None
     mode = "t2v"
+    a_secs = 0.0
     sub_meta: Optional[dict[str, Any]] = None
     if input_reference is not None:
         fn = input_reference.filename or "ref"
         is_video = fn.lower().endswith(_VIDEO_EXTS) or str(extra.get("mode", "")).lower() == "extend"
+        is_audio = fn.lower().endswith(_AUDIO_EXTS) or str(extra.get("mode", "")).lower() == "a2v"
         data = await input_reference.read()
         if last_frame is not None:
             # FIRST-LAST-FRAME: two images -> interpolate. Reject a video first frame here.
@@ -209,12 +222,40 @@ async def create_video(request: Request,
                 raise HTTPException(400, f"could not probe input video: {e}")
             if gframes < 9:
                 raise HTTPException(400, f"guide clip too short ({gframes} frames); need >= 9")
+        elif is_audio:
+            # AUDIO->VIDEO: the composed audio directs the scene. Write it to ComfyUI's input
+            # dir (LoadAudio reads from there); the ORIGINAL track is muxed back on in /content.
+            mode = "a2v"
+            INPUT_DIR.mkdir(parents=True, exist_ok=True)
+            ref_name = f"a2v_{uuid.uuid4().hex[:16]}{pathlib.Path(fn).suffix.lower() or '.wav'}"
+            (INPUT_DIR / ref_name).write_bytes(data)
+            try:
+                a_secs = _probe_audio_duration(INPUT_DIR / ref_name)
+            except Exception as e:
+                raise HTTPException(400, f"could not probe input audio: {e}")
+            if a_secs < 0.3:
+                raise HTTPException(400, f"audio too short ({a_secs:.2f}s)")
         else:
             ref_name = await _client.upload_image(data, filename=fn)
     elif last_frame is not None:
         raise HTTPException(400, "last_frame given without input_reference (need both for first-last-frame)")
 
-    if mode == "flf":
+    if h3:
+        # H3 supports t2v (no ref), i2v (image ref -> first_frame), flf (both frames).
+        # extend/a2v are LTX-only modes — H3's own audio is generated, not injected.
+        if mode in ("extend", "a2v"):
+            raise HTTPException(400, f"mode '{mode}' is not supported on {model}; "
+                                     "use an ltx2 model for extend/a2v")
+        try:
+            wf, sub_meta = inject.build_h3_workflow(
+                prompt, size=body.get("size"), seconds=body.get("seconds"),
+                seed=body.get("seed"),
+                first_image=first_name if mode == "flf" else ref_name,
+                last_image=last_name if mode == "flf" else None,
+                extra_body=extra)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+    elif mode == "flf":
         wf, sub_meta = inject.build_flf_workflow(
             prompt, first_image=first_name, last_image=last_name, first_w=fw, first_h=fh,
             size=body.get("size"), seconds=body.get("seconds"), seed=body.get("seed"),
@@ -223,6 +264,11 @@ async def create_video(request: Request,
         wf, sub_meta = inject.build_extend_workflow(
             prompt, video_filename=ref_name, guide_frames=gframes, guide_w=gw, guide_h=gh,
             size=body.get("size"), seconds=body.get("seconds"), seed=body.get("seed"),
+            negative_prompt=body.get("negative_prompt"), extra_body=extra)
+    elif mode == "a2v":
+        wf, sub_meta = inject.build_a2v_workflow(
+            prompt, audio_filename=ref_name, audio_seconds=a_secs,
+            size=body.get("size"), seed=body.get("seed"),
             negative_prompt=body.get("negative_prompt"), extra_body=extra)
     else:
         wf = inject.build_workflow(
@@ -264,6 +310,25 @@ async def get_content(job_id: str):
         raise HTTPException(500, "completed but no output file recorded")
     # read off local disk (co-located); fall back to ComfyUI /view
     path = OUTPUT_DIR / out["subfolder"] / out["filename"]
+
+    # a2v: the model re-renders audio, so ship the ORIGINAL composed track — mux it onto the
+    # generated video (cached next to the output so repeat /content calls don't re-encode).
+    params = job.get("params") or {}
+    if params.get("mode") == "a2v" and params.get("input_reference") and path.exists():
+        muxed = OUTPUT_DIR / (pathlib.Path(out["filename"]).stem + ".orig.mp4")
+        audio_path = INPUT_DIR / params["input_reference"]
+        if not muxed.exists() and audio_path.exists():
+            try:
+                subprocess.run(
+                    ["ffmpeg", "-y", "-v", "error", "-i", str(path), "-i", str(audio_path),
+                     "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-shortest",
+                     str(muxed)], check=True)
+            except Exception as e:
+                raise HTTPException(500, f"a2v audio mux failed: {e}")
+        if muxed.exists():
+            return Response(content=muxed.read_bytes(), media_type="video/mp4",
+                            headers={"Content-Disposition": f'inline; filename="{muxed.name}"'})
+
     if path.exists():
         data = path.read_bytes()
     else:
