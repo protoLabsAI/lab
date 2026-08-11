@@ -439,6 +439,24 @@ Power is capped at **375 W** (not the 600 W this doc used to claim) by
 default is the obvious lever if a workload ever needs it — but it spends straight into the
 top card's thermal delta, so measure GPU 0 first. Don't diagnose a hot top card as a fault.
 
+**Chassis fans ARE measurable (2026-08-11) — `modprobe nct6775`, no reboot, no kernel args.**
+It binds cleanly on this board (ASUS ROG Crosshair X670E Hero, BIOS 0922); ACPI does *not*
+reserve the ports, so `acpi_enforce_resources=lax` is unnecessary. Chip = **NCT6799D at
+0x2e:0x290** (`nct6799-isa-0290`). Persisted in `/etc/modules-load.d/nct6775.conf`.
+node-exporter's hwmon collector picks it up with **zero config change** — 46 new
+`node_hwmon_fan*` series flow straight to Prometheus on ava.
+
+**And the finding that matters: the board's fan curve is GPU-blind.** Only 2 of 7 headers
+are populated (fan2 ~1128 RPM, fan3 ~919 RPM) and both sit at **57% PWM** while GPU 0 runs
+86 °C. Smart Fan IV (`pwm_enable=5`) regulates off the board's own thermistors — SYSTIN 52,
+CPUTIN 54.5, PECI 57, all far under the 80 °C threshold — so the controller sees an idle-cool
+machine and never ramps. The heat source is invisible to the thing moving the air. That is
+*why* the top card runs hot, and it is a missing input, not a broken curve. Fixing it means
+driving PWM from GPU temp — see the fan-curve task; **any such daemon must restore
+`pwm_enable=5` on exit**, or a dead process leaves the fans pinned wherever it last wrote.
+Ignore the `in0..in17` voltage ALARMs — lm-sensors ships no limits for this chip, so
+min=max=0 flags everything.
+
 **2026-07-22: prod migrated to vLLM 0.25.0** (`~/dev/vllm-025`, clone of vllm-024-test + `pip install vllm==0.25.0`). Driven by poolside Laguna, whose card **requires 0.25.0+** — on 0.24.0 it garbled tool-calling + multi-turn agentic (band-aids: drop fp8-KV, patch `poolside_v1` regex #47311, sampling override — S/118B still borked). 0.25.0 fixes it NATIVELY (#42650 Blackwell attn + #47311 parser baked in; stock parser + fp8-KV clean, multi-turn stable). torch **stays 2.11.0+cu130**, flashinfer 0.6.12→0.6.13, sm120 recipe unchanged (first-load JIT ~4min). Behavior-preserving on Ornith: 206 tok/s (= 0.24.0), tools clean. `vllm-fast.service` repointed vllm-024-test→vllm-025 (rollback: `vllm-fast.service.pre-025-bak`; vllm-024-test env untouched). See [[reference_laguna_serving]].
 
 **2026-07-11: prod migrated to vLLM 0.24.0** (both Ornith-35B-NVFP4 replicas, `vllm.service` + `vllm-replica-b.service`). torch **stays ==2.11.0+cu130** (0.24.0 pins it) — only vllm + flashinfer 0.6.11→0.6.12 + compressed-tensors 0.15→0.17 + `nvidia-cutlass-dsl[cu13]` moved. **Behavior-preserving:** same config (`--moe-backend marlin`, NO MTP, 256K, vision), MARLIN NVFP4 backend confirmed in both engine logs, FC parity 89% (vs ~91% baseline = noise). Env lives at `~/dev/vllm-024-test` (units repointed there: ExecStart + CUDA_HOME + PATH; sm120 recipe env unchanged). **Rollback = restore units from `~/dev/.vllm-bump-review/unit-backups/*.pre-0240-20260711-*` + daemon-reload + restart** (0.22.1 `~/dev/vllm-env` untouched). **Install debt:** `vllm-024-test` was a plain `pip install vllm==0.24.0` into a clone of prod `vllm-env`, NOT the hash-locked supply-chain review the 0.22.1 cutover got — harden before treating as canonical. Enables NVFP4+bf16-MTP composition (drop `--moe-backend`, oracle picks cutlass) — MTP left OFF pending a concurrency benchmark ([[project_qwen36_27b_smartlane_gate]]).
