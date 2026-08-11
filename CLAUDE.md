@@ -342,7 +342,10 @@ NCCL env vars for PCIe (no NVLink): `NCCL_ALGO=Ring NCCL_PROTO=Simple NCCL_MIN_N
 - Root cause: ACS enabled on PCIe bridges corrupts P2P during CUDA graph replay
 - Disabling P2P forces shared memory transport — slight overhead, fully stable
 - TTFT: 3077 ms → 29 ms with prefix caching after warmup
-- Power draw: 88–96 W per card at 600 W limit — MoE is not power-bound
+- Power draw: 88–96 W per card — MoE is not power-bound. **⚠️ The "600 W limit" in this line
+  was stale: both cards are capped at 375 W** by `nvidia-power-limit.service` (enabled,
+  `nvidia-smi -pl 375`; `ExecStop` restores 600). Default/max is 600 W, min 150 W — so ~60%
+  more power is available on request, deliberately not taken (energy budget).
 - 35B TP=2: prefix caching fixed 1.8 s TTFT → 0.5 s (**−70%**), wall tok/s +25%
 - `VLLM_USE_FLASHINFER_MOE_FP8` crashes on 122B FP8 (unsupported quant scheme) — don't use
 - Previous finding that TP=2 needs enforce-eager was wrong — `NCCL_P2P_DISABLE=1` is the fix
@@ -424,6 +427,17 @@ Base models (0.8B, 2B, 4B) downloaded for pretraining. FP8 quants in `/mnt/model
 Cold storage (`/mnt/data/models-cold/`): FLUX.2-klein 9B+base (100GB), Z-Image+Turbo (51GB), Voxtral-Mini-4B (17GB), OCR models (11.4GB). Image-gen models live here pending eventual reclaim — they belong on avaLab now.
 
 ## Blackwell constraints
+
+**GPU thermals / power (characterized 2026-08-11 under sustained TP=2 load).** `GPU 0` =
+PCI `01:00.0` = the **top card**, and it runs a consistent **~12 °C hotter** than GPU 1
+(`03:00.0`) — 85/73 °C at peak, 76/64 °C at moderate load. Cause is airflow, not workload:
+the lower card exhausts up into the top one. **This costs nothing today** — HW *and* SW
+thermal slowdown both read **0 µs cumulative**, no throttle flags ever set, both cards hold
+an identical 2805 MHz SM clock, and fans sit at 40–47%. Headroom is real, not marginal.
+Power is capped at **375 W** (not the 600 W this doc used to claim) by
+`nvidia-power-limit.service`; draw under load is ~260–380 W. Raising toward the 600 W
+default is the obvious lever if a workload ever needs it — but it spends straight into the
+top card's thermal delta, so measure GPU 0 first. Don't diagnose a hot top card as a fault.
 
 **2026-07-22: prod migrated to vLLM 0.25.0** (`~/dev/vllm-025`, clone of vllm-024-test + `pip install vllm==0.25.0`). Driven by poolside Laguna, whose card **requires 0.25.0+** — on 0.24.0 it garbled tool-calling + multi-turn agentic (band-aids: drop fp8-KV, patch `poolside_v1` regex #47311, sampling override — S/118B still borked). 0.25.0 fixes it NATIVELY (#42650 Blackwell attn + #47311 parser baked in; stock parser + fp8-KV clean, multi-turn stable). torch **stays 2.11.0+cu130**, flashinfer 0.6.12→0.6.13, sm120 recipe unchanged (first-load JIT ~4min). Behavior-preserving on Ornith: 206 tok/s (= 0.24.0), tools clean. `vllm-fast.service` repointed vllm-024-test→vllm-025 (rollback: `vllm-fast.service.pre-025-bak`; vllm-024-test env untouched). See [[reference_laguna_serving]].
 
