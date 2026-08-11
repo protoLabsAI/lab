@@ -471,10 +471,12 @@ All secrets in Infisical at `secrets.proto-labs.ai`. Never commit secrets. Gatew
   checkpoint** the prod smart lane serves from (`DeepSeek-V4-Flash-0731`) — despite the
   "cold" name this path is load-bearing for prod; don't treat it as archive space
 - `/` (OS drive) — **49% / 454GB free as of 2026-08-11** (was 99% / ~11GB; freed by Josh).
-  Reclaim candidate if it tightens again: `nvme1n1` is a full unmounted **Windows install**
-  (~931GB, unused by Linux). Windows DATA drive is **`/dev/sdb`** (1.8TB NTFS, label
-  `Backup`) — never format or mount it. (Node CLAUDE.md still calls it `/dev/sdd`; it
-  enumerates as `sdb` now.)
+- **🚫 The Windows install is PERMANENT — do not propose reclaiming it (Josh, 2026-08-11).**
+  `nvme1n1` (~931GB, EFI + MSR + NTFS + recovery) stays as-is. It is NOT free capacity, is
+  not a reclaim candidate, and should not be offered as one when a drive fills up. Solve
+  storage pressure by pruning models/data instead. The Windows DATA drive is **`/dev/sdb`**
+  (1.8TB NTFS, label `Backup`) — never format or mount it either. (Node CLAUDE.md still
+  calls it `/dev/sdd`; it enumerates as `sdb` now.)
 - `/mnt/scratch` — logs, caches, docker volumes (disposable)
 - `/mnt/pool` — **REMOVED 2026-05-28**: the 37TB mergerfs HDD pool (2x 20TB IronWolf Pro) was pulled and relocated to external housing on another machine. No bulk HDD storage on this node anymore; training corpora that lived here (incl. the 6.4T salm-duplex set) are now on the external box.
 
