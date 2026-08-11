@@ -463,10 +463,36 @@ All secrets in Infisical at `secrets.proto-labs.ai`. Never commit secrets. Gatew
 
 ## Storage
 
-- `/mnt/models` — frequently-accessed model weights only (1TB NVMe, **30GB free / 97% as of
-  2026-08-11** — now the tightest drive on the box; was 420GB. Any sizeable pull fails here)
-- `/mnt/data` — datasets, checkpoints, outputs, cold model storage (2TB NVMe, **88GB free /
-  95% as of 2026-08-11**)
+- `/mnt/models` — frequently-accessed model weights only (1TB NVMe, **257GB free / 71%** after
+  the 2026-08-11 reclaim; was 30GB free / 97%)
+- `/mnt/data` — datasets, checkpoints, outputs, cold model storage (2TB NVMe, **383GB free /
+  78%** after the 2026-08-11 reclaim; was 88GB free / 95%)
+
+**Reclaim 2026-08-11 — 523GB freed.** Removed, all verified zero-reference first:
+superseded **poolside Laguna** trio (121G, lane replaced by DSV4 on 08-10) · **LTX-2 19B**
+(293G — the generation before LTX-2.3's 22B; its 7 ComfyUI symlinks removed in the same
+pass) · unused `ideogram-4-fp8` HF copy (26G — the *used* copy is `models-cold/Ideogram-4`) ·
+`RedHatAI/gemma-4-31B-it-NVFP4` (22G) · HF `fishaudio/s2-pro` (11G — live copy is
+`~/dev/fish-speech/checkpoints/s2-pro`) · `Ornith-1.0-9B-NVFP4` (11G) · gemma4 dspark/dflash/
+eagle3 drafts (17G — DSV4's DSpark head is built in, no external draft) · canary-1b-flash +
+non-turbo whisper-large-v3 (6G — protoVoice pins the **turbo** variant) · MiniCPM ×3 (6.8G,
+vision retired here) · GLM-OCR (2.5G).
+
+**Two rules that made this safe, worth reusing:**
+- **`/mnt/models` and `/mnt/data` are separate filesystems**, so the `--local-dir` hardlink
+  trap cannot span them. Verified `find -type f -links +1` returned **0** across the whole
+  delete set before touching anything. Always run that check first.
+- **Grep-absence is NOT proof of orphanhood.** `models-cold/ltx2-textenc` (13G) has *zero*
+  grep-able references anywhere yet **is** the live text encoder for both LTX-2.3 workflows,
+  reached only through one ComfyUI symlink. Enumerate symlink targets, don't just grep.
+  **KEEP:** `ltx2-textenc`, `LTX-2.3`, `DeepSeek-V4-Flash-0731`, `gemma-3-12b`, `ACE-Step-1.5`.
+
+**Pre-existing breakage found (NOT caused by the reclaim):** 16 dangling ComfyUI symlinks,
+all predating this cleanup — targets `models--Comfy-Org--Qwen-Image_ComfyUI` (the documented
+2026-05-03 hardlink incident), `models--Qwen--Qwen-Image-2512`, `models--Comfy-Org--ltx-2`,
+`/mnt/models/anima`, plus stale `models--Lightricks--LTX-2.3` HF-cache links whose files are
+gone (the working LTX-2.3 links point at `models-cold/LTX-2.3`). Image-gen workflows using
+qwen-image or anima are already broken.
 - `/mnt/data/models-cold/` — FLUX, Z-Image, Voxtral, OCR, **and the live DSV4-Flash
   checkpoint** the prod smart lane serves from (`DeepSeek-V4-Flash-0731`) — despite the
   "cold" name this path is load-bearing for prod; don't treat it as archive space
