@@ -154,6 +154,38 @@ accept (5.01 GiB for one 393216-token request) and the reported concurrency rati
 context to buy KV does not work — buy bytes instead. 384K also stays load-bearing: it's what
 makes `reasoning_effort: max` legal.
 
+**MEASURED 2026-08-11 — full `speed-test-v2 full` sweep at KVMEM 8 GiB, 25 cells, 0 errors.**
+Full table + caveats: `evals/results/speed-v2/dsv4-jasl-8gib-20260811-104306/RESULTS.md`.
+
+```
+regime      C  ttft p50  tpot p50  agg tok/s  goodput      regimes: chat 1k/1k
+chat       16     302ms    29.3ms      508.4     0.50       context 8k/1k
+context     8    1343ms    30.2ms      248.0     0.22       gen 1k/8k
+context    16    1405ms    49.0ms      309.8     0.12       think 1k/16k
+think      16     320ms    12.2ms     1096.0     0.06       legacy 128/800
+legacy     16     182ms    28.0ms      529.2     0.66
+```
+
+**`--max-num-seqs 16` is a HARD CEILING — the top actionable finding.** The C=32 cliff
+reproduces in **all five regimes**: throughput flat (−2% to +13%) while TTFT p50 collapses
+to 21–216 s and goodput goes to ~0. `think` C=32 has a **216 s median** TTFT. Above 16
+concurrent, requests queue instead of degrading. The lane **already runs at the cap** (13–15
+concurrent under load; 13 running / 49 waiting in the KV incident) and KV can now afford more
+(44% util, 0 preemptions) — raise MAXSEQS, not KVMEM.
+
+**Optimal concurrency is C=16 — except long prompts, where it's C=8.** `context` (8k) pushes
+TPOT to 49.0 ms p50 / 62.9 p99 at C=16, through the 50 ms SLO; goodput peaks at C=8 (0.22)
+and falls to 0.12 at C=16. Long-output work is this lane's strength: `think` does 1096 tok/s
+at C=16 with 320 ms TTFT, and 3.6 ms TPOT (~278 tok/s/stream) at C=1.
+
+⚠️ **`--dataset-name random` silently defeats spec decode — a caveat the script's honesty
+notes don't mention.** A draft head can't predict random tokens: DSpark acceptance measured
+**11–22% (len 1.57–2.12)** during this sweep vs **48.9% (len 3.44)** on coherent prompts. The
+fork's headline feature contributes ~nothing here while still paying 5–10× verify-batch
+inflation. **These numbers are a floor**, and benchmarking this lane against a
+non-spec-decode lane on random data is actively unfair to it. (Same day, live traffic
+measured 1.47 s mean TTFT — better than `context` predicts, via cache hits + coherent text.)
+
 **Still on the table (not taken — needs a load-test window, not a boot check):**
 - **KVMEM 8 → ~10 GiB.** ~3.6 GiB/card was left as cushion; the true ceiling is between
   8 GiB (holds) and 11.05 GiB (runtime-OOMs). Probe with `speed-test-v2.sh full` at real
