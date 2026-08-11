@@ -51,7 +51,8 @@ def load_task(task_path: Path) -> dict:
         return yaml.safe_load(f)
 
 
-def run_agent(client: OpenAI, model: str, task: dict, max_turns: int = 20, max_tokens: int = 32768) -> dict:
+def run_agent(client: OpenAI, model: str, task: dict, max_turns: int = 20, max_tokens: int = 32768,
+              reasoning_effort: str | None = None) -> dict:
     """Execute a task by sending prompts to an agent via the gateway.
 
     Returns the full conversation trace and final output.
@@ -81,6 +82,12 @@ def run_agent(client: OpenAI, model: str, task: dict, max_turns: int = 20, max_t
         extra_body.setdefault("min_p", 0.0)
         extra_body.setdefault("presence_penalty", 0.0 if is_thinking else 1.5)
         extra_body.setdefault("repetition_penalty", 1.0)
+
+        # Deliberation depth. Sent via extra_body rather than a top-level kwarg so it
+        # passes through regardless of the installed OpenAI SDK version. Task-level
+        # extra_body wins, so a suite can pin its own effort.
+        if reasoning_effort:
+            extra_body.setdefault("reasoning_effort", reasoning_effort)
 
         kwargs = {
             "model": model,
@@ -260,11 +267,20 @@ def grade_task(task: dict, output: dict, gateway_url: str = "http://ava:4000/v1"
 @click.option("--api-key", envvar=["GATEWAY_API_KEY", "LITELLM_API_KEY"], default="not-needed")
 @click.option("--submit-langfuse", is_flag=True, help="Submit scores to Langfuse")
 @click.option("--thinking", is_flag=True, help="Enable thinking/reasoning mode (Gemma 4, etc.)")
+@click.option("--effort", "reasoning_effort", envvar="EVAL_REASONING_EFFORT", default=None,
+              type=click.Choice(["none", "low", "medium", "high", "xhigh", "max"]),
+              help="reasoning_effort sent per request. On the DSV4/jasl lane this is the deliberation "
+                   "knob: 'none' forces thinking off, 'xhigh'/'max' deepen it (max needs >=384K ctx). "
+                   "Unset = server default (adaptive-ON on the jasl fork). Recorded in the result JSON.")
 @click.option("--output-dir", type=click.Path(), default=None, help="Directory to write result JSON")
 @click.option("--max-tokens", default=32768, type=int, help="Max output tokens per turn. Lower (4096) for tiny models with 8K context.")
-def main(task_path, suite, model, trials, gateway_url, api_key, submit_langfuse, thinking, output_dir, max_tokens):
+@click.option("--http-timeout", envvar="EVAL_HTTP_TIMEOUT", default=600.0, type=float,
+              help="Client timeout (s) per request. Slow thinkers on reasoning_hard can exceed the 600s default; "
+                   "a timeout aborts the suite, so raise it rather than scoring the model on a harness error.")
+def main(task_path, suite, model, trials, gateway_url, api_key, submit_langfuse, thinking, reasoning_effort,
+         output_dir, max_tokens, http_timeout):
     """Run custom eval tasks and grade results."""
-    client = OpenAI(base_url=gateway_url, api_key=api_key)
+    client = OpenAI(base_url=gateway_url, api_key=api_key, timeout=http_timeout)
     scorer = LangfuseScorer() if submit_langfuse else None
 
     # Collect task files
@@ -278,7 +294,8 @@ def main(task_path, suite, model, trials, gateway_url, api_key, submit_langfuse,
         click.echo("Specify --task or --suite")
         sys.exit(1)
 
-    click.echo(f"Model: {model} | Trials: {trials} | Tasks: {len(task_files)}")
+    click.echo(f"Model: {model} | Trials: {trials} | Tasks: {len(task_files)}"
+               + (f" | effort: {reasoning_effort}" if reasoning_effort else ""))
     click.echo("=" * 60)
 
     all_results = []
@@ -321,7 +338,8 @@ def main(task_path, suite, model, trials, gateway_url, api_key, submit_langfuse,
             trial_results = []
             trial_records: list[dict] = []
             for trial in range(1, trials + 1):
-                output = run_agent(client, model, task, max_tokens=max_tokens)
+                output = run_agent(client, model, task, max_tokens=max_tokens,
+                                   reasoning_effort=reasoning_effort)
                 judge_gateway = os.environ.get("JUDGE_GATEWAY_URL", "http://ava:4000/v1")
                 grades = grade_task(task, output, gateway_url=gateway_url, api_key=api_key, judge_url=judge_gateway)
 
@@ -413,6 +431,7 @@ def main(task_path, suite, model, trials, gateway_url, api_key, submit_langfuse,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "trials": trials,
             "thinking": thinking,
+            "reasoning_effort": reasoning_effort,
             "suites": merged_suites,
             "summary": {
                 "total_tasks": merged_total,
