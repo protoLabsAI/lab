@@ -59,7 +59,100 @@ Each phase has an exit criterion; don't move on until current phase is done.
 
 Default to publishing publicly via `protoLabsAI/` on HuggingFace and protolabs.studio for the writeup. Privacy is a drafting state, not a target. **Every shipped experiment produces a blog draft in `experiments/<name>/BLOG.md` before the next experiment starts.** audio-tags is the template.
 
-## Daily setup (dual GPU) — 2026-07-22: vLLM 0.25.0 default, Ornith fast + Laguna-S smart
+## Daily setup (dual GPU) — 2026-08-10: DSV4-Flash smart lane on the jasl fork (CANONICAL)
+
+**★ CURRENT PROD (2026-08-10, Josh-approved cutover).** `vllm-smart.service` runs
+`models/serve-dsv4-flash-jasl.sh`: DeepSeek-V4-Flash-0731 on the **jasl vLLM fork**
+(pin `aa0d513027`, env `~/dev/vllm-jasl`, rebuild via `models/build-vllm-jasl.sh`) —
+TP=2 both GPUs :8041, serves `smart reasoning coder deepseek-v4-flash`, embeds coexist.
+
+| Change vs stock 0.25.1 lane | Value |
+|---|---|
+| Decode C1 (real prompts) | **184 t/s vs 103.5 (+78%)** — DSpark spec decode K=5 (K≥5 REQUIRED, block size) |
+| Decode C8 | neutral (−0.6%) — NOT the dFlash inversion |
+| Context | **393216 (384K)** — DeepGEMM >256K ceiling fixed in fork indexer; `reasoning_effort: max` now legal |
+| KV pool | **689,133 tok (1.75× @ 384K)** via `--kv-cache-memory 8589934592`, fp8 KV — see the 2026-08-11 correction below; the 11859195904 / 951,437-tok figure measured on 08-10 runtime-OOMs and must NOT be restored |
+| Scorecard | LCB 0.633↑ FC 0.907↑ claw 0.744 · reasoning_hard 0.861 (−0.11, thinking-LENGTH delta — see below) |
+
+Full characterization: `evals/results/DSV4-JASL-TEST-2026-08-10.md`. KV footnote: stock's
+"1.89M tokens" was a reporting bug (2.19× over-report); real stock capacity ≈ 860K.
+
+**Known deltas / open items:**
+- **Default thinking = adaptive-ON** (short reasoning on every request in `reasoning`
+  field) vs stock's default-OFF. `thinking:false` / `reasoning_effort:"none"` force off.
+  Gateway aliases (homelab-iac#215) still assume default-OFF — **pin per-alias on ava**.
+- **reasoning_hard −0.11**: fork deliberates ~2/3 as long on hard tasks. Mitigation =
+  `reasoning_effort: xhigh/max` (2.4× deliberation, 384K allows max) — **unproven on the
+  suite**; add an effort knob to `runners/run_custom` and re-run.
+- **Accepted debt: no supply-chain review** of the fork (source build from github.com/jasl/vllm).
+- Rollback: `unit-backups/vllm-smart.service.pre-jasl-20260810-*` (stock 0.25.1 lane, ~2 min).
+- OS drive at 99% (~11G free) after the env build — Windows NVMe reclaim (~1TB) is the fix.
+
+**Vision lane RETIRED from this node 2026-08-11 (same day it landed) — moving to ava.**
+`vllm-vision.service` stopped + **disabled**; `embed-b.service` re-enabled (GPU0 :8004);
+smart lane KVMEM raised **5637144576 → 8589934592** (8 GiB; KV pool 452,238 → **689,133
+tokens**, max concurrency 1.15× → **1.75×** @ 384K). KV dtype stays **fp8** (unchanged).
+Validated under load, not just at boot: C=8 burst on 20K-token prompts (13 concurrent with
+live traffic) → 8/8 clean, **0 preemptions**, ~3.6 GiB free per card.
+
+**Do NOT restore 11859195904 here** (the 2026-08-10 "fully utilize" value) — tried it first
+and it FAILED: the pool allocates fine (951,437 tok, 2.42×) and then dies on the first real
+inference with `torch.OutOfMemoryError` on **GPU1**, wanting 256 MiB of transient activation
+with ~245 MiB free. Vision only ever constrained GPU0; **GPU1's tenancy (embed-A, 1.81 GiB)
+never changed**, so GPU1 could not hold an 11.3 GiB pool with or without vision. Yesterday's
+walk-down in the log (603,011 → 516,890 → 452,238) was the same wall being hit from the
+GPU0 side.
+
+**Two traps this exposed, both reusable:**
+1. **`--kv-cache-memory` is NOT profiled.** vLLM allocates exactly the bytes you ask for and
+   only discovers the shortfall when real activations land. A clean startup proves nothing —
+   always leave runtime headroom and validate under load, not at boot.
+2. **`/health` lies when the engine wedges.** After the worker OOM'd, the API server kept
+   returning **200** while the engine core sat behind a dead worker (`No available shared
+   memory broadcast block found in 60 seconds`) serving nothing. Any systemd gate or gateway
+   health check would have kept routing traffic to it. **Gate on a real completion.**
+
+**Why it was pulled:** the one-day-old vision lane cost the smart lane more than it was
+worth. Under real fan-out DSV4 was **KV-starved** — 13 running / 49 queued (44 blocked on
+`capacity`), KV usage 91%, **mean TTFT 50.5 s** — while vision had served **7 requests /
+646 prompt tokens** in ~4.9 h of uptime. Decode was never the problem (14.8 ms TPOT ≈ 67
+tok/s/stream, **0 preemptions**); the queue was.
+
+**The TP=2 tenancy rule this taught us — worth keeping.** Under TP=2 the KV pool is sharded
+symmetrically, so it is bounded by the **tighter card**. A lopsided tenant strands headroom
+on the other one: with vision (7.3 G) on GPU0 and embed-A (1.9 G) on GPU1, GPU0 had 688 MiB
+free while GPU1 sat on 6128 MiB that **no request could ever use**. Keep co-tenants balanced
+across both cards, or the imbalance is paid twice. (Consolidating both tenants onto one card
+is *worse*, not better — it just moves the binding constraint.)
+
+**Note `--max-model-len` is NOT a KV lever here.** With `--kv-cache-memory` pinned, the pool
+is a fixed byte allocation; lowering max-model-len frees ~0 bytes (activation memory scales
+with `--max-num-batched-tokens`, not context length). It only lowers the *floor* vLLM will
+accept (5.01 GiB for one 393216-token request) and the reported concurrency ratio. Cutting
+context to buy KV does not work — buy bytes instead. 384K also stays load-bearing: it's what
+makes `reasoning_effort: max` legal.
+
+**Still on the table (not taken — needs a load-test window, not a boot check):**
+- **KVMEM 8 → ~10 GiB.** ~3.6 GiB/card was left as cushion; the true ceiling is between
+  8 GiB (holds) and 11.05 GiB (runtime-OOMs). Probe with `speed-test-v2.sh full` at real
+  prompt sizes, not a single request.
+- **`--max-num-batched-tokens 4096` is the bigger TTFT lever, and it is untouched.** In the
+  KV-starved incident only **8.6 s of the 50.5 s mean TTFT was queue wait** — the other ~42 s
+  was prefill. At MNBT 4096 a p88-sized 50K-token prompt needs 12+ chunked-prefill iterations
+  competing with decode. Raising MNBT costs activation memory (which is why it pairs *against*
+  a KVMEM raise — they draw on the same cushion). Decode was never the problem: 14.8 ms TPOT
+  ≈ 67 tok/s/stream throughout.
+
+**Consumers left dangling until MiniCPM lands on ava:** `protolabs/vision` gateway alias
+(dead :8050) and protoAgent `knowledge.image_describe_model: protolabs/vision` in
+`~/.protoagent/default/config/langgraph-config.yaml`. No local vision fallback — the fast
+lane (Ornith-35B-NVFP4), which *out-visions* MiniCPM (OCRBench 89.7 vs 77.3, MMMU 75.6 vs
+50.2), has been down since the 2026-08-08 DSV4 cutover. To bring vision back here instead:
+re-enable `vllm-vision.service`, disable embed-b, drop KVMEM to 5637144576.
+
+> **Below: the prior 2026-07-22 setup** — kept for Ornith/Laguna serving notes and rollback context.
+
+## [SUPERSEDED 2026-08-10] Daily setup (dual GPU) — 2026-07-22: vLLM 0.25.0 default, Ornith fast + Laguna-S smart
 
 **★ CURRENT PROD (2026-07-22).** vLLM **0.25.0** (`~/dev/vllm-025`) is now the default env — cut over from
 0.24.0/`vllm-024-test` (which is untouched as rollback). torch stays 2.11.0+cu130, flashinfer 0.6.13, sm120
@@ -184,6 +277,19 @@ bash models/vllm-swap.sh qwen-122b-fp8      # quality ceiling FP8 official TP=2 
 bash models/vllm-swap.sh qwen-122b-int4     # quality ceiling INT4 TP=2 (122 tok/s)
 bash models/vllm-swap.sh qwen-27b-fp8-tp2   # FP8 official TP=2 (70 tok/s, 131K)
 ```
+
+## A/B chat (side-by-side model comparison)
+
+```bash
+python models/ab_chat.py                    # defaults: Daria gated :8043 vs base :8045
+python models/ab_chat.py --a URL --am MODEL --al LABEL --b URL --bm MODEL --bl LABEL
+python models/ab_chat.py --once "prompt"    # one-shot, scriptable
+```
+
+Single input → two columns, independent multi-turn histories, per-side latency. Works against any
+two OpenAI-compatible endpoints (vLLM lanes, llama.cpp, custom servers). In-chat: `/sys <text>`
+(system prompt both sides), `/clear`, `/save [path]` (JSON transcript → good sample material for
+cards/blogs), `/quit`. Knobs: `--max-tokens --temp --timeout`. Zero deps beyond `requests`.
 
 ## Speed testing
 
