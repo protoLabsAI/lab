@@ -77,6 +77,28 @@ TP=2 both GPUs :8041, serves `smart reasoning coder deepseek-v4-flash`, embeds c
 Full characterization: `evals/results/DSV4-JASL-TEST-2026-08-10.md`. KV footnote: stock's
 "1.89M tokens" was a reporting bug (2.19× over-report); real stock capacity ≈ 860K.
 
+**xgrammar "Failed to advance FSM" errors are LOG NOISE, not corrupted output (measured
+2026-08-11).** The jasl lane logs `backend_xgrammar.py:162 Failed to advance FSM for request
+… for tokens N` on guided-decoding requests. Root cause is **adaptive thinking × guided
+decoding** — clean A/B, identical schema:
+
+```
+                   FSM errors   reasoning chars   schema-valid
+thinking ON  (12)      18          3335 mean         12/12
+thinking OFF (12)       0             0              12/12
+tools    ON  (10)       5             —              10/10
+tools    OFF (10)       0             —              10/10
+```
+
+xgrammar is fed reasoning tokens that can't match the JSON grammar and complains; the engine
+applies the grammar only to the content stream, so **output integrity is unaffected**.
+**86 guided/tool requests across 7 schema shapes (flat, nested, array-of-objects, enum,
+regex, 4-deep, anyOf) — 100% schema-valid, zero violations.** structured 0.917 / FC 0.907 are
+NOT suspect. ⚠️ But **do not alert on this string**: every thinking+guided request emits
+~0.5–1.5 lines, so a *real* FSM failure would be buried. Fix (or upstream report) first.
+Lesson: this was initially escalated to top priority on log severity alone — measure the
+output before ranking a defect.
+
 **Known deltas / open items:**
 - **Default thinking = adaptive-ON** (short reasoning on every request in `reasoning`
   field) vs stock's default-OFF. `thinking:false` / `reasoning_effort:"none"` force off.
