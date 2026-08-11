@@ -457,6 +457,29 @@ driving PWM from GPU temp — see the fan-curve task; **any such daemon must res
 Ignore the `in0..in17` voltage ALARMs — lm-sensors ships no limits for this chip, so
 min=max=0 flags everything.
 
+**…and then MEASURED it, which killed the idea. Chassis airflow is NOT the constraint.**
+Controlled A/B, load held constant at 10-14 concurrent requests, 4 min soak per arm:
+
+```
+                gpu0  gpu1   fan2 RPM  fan3 RPM
+57% PWM (board)   85    72      1128       934
+100% PWM          83    71      1662      1430
+```
+
+**+47% fan RPM bought ~1 °C** — and the 100% arm was carrying *more* load, so the real effect
+is ≤1 °C. Don't build a GPU-driven chassis fan curve: it trades a genuine failure mode
+(`pwm_enable=1` held by a process that can die) for nothing. The case already supplies more
+air than the GPU coolers can use. It also means **the ~12 °C GPU0/GPU1 delta is card-to-card,
+not case airflow** — GPU 1 exhausts into GPU 0's intake, and no amount of case fan can undo
+that. The remaining lever is the cards' own fans, which idle at **52% / 44% while at 84/70 °C**
+(read-only via `nvidia-smi`; `nvidia-settings` needs an X display this box doesn't have).
+
+⚠️ **Thermal-A/B methodology, learned by getting it wrong:** the first run showed a glorious
+86 → 47 °C "win" from ramping fans. It was entirely bogus — the lane went idle mid-test and
+that was just residual heat bleeding off at zero load. Only caught because the sampler
+printed `running=0.0`. **Always instrument load in a thermal experiment and hold it constant
+across arms**; the confound is huge and points the same way as the hypothesis.
+
 **2026-07-22: prod migrated to vLLM 0.25.0** (`~/dev/vllm-025`, clone of vllm-024-test + `pip install vllm==0.25.0`). Driven by poolside Laguna, whose card **requires 0.25.0+** — on 0.24.0 it garbled tool-calling + multi-turn agentic (band-aids: drop fp8-KV, patch `poolside_v1` regex #47311, sampling override — S/118B still borked). 0.25.0 fixes it NATIVELY (#42650 Blackwell attn + #47311 parser baked in; stock parser + fp8-KV clean, multi-turn stable). torch **stays 2.11.0+cu130**, flashinfer 0.6.12→0.6.13, sm120 recipe unchanged (first-load JIT ~4min). Behavior-preserving on Ornith: 206 tok/s (= 0.24.0), tools clean. `vllm-fast.service` repointed vllm-024-test→vllm-025 (rollback: `vllm-fast.service.pre-025-bak`; vllm-024-test env untouched). See [[reference_laguna_serving]].
 
 **2026-07-11: prod migrated to vLLM 0.24.0** (both Ornith-35B-NVFP4 replicas, `vllm.service` + `vllm-replica-b.service`). torch **stays ==2.11.0+cu130** (0.24.0 pins it) — only vllm + flashinfer 0.6.11→0.6.12 + compressed-tensors 0.15→0.17 + `nvidia-cutlass-dsl[cu13]` moved. **Behavior-preserving:** same config (`--moe-backend marlin`, NO MTP, 256K, vision), MARLIN NVFP4 backend confirmed in both engine logs, FC parity 89% (vs ~91% baseline = noise). Env lives at `~/dev/vllm-024-test` (units repointed there: ExecStart + CUDA_HOME + PATH; sm120 recipe env unchanged). **Rollback = restore units from `~/dev/.vllm-bump-review/unit-backups/*.pre-0240-20260711-*` + daemon-reload + restart** (0.22.1 `~/dev/vllm-env` untouched). **Install debt:** `vllm-024-test` was a plain `pip install vllm==0.24.0` into a clone of prod `vllm-env`, NOT the hash-locked supply-chain review the 0.22.1 cutover got — harden before treating as canonical. Enables NVFP4+bf16-MTP composition (drop `--moe-backend`, oracle picks cutlass) — MTP left OFF pending a concurrency benchmark ([[project_qwen36_27b_smartlane_gate]]).
