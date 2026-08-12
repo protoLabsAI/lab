@@ -61,3 +61,30 @@ incorrect output; the fork validates this). So that waste is structural and untu
 Raising `--max-num-seqs` above 16 pushes the lane toward higher concurrency — exactly where DSpark
 costs throughput. The two changes are not independent and should be evaluated together, not
 sequentially.
+
+---
+
+## ⚠️ CONTAMINATION FOUND AFTER THE FACT (2026-08-11, same session)
+
+While running a follow-up MAXSEQS A/B on the same harness, run-to-run spread on **identical
+configs** measured **31–60%**. Root cause: the lane was serving **production traffic throughout** —
+8 completions in a 45 s "idle" window, 1–3 concurrent, from `100.101.189.45` (the ava gateway).
+
+**This A/B was run under the same uncontrolled load.** Treat the numbers above as directional, not
+final:
+
+- The **direction** is credible — the effect is large (+104% → −19%), monotonic across four
+  concurrencies, matches the documented dFlash precedent, and has a clear mechanism (verify-batch
+  inflation competing for saturated compute).
+- The **magnitudes are not trustworthy**, and the C=1 arm is the most suspect: background load of
+  1–3 concurrent requests perturbs a nominally single-stream measurement far more than a C=16 one,
+  which would inflate the apparent ON-vs-OFF gap at C=1 specifically.
+- The **crossover point (C≈5–6) is therefore soft** — it could sit meaningfully higher, and the
+  low-acceptance corpus (15–30% vs 39–48% live) already biases it low for a second, independent
+  reason.
+
+**Do not act on this without a re-run under a traffic-quiesced lane** (see the MAXSEQS task for the
+protocol: quiesce the gateway, verify flat `request_success_total`, n≥5, interleave arms A/B/A/B).
+
+Lesson, third instance in one day: **instrument the load variable in any serving experiment and
+hold it constant across arms.** A benchmark that shares a lane with prod traffic is measuring both.
