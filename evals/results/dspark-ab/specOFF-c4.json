@@ -1,0 +1,18 @@
+{
+ "label": "spec-OFF",
+ "concurrency": 4,
+ "n": 16,
+ "ok": 16,
+ "failed": 0,
+ "input_tokens": 1024,
+ "output_tokens": 256,
+ "ttft_p50_ms": 307.35996598377824,
+ "ttft_p99_ms": 608.3226369228214,
+ "tpot_p50_ms": 13.26564386277003,
+ "tpot_p99_ms": 14.03938444313027,
+ "mean_ttft_ms": 349.90189500240376,
+ "mean_tpot_ms": 13.325157453187321,
+ "agg_out_tok_s": 273.0089269535351,
+ "wall_s": 15.003172407974489,
+ "total_output_tokens": 4096
+}
