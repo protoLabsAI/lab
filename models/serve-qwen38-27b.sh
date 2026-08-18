@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Qwen3.8-27B bf16 eval serve — single GPU 0, :8000, served as `local`.
+# Qwen3.8-27B bf16 serve — THE script the vllm-local systemd unit runs in prod (since
+# 2026-08-15); this file is its source of truth, committed to stop repo/disk drift.
+# Defaults are the eval configuration: single GPU 0, :8000, served as `local`, MTP off.
 #
 # Qwen3.8 is a NEW POST-TRAIN ON THE QWEN3.5 ARCHITECTURE, not a new arch:
 # config.json declares model_type=qwen3_5 / Qwen3_5ForConditionalGeneration, which both
