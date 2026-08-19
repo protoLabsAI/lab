@@ -59,21 +59,87 @@ Each phase has an exit criterion; don't move on until current phase is done.
 
 Default to publishing publicly via `protoLabsAI/` on HuggingFace and protolabs.studio for the writeup. Privacy is a drafting state, not a target. **Every shipped experiment produces a blog draft in `experiments/<name>/BLOG.md` before the next experiment starts.** audio-tags is the template.
 
-## Daily setup (dual GPU) — Ornith-35B-NVFP4 replicas (2026-07-04)
+## Daily setup (dual GPU) — 2026-07-22: vLLM 0.25.0 default, Ornith fast + Laguna-S smart
 
-All services run as systemd and auto-start on boot. **Daily driver = 2× our `Ornith-1.0-35B-NVFP4` replicas** (one per GPU, gateway round-robin) — flipped from FP8 on 2026-07-04 after a 6/6 gate PASS vs the FP8 prod baseline (claw paired +0.005, reasoning ×3 tied, FC +1.4, coherence clean to 60K, C1 speed parity at 208 tok/s, **24 GB vs 35 GB weights** → +11 GB KV headroom per card). Published at [`protoLabsAI/Ornith-1.0-35B-NVFP4`](https://huggingface.co/protoLabsAI/Ornith-1.0-35B-NVFP4); FP8 units backed up at `~/dev/.vllm-bump-review/unit-backups/*.pre-nvfp4-20260704-0850` (rollback = restore + daemon-reload + restart). **NVFP4 units REQUIRE the sm120 recipe env in the unit** (`FLASHINFER_CUDA_ARCH_LIST=12.0f`, `CUDA_HOME=<cu13>`, cu13 in PATH, `NVCC_APPEND_FLAGS=-DCCCL_DISABLE_CTK_COMPATIBILITY_CHECK`, `VLLM_USE_TRITON_FP8_GEMM=1`) — without it the NVFP4 linear GEMMs hit the FlashInfer "no CUDA arch for major 12" crash — plus `--moe-backend marlin` (trtllm Sm120_SafeFP4 segfaults). Vision verified working on the quant (visual tower kept bf16). North star in [`FOCUS.md`](FOCUS.md).
+**★ CURRENT PROD (2026-07-22).** vLLM **0.25.0** (`~/dev/vllm-025`) is now the default env — cut over from
+0.24.0/`vllm-024-test` (which is untouched as rollback). torch stays 2.11.0+cu130, flashinfer 0.6.13, sm120
+recipe unchanged. Behavior-preserving on Ornith (206 tok/s, tools clean).
 
 | GPU | Service | Model | Port | Notes |
 |-----|---------|-------|------|-------|
-| 0 | `vllm.service` | Ornith-1.0-35B-NVFP4 | :8000 | replica A, util 0.90, 256K, vision, `local` |
-| 1 | `vllm-replica-b.service` | Ornith-1.0-35B-NVFP4 | :8003 | replica B, util 0.72 (Fish+embed co-resident), 256K, vision, `local` |
-| 0 | `embed-b.service` | Qwen3-Embedding-0.6B | :8004 | embed B (doubled) |
-| 1 | `embed-server.service` | Qwen3-Embedding-0.6B | :8001 | embed A |
-| 1 | `protovoice-stack.service` | Fish S2-Pro TTS | :8092 | ~20GB, lazy-load |
+| 0 | `vllm-fast.service` (→vllm-025) | Ornith-1.0-35B-NVFP4 | :8040 | `fast` — orchestrator/agentic, `qwen3_xml` tools, fp8-KV, util 0.33 |
+| 1 | manual serve (vllm-025) | **poolside Laguna-S-2.1-NVFP4** | :8041 | `smart` — 118B/8B agentic coder (SWE-bench 78.5%), `poolside_v1` parsers |
 
-`vllm-fast.service` (retired Gemma fast lane) is **disabled**. Gateway: `protolabs/smart` round-robins (`least-busy`) across :8000+:8003, embedding alias balances :8001+:8004 ([homelab-iac#174](https://github.com/protoLabsAI/homelab-iac/issues/174)). ~207 tok/s/request, ~6500 tok/s aggregate. **Replicas beat DP+EP/TP=2 on PCIe** — never shard a model that fits one card (benchmarked C32: DP+EP 3830 · single 3990 · 2 replicas ~6500). Eval judges target a replica (`local` :8000/:8003) now the Gemma lane is gone. WAN upload is ~100 Mbps (a 100BASE-TX choke, [homelab-iac#176](https://github.com/protoLabsAI/homelab-iac/issues/176)) — publish big models via per-file commits or cloud-quantize.
+- **Laguna needs vLLM 0.25.0** (0.24.0 garbles tools/multi-turn — every band-aid failed; the version IS the
+  fix). Serve: `--trust-remote-code --reasoning-parser poolside_v1 --enable-auto-tool-choice --tool-call-parser
+  poolside_v1 --override-generation-config '{"temperature":0.7,"top_p":0.95}' --moe-backend marlin
+  --kv-cache-dtype fp8`, `HF_HUB_OFFLINE=1`, sm120 env. The override is load-bearing (raw sampling defaults
+  degrade NVFP4). Full playbook: [[reference_laguna_serving]].
+- **S is a manual serve** (not yet a systemd unit — make one when it graduates from vibe-testing).
+- **Rollback fast to 0.24.0**: restore `/etc/systemd/system/vllm-fast.service.pre-025-bak` + daemon-reload + restart.
+- Media (ComfyUI/Fish/embed on GPU1) currently displaced by Laguna-S; bring back if S moves off GPU1.
 
-> **Everything below this line is HISTORICAL** — dFlash, DiffusionGemma, AR-Gemma fast lane, 27B-MTP smart lane — all **superseded by the Ornith replica setup above**. Kept for breakdown material + the GPU/util/Fish-TTS budget math.
+> **Below: the prior 2026-07-20 2-lane (gemma-31B smart on 0.24.0)** — kept for the gemma-4 landmines,
+> sequential-start rationale, and rollback path.
+
+**[prior] CURRENT PROD.** Consolidated from the 3-lane fleet after the Gemma-4 v2 re-pass
+(`evals/results/GEMMA4-REPASS-2026-07-19.md`): **GPU0 = LLM card, GPU1 = media card.**
+
+| GPU | Service | Model | Port | util | Notes |
+|-----|---------|-------|------|------|-------|
+| 0 | `vllm-fast.service` | Ornith-1.0-35B-NVFP4 | :8040 | 0.33 | `fast` — orchestrator/agentic/vision, tools (`qwen3_xml`), 256K, fp8-KV (unchanged) |
+| 0 | `vllm-smart.service` | **RedHatAI/gemma-4-31B-it-NVFP4 + MTP K=1** | :8041 | 0.59 | serves `smart` + legacy `reasoning`/`coder` aliases; gemma4 parsers, non-thinking, 256K, fp8-KV, `--language-model-only` |
+| 0 | `embed-b.service` | Qwen3-Embedding-0.6B | :8004 | — | embed B |
+| 1 | ComfyUI | LTX-2.3 NVFP4 / Krea / ACE-Step / Ideogram | :8188 | — | media card — full headroom for video/image/music |
+| 1 | `protovoice-stack.service` | Fish S2-Pro TTS | :8092 | — | lazy ~20G (inactive unless needed) |
+| 1 | `embed-server.service` | Qwen3-Embedding-0.6B | :8001 | — | embed A |
+
+- **Why 31B**: board-best LCB (0.708 > CoderNext 0.645), board-best structured_hard (0.849),
+  IF 0.90, FC 0.926, claw 0.724 — one dense 22G checkpoint ≈ the reasoning+coder lanes.
+  ThinkingCap keeps a reasoning_hard edge (0.889 vs 0.806) — rollback below if that matters.
+- **Sequential start still REQUIRED on GPU0**: smart gates on fast `/health` (ExecStartPre).
+  Restart order: fast → smart → embed-b.
+- **Gemma-4 serving landmines**: nvidia ModelOpt NVFP4 does NOT load on 0.24.0 (tie_weights
+  NotImplementedError) — compressed-tensors only. Forced `enable_thinking:true` is broken on
+  the family (12B: parser swallows the entire output) — the lane is non-thinking (gemma4 structural
+  default), which is also the correct coding config. TRITON_ATTN env required.
+- **Rollback to 3-lane**: `vllm-reasoning.service` (ThinkingCap :8041) + `vllm-coder.service`
+  (Coder-Next :8032) on disk, **disabled** 2026-07-20; backups
+  `~/dev/.vllm-bump-review/unit-backups/*.pre-2lane-20260720-*`. Stop smart → enable+start
+  reasoning (then coder on GPU1, which again competes with ComfyUI for VRAM).
+- **Gateway**: ava-side remap needed — `protolabs/coder` base_url :8032→:8041 (model name
+  `coder` still served); `protolabs/reasoning`/:8041 unchanged; new alias `protolabs/smart`
+  recommended. Until remapped, coder alias 404s (lane was already stopped pre-cutover).
+
+> **Everything below is the superseded 3-lane fleet (2026-07-11/12/13)** — kept for the
+> fp8-KV findings, sequential-start rationale, and GPU budget math, which still apply.
+
+## [SUPERSEDED 2026-07-20] Daily setup (dual GPU) — 3-lane NVFP4 fleet (2026-07-11, fp8-KV added 2026-07-12)
+
+All services run as systemd and auto-start on boot. **Daily driver = a 3-lane split**: fast (orchestrator/agentic), reasoning (thinking), coder — all NVFP4, all 256K ctx, all on vLLM 0.24.0 (`~/dev/vllm-024-test`). Superseded the 2× Ornith-replica setup (now [[project_blackwell_3lane_fleet]]).
+
+| GPU | Service | Model | Port | util | Notes |
+|-----|---------|-------|------|------|-------|
+| 0 | `vllm-fast.service` | Ornith-1.0-35B-NVFP4 | :8040 | 0.33 | `fast`, tools (`qwen3_xml`), vision, orchestrator lane |
+| 0 | `vllm-reasoning.service` | ThinkingCap-Qwen3.6-27B-NVFP4 | :8041 | 0.59 | `reasoning`, MTP k=1 (+51%), tools, thinking (util 0.62→0.59 on 2026-07-13 to fit embed-B on GPU0) |
+| 0 | `embed-b.service` | Qwen3-Embedding-0.6B | :8004 | — | embed B (load-balanced w/ embed A) |
+| 1 | `vllm-coder.service` | Qwen3-Coder-Next-NVFP4 | :8032 | 0.63 | `coder`, co-resident w/ Fish+embed |
+| 1 | `embed-server.service` | Qwen3-Embedding-0.6B | :8001 | — | embed A |
+| 1 | `protovoice-stack.service` | Fish S2-Pro TTS | :8092 | — | ~20GB, lazy-load |
+
+**Embed is always-on, load-balanced across BOTH cards (2026-07-13):** `embed-server.service` (embed A, GPU1 :8001) + `embed-b.service` (embed B, GPU0 :8004), both `enabled` (survive reboot), same Qwen3-Embedding-0.6B. The 3-lane fleet had packed GPU0 solid (fast 0.33 + reasoning 0.62 → ~19 MiB free), which OOM'd embed-B; trimmed reasoning util **0.62→0.59** (frees ~3G, backup at `~/dev/.vllm-bump-review/unit-backups/vllm-reasoning.service.pre-embedb-util059-*`) so both embed lanes fit. Restart order if GPU0 lanes bounce: fast → reasoning (gated on fast `/health`) → embed-b. Reasoning reload was clean (~70s, fast untouched).
+
+**All three lanes run `--kv-cache-dtype fp8` (2026-07-12).** fp8-KV is FIXED on 0.24.0/sm120 (overturns the old "broken on sm120" wall) — coherent, +2% speed, and **2–4× KV headroom**: fast 683K tok (2.61×), reasoning 872K (3.33×), coder 1.14M (4.33×). Depth-gate PASS: exact needle retrieval at 8K/32K/105K on all three, no rot. See [[project_vllm_0221_cuda13_migration]].
+
+**Config invariants:** all lanes `--max-model-len 262144 --max-num-seqs 8 --enable-chunked-prefill --enable-prefix-caching --trust-remote-code` + the **sm120 recipe env** (`FLASHINFER_CUDA_ARCH_LIST=12.0f`, `CUDA_HOME=<cu13>`, cu13 in PATH, `NVCC_APPEND_FLAGS=-DCCCL_DISABLE_CTK_COMPATIBILITY_CHECK`, `VLLM_USE_TRITON_FP8_GEMM=1`, `VLLM_USE_FLASHINFER_SAMPLER=0`). Marlin lanes use `--moe-backend marlin`; **MTP lanes drop the global `--moe-backend` and use `--linear-backend marlin`** so the MoE oracle picks cutlass (composes with the bf16 MTP head — global marlin was the blocker, not the head). Vision kept bf16 on the quant.
+
+**⚠️ Sequential-start REQUIRED** — util is a fraction of the WHOLE card and the co-resident lanes race for memory on a shared GPU; the reasoning/coder units gate on the prior lane's `/health` via ExecStartPre. Don't parallel-restart same-GPU lanes.
+
+**Gateway map** (homelab-iac#190, ava side): `protolabs/fast`→Ornith :8040, `protolabs/reasoning`→ThinkingCap :8041, `protolabs/coder`→Coder-Next :8032, old `reasoning`→`cloud` (DeepSeek V4). Eval judges target a local lane. WAN upload ~100 Mbps ([homelab-iac#176](https://github.com/protoLabsAI/homelab-iac/issues/176)) — publish big models per-file or cloud-quantize.
+
+**Rollback to 2× Ornith replicas:** `vllm.service` (:8000) + `vllm-replica-b.service` (:8003) are on disk, **disabled** (relabeled ROLLBACK 2026-07-12); re-enable + start to revert. That setup ran both cards as `Ornith-1.0-35B-NVFP4` replicas (util 0.90/0.72), `protolabs/smart` round-robin, ~6500 tok/s aggregate — **replicas beat DP+EP/TP=2 on PCIe** (C32: DP+EP 3830 · single 3990 · 2 replicas ~6500); never shard a model that fits one card.
+
+> **Everything below this line is HISTORICAL** — 2× Ornith replicas, dFlash, DiffusionGemma, AR-Gemma fast lane, 27B-MTP smart lane — all **superseded by the 3-lane fleet above**. Kept for breakdown material + the GPU/util/Fish-TTS budget math.
 
 **2026-06-25: smart lane tried dFlash spec-decode, then REVERTED to MTP (see tradeoff note below).** For ~2.5h ran z-lab's block-diffusion **dFlash** draft (`z-lab/Qwen3.6-27B-DFlash`, 2B bf16, drafts for Qwen3.6-27B). Serves on **stock vLLM 0.22.1 — no bump, no PR, no `speculators` pip** (0.22.1 already ships `qwen3_dflash.py`/`DFlashQwen3ForCausalLM` + `v1/spec_decode/dflash.py`; the model card's "needs PR #40898 for interleaved SWA" note is stale for our build). Measured **74.6 → 106.9 decode tok/s (+43%)** single-stream in the live prod config (`-O3`, 225K, 512 seqs); tool-calling (`qwen3_xml`) + thinking verified clean, lossless (target verifies every accepted token). Only the `--speculative-config` line changed (MTP → `{"method":"dflash","model":"z-lab/Qwen3.6-27B-DFlash","num_speculative_tokens":10}`); `num_speculative_tokens=10` is the tuned peak (sweep 3/6/10/16 → 96.8/114.3/116.9/106.2 tok/s on a leaner GPU1 config). Backup unit at `~/dev/.vllm-bump-review/unit-backups/vllm.service.pre-dflash-*` — rollback to MTP = restore + `daemon-reload` + restart. Full work in `experiments/dflash/` (README/RESULTS/sweep.sh/run-dflash.sh/bench.sh/conc_bench.py/conc-driver.sh).
 
@@ -177,15 +243,31 @@ NCCL env vars for PCIe (no NVLink): `NCCL_ALGO=Ring NCCL_PROTO=Simple NCCL_MIN_N
 
 ## Running evals
 
+**Standard model scorecard (use this for model decisions) — `evals/eval-model.sh`:**
 ```bash
 cd evals
+./eval-model.sh <label> <target-url> <model> [--quick|--full]   # → results/scorecard-<label>-<ts>/scorecard.{md,json}
 
-./run.sh profile --name quick --model local    # ~15 min smoke test, 1 trial
+./eval-model.sh ThinkingCap http://localhost:8041/v1 reasoning         # quick (default): the discriminating battery
+./eval-model.sh Ornith-35B  http://localhost:8040/v1 fast --full       # + breadth suites
+```
+The **discriminating frontier battery** — the classic `run.sh profile` suites saturate (~0.95) on frontier
+models, so this is the reusable standard: **quick** = claw(10, agentic) + reasoning_hard (solver-verified) +
+LiveCodeBench (exec-graded) + function_call (schema); **full** adds instruction_following + structured_hard +
+safety + creative_writing. Judge-free except claw, which uses an **independent cloud judge** (`protolabs/cloud`
+= DeepSeek V4) so a local model never grades itself. Aggregator `runners/scorecard.py` also **flags any
+llm_judge 0.5-fallbacks** (a dead judge can't masquerade as real scores). Knobs: `LCB_LIMIT=N`, `EVAL_THINKING=0`,
+`JUDGE_MODEL`/`JUDGE_GATEWAY_URL`. **NOTE:** `evals/.env` pins the judge to a dead `:8000` (old replica) —
+`eval-model.sh` overrides it to the cloud judge; if you use `run.sh --local` directly, repoint the judge first.
+
+**Classic profiles / individual suites:**
+```bash
+./run.sh profile --name quick --model local    # ~15 min smoke test, 1 trial (NOTE: suites saturate on frontier models)
 ./run.sh profile --name full --model local     # comprehensive, full breadth, 1 trial
 
 ./run.sh claw --model local --tasks T02,T04,T06,T08 --port-offset 200
 ./run.sh custom --suite coding --model local --trials 1
-./run.sh custom --suite reasoning --model local --trials 1
+./run.sh custom --suite reasoning_hard --model local --thinking   # the discriminating reasoning suite
 ./run.sh function-call --model local --all-suites
 ```
 
@@ -210,7 +292,12 @@ Profiles: **quick** — 10 claw + custom + FC, 1 trial. **full** — 30 claw + a
 
 ## Model inventory (`/mnt/models`)
 
-| Model | Size | tok/s | +MTP | Quick Score | Role |
+> ⚠️ The `tok/s` column below is **single-stream (C=1)** — internal reference only, **NOT a publishable number**
+> (a C1 win can invert 3× under real C=4-8 fan-out — the dFlash lesson). For any card/blog/board number use
+> `speed-test-v2.sh` (concurrency-swept aggregate + goodput + cache-warm + decode-at-depth-to-256K). See
+> [[feedback_eval_prod_token_budget]] — the same honest-numbers bar applies to speed as to quality.
+
+| Model | Size | tok/s (C1) | +MTP | Quick Score | Role |
 |-------|------|:-----:|:----:|:-----------:|------|
 | **Qwen 35B MoE FP8** | 35GB | **180** | — | — | Speed king, 262K ctx, single GPU (Qwen official) |
 | **Qwen 9B FP8** | 19GB* | **141** | — | — | On-the-fly FP8 (+53% vs bf16) |
@@ -232,7 +319,11 @@ Cold storage (`/mnt/data/models-cold/`): FLUX.2-klein 9B+base (100GB), Z-Image+T
 
 ## Blackwell constraints
 
-**2026-06-13: prod migrated to vLLM 0.22.1 / CUDA 13** (was 0.20.1 / CUDA 12.8). torch 2.11+cu130, transformers 5.12. Supply-chain-reviewed hash-locked install. Two env vars are now REQUIRED on sm120 that 0.20.1 set automatically — without them you hit the FlashInfer sm75 crash:
+**2026-07-22: prod migrated to vLLM 0.25.0** (`~/dev/vllm-025`, clone of vllm-024-test + `pip install vllm==0.25.0`). Driven by poolside Laguna, whose card **requires 0.25.0+** — on 0.24.0 it garbled tool-calling + multi-turn agentic (band-aids: drop fp8-KV, patch `poolside_v1` regex #47311, sampling override — S/118B still borked). 0.25.0 fixes it NATIVELY (#42650 Blackwell attn + #47311 parser baked in; stock parser + fp8-KV clean, multi-turn stable). torch **stays 2.11.0+cu130**, flashinfer 0.6.12→0.6.13, sm120 recipe unchanged (first-load JIT ~4min). Behavior-preserving on Ornith: 206 tok/s (= 0.24.0), tools clean. `vllm-fast.service` repointed vllm-024-test→vllm-025 (rollback: `vllm-fast.service.pre-025-bak`; vllm-024-test env untouched). See [[reference_laguna_serving]].
+
+**2026-07-11: prod migrated to vLLM 0.24.0** (both Ornith-35B-NVFP4 replicas, `vllm.service` + `vllm-replica-b.service`). torch **stays ==2.11.0+cu130** (0.24.0 pins it) — only vllm + flashinfer 0.6.11→0.6.12 + compressed-tensors 0.15→0.17 + `nvidia-cutlass-dsl[cu13]` moved. **Behavior-preserving:** same config (`--moe-backend marlin`, NO MTP, 256K, vision), MARLIN NVFP4 backend confirmed in both engine logs, FC parity 89% (vs ~91% baseline = noise). Env lives at `~/dev/vllm-024-test` (units repointed there: ExecStart + CUDA_HOME + PATH; sm120 recipe env unchanged). **Rollback = restore units from `~/dev/.vllm-bump-review/unit-backups/*.pre-0240-20260711-*` + daemon-reload + restart** (0.22.1 `~/dev/vllm-env` untouched). **Install debt:** `vllm-024-test` was a plain `pip install vllm==0.24.0` into a clone of prod `vllm-env`, NOT the hash-locked supply-chain review the 0.22.1 cutover got — harden before treating as canonical. Enables NVFP4+bf16-MTP composition (drop `--moe-backend`, oracle picks cutlass) — MTP left OFF pending a concurrency benchmark ([[project_qwen36_27b_smartlane_gate]]).
+
+**2026-06-13: prod was vLLM 0.22.1 / CUDA 13** (was 0.20.1 / CUDA 12.8). torch 2.11+cu130, transformers 5.12. Supply-chain-reviewed hash-locked install. Two env vars are now REQUIRED on sm120 that 0.20.1 set automatically — without them you hit the FlashInfer sm75 crash:
 - **`VLLM_USE_FLASHINFER_SAMPLER=0`** — 0.22.1 routes top-k logit sampling through FlashInfer's JIT, which rejects sm120. Now set in both units (`vllm.service`, `vllm-fast.service`) + `vllm-swap.sh`. Universal; needed for every model.
 - **`VLLM_ATTENTION_BACKEND=TRITON_ATTN`** on the Gemma fast lane (belt-and-suspenders; 0.22.1 still auto-forces it for gemma4's heterogeneous head dims). Qwen auto-selects fine without it.
 - Cutover was a venv directory-swap (`vllm-env` ⇄ `vllm-env-0.20.1-bak`) — this breaks pip console-script shebangs (`vllm`, `hf`); rewrite `vllm-env-OLD → vllm-env` across `bin/` after. `huggingface-cli` is gone in the new env → use `hf`. Rollback = swap dirs back + revert units; backups in `~/dev/.vllm-bump-review/unit-backups/`.
