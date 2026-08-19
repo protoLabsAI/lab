@@ -13,8 +13,10 @@ from .nodes_prompt import NODE_CLASS_MAPPINGS as _N2
 from .nodes_prompt import NODE_DISPLAY_NAME_MAPPINGS as _D2
 from .nodes_audio import NODE_CLASS_MAPPINGS as _N3
 from .nodes_audio import NODE_DISPLAY_NAME_MAPPINGS as _D3
+from .nodes_json import NODE_CLASS_MAPPINGS as _N4
+from .nodes_json import NODE_DISPLAY_NAME_MAPPINGS as _D4
 
-NODE_CLASS_MAPPINGS = {**_N1, **_N2, **_N3}
-NODE_DISPLAY_NAME_MAPPINGS = {**_D1, **_D2, **_D3}
+NODE_CLASS_MAPPINGS = {**_N1, **_N2, **_N3, **_N4}
+NODE_DISPLAY_NAME_MAPPINGS = {**_D1, **_D2, **_D3, **_D4}
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
