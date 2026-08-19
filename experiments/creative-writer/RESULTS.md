@@ -365,6 +365,37 @@ less deterministic slop.** The four serving traps in DARIA.md are the price of a
 24% slop reduction, which is a defensible trade — where "zero measurable contribution" would
 not have been.
 
+### Held-out check: is the de-slop effect just tuning on the metric we report?
+
+Fair challenge (protoLab#30): the tau/lam operating point was selected in
+`phase2_gated_probe.py` using `slop_1kw` over the **top 600** phrases — the same index Round 5
+reports. The powered p-value establishes the effect **reproduces across fresh generations**; it
+does not establish that it exists on anything the clamp was not fitted to. Those are different
+claims and only the first was supported.
+
+The phrase list has **50,084** entries. Bands past 600 were never used in tuning or in any
+published number, so they test the underlying claim — "the clamp reduces slop-register
+language" — rather than "the clamp reduces these 600 strings". Same 576 banked pieces, no
+generation, no judge (`clamp_decision.py --holdout`):
+
+    band                   phrases     off      on    delta     pct   perm p
+    tuned-on (top 600)         600    5.71    4.32    -1.38  -24.2%   0.0082   <-- tuned here
+    held-out 600-1200          600    3.49    2.05    -1.44  -41.2%   0.0001
+    held-out 1200-5000        3800   13.30   10.67    -2.63  -19.8%   0.0002
+    held-out 5000-20000      15000   45.34   40.55    -4.79  -10.6%   0.0000
+
+**The effect generalizes.** It holds on all three held-out bands — 19,400 phrases the operating
+point never saw — at p <= 0.0002, i.e. more significantly than on the band it was tuned on
+(larger phrase sets, lower variance). The declining percentage across wider bands is expected
+rather than troubling: broader bands admit progressively more ordinary English that any prose
+contains, which dilutes the signal without reversing it.
+
+So the clamp is **a real register shift, not an artifact of fitting 600 strings**. That is the
+strongest version of its case, and it is worth being precise about what it does NOT rescue:
+**the -0.16 rubric result stands unchanged.** The clamp moves lexical register, demonstrably
+and generalizably, and contributes nothing measurable to judged craft. Both halves are true at
+once, and the honest spec has to carry both.
+
 **The methodology lesson, and it is the mirror of Round 4's.** Round 4's lesson was *run the
 cheap baseline first* — it caught an effect being credited to a mechanism that a sampler
 parameter supplied. Round 5's is the other error: **"inside the noise band" at small n is not
