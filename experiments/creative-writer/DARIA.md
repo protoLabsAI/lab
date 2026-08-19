@@ -63,6 +63,13 @@ is either inert or subtly wrong. **Measure the output; never accept a log line a
    token 2867 — past the end of every piece. Use the absolute-token bounds
    (`--ramp-start-tok/--ramp-end-tok`) whenever the caller's budget is not the expected length.
 
+6. **A concurrent A/B is not concurrent unless the job list interleaves.** `clamp_ab.py`
+   originally built jobs arm-major (`for arm in lanes` outermost); `ThreadPoolExecutor`
+   consumes FIFO, so one whole arm drained before the other began and the arms were
+   time-separated — while the docstring claimed they shared GPU contention and wall clock.
+   The fix is a loop reorder. Check the banked corpus, not the intent: the completion order
+   of the records tells you what actually happened.
+
 ## The clamp earns its keep — settled 2026-08-19
 
 Round 4 reduced the clamp's contribution to one claim: ~19% less deterministic slop on top of
@@ -71,8 +78,9 @@ per arm. Resolved per run, the Round 4 data puts the delta at 1.4 sd with overla
 **underpowered, not null**. A powered A/B (two concurrently-served lanes differing only in
 `DARIA_ENABLE`, 9 runs x 32 prompts each, judge-free) settles it:
 
-    clamp_off  slop 5.71 +/- 1.07      clamp_on  slop 4.32 +/- 0.75
-    delta -1.38 per 1k words (-24.2%), exact permutation p = 0.0082
+    clamp_off  slop 5.79 +/- 0.52      clamp_on  slop 4.29 +/- 0.61
+    delta -1.50 per 1k words (-25.9%), exact permutation p = 0.00004114 (2/48620 — the
+    minimum attainable at n=9/arm; all nine clamp_on runs sit below all nine clamp_off runs)
 
 **Daria's honest spec: the craft and stability of `base + repetition_penalty 1.15`, with ~24%
 less deterministic slop.** The clamp is a slop dial — that is the whole product claim, and it
@@ -95,7 +103,8 @@ is measured. The traps below are the price of it. See `RESULTS.md` Round 5.
   averages over 19-29 of 32 pieces depending on the run. Always re-judge with a real budget
   (`daria_judge.py`, 16k + reasoning_content fallback) before comparing runs.
 - **The nonsense-refusal artifact: NOT clamp-attributable (2026-08-19).** `refusal_probe.py`,
-  12 short prompts x 12 reps against clamp-on and clamp-off lanes: **0/144 in both arms**
+  12 short prompts x 12 reps against clamp-on and clamp-off lanes, arms interleaved: **0/144
+  in both arms**
   (95% CI 0-2.60%). That does not exclude the "low single-digit rate" originally reported —
   a 2.6% ceiling is consistent with 1-2% — but it rules the clamp out as the cause at any
   rate above ~2.6%. Separating a real 1-2% rate from zero needs ~1000+ calls per arm.

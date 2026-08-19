@@ -39,18 +39,12 @@ _W = [1.0 - adj for _, adj in _SP]
 _MX = max(_W)
 SLOP = {w.lower(): s / _MX for (w, _), s in zip(_SP[:600], _W[:600])}
 
-# The "I can't browse the web" class of nonsense refusal DARIA.md flags as unquantified.
-# Deliberately broad: these are assistant-register intrusions into a creative piece, and any
-# of them in a short story is a defect regardless of exact wording.
-REFUSAL = re.compile(
-    r"\b(I (?:can(?:no|')t|am unable to|don't have the ability to) (?:browse|access|search)"
-    r"|as an AI\b|I'm an AI\b|I am an AI\b|as a language model"
-    r"|I don't have (?:real-time|access to the internet)"
-    r"|I cannot fulfill|I can't assist with|I'm sorry, but I)",
-    re.I,
-)
+# Single owner: refusal_probe.py. Two copies had already drifted apart (it matched one extra
+# alternative), which would have made "0/288 here" and "0/144 there" different measurements
+# reported as the same one.
+from refusal_probe import REFUSAL  # noqa: E402
 
-DEGEN_4GRAM = 10  # a 4-gram repeated >10x in one piece is a loop, not a refrain
+DEGEN_4GRAM = 10  # RESULTS.md defines the gate as a 4-gram repeated >=10x in one piece
 
 
 def slop_1kw(t: str) -> float:
@@ -80,6 +74,25 @@ def load_arms():
     return arms
 
 
+def _validate(arms):
+    """Refuse to compute on a corpus that cannot support the comparison.
+
+    clamp_ab.py now aborts rather than banking a partial run, but older files predate that
+    and a missing arm would otherwise surface as a KeyError halfway through a statistic —
+    or worse, as unequal arms silently compared.
+    """
+    missing = {"clamp_on", "clamp_off"} - set(arms)
+    if missing:
+        sys.exit(f"corpus is missing arm(s) {sorted(missing)} — cannot run the comparison")
+    counts = {k: collections.Counter(r["config"] for r in v) for k, v in arms.items()}
+    sizes = {k: sorted(set(c.values())) for k, c in counts.items()}
+    if any(len(v) != 1 for v in sizes.values()):
+        sys.exit(f"unequal pieces per run: {sizes} — arms are not comparable")
+    if len({len(c) for c in counts.values()}) != 1:
+        sys.exit(f"unequal run counts per arm: "
+                 f"{ {k: len(c) for k, c in counts.items()} } — arms are not comparable")
+
+
 def per_run(records):
     runs = collections.defaultdict(list)
     for r in records:
@@ -97,7 +110,7 @@ def per_run(records):
             rubric=(st.mean(p["rubric"] for p in pieces)
                     if all("rubric" in p for p in pieces) else float("nan")),
             words=st.mean(len(t.split()) for t in texts),
-            degen=sum(1 for x in w4 if x > DEGEN_4GRAM),
+            degen=sum(1 for x in w4 if x >= DEGEN_4GRAM),
             worst4=max(w4),
             refusals=sum(1 for t in texts if REFUSAL.search(t)),
         ))
@@ -131,6 +144,7 @@ def cmd_ab(path):
     arms = collections.defaultdict(list)
     for r in recs:
         arms[r["arm"]].append(r)
+    _validate(arms)
     print(f"powered A/B: {len(recs)} pieces, arms {{{', '.join(f'{k}:{len(v)}' for k, v in arms.items())}}}\n")
 
     print(f"{'arm':>10s} {'run':>4s} {'slop':>6s} {'words':>6s} {'degen':>6s} {'worst4':>7s} {'refuse':>7s}")
@@ -183,6 +197,7 @@ def cmd_holdout(path):
     arms = collections.defaultdict(list)
     for r in recs:
         arms[r["arm"]].append(r)
+    _validate(arms)
 
     print(f"held-out validation on {len(recs)} banked pieces (no generation, no judge)\n")
     print(f"{'band':>22s} {'phrases':>8s} {'off':>7s} {'on':>7s} {'delta':>8s} {'pct':>7s} {'perm p':>8s}")

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Quantify the nonsense-refusal artifact, and attribute it to the clamp or to the base.
 
-DARIA.md carries this as an open item: an "I can't browse the web..." style assistant-register
-intrusion "appears in both the HF and vLLM paths at low single-digit rates on short prompts.
-Unquantified." It matters to the clamp decision — if the clamp causes it, that is a cost on
+DARIA.md carried this as an open item before this probe ran: an "I can't browse the web..."
+style assistant-register intrusion reported in both the HF and vLLM paths at low single-digit
+rates on short prompts, unquantified. It matters to the clamp decision — if the clamp causes it, that is a cost on
 the other side of the ledger from the slop reduction.
 
 The Round 4 / powered-A/B corpora cannot answer it: those are long-form EQ-Bench prompts and
@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 import threading
 import time
 import urllib.request
@@ -85,11 +86,12 @@ def main():
     a = ap.parse_args()
 
     lanes = {"clamp_on": a.on, "clamp_off": a.off}
-    jobs = [(arm, rep, i, p) for arm in lanes for rep in range(a.reps)
-            for i, p in enumerate(PROMPTS)]
+    # arm innermost — see clamp_ab.py: an arm-major list time-separates the arms.
+    jobs = [(arm, rep, i, p) for rep in range(a.reps)
+            for i, p in enumerate(PROMPTS) for arm in lanes]
     print(f"{len(PROMPTS)} short prompts x {a.reps} reps x 2 arms = {len(jobs)} calls", flush=True)
 
-    recs, t0 = [], time.time()
+    recs, failed, t0 = [], [], time.time()
 
     def work(job):
         arm, rep, i, prompt = job
@@ -97,6 +99,8 @@ def main():
             out = call(lanes[arm], prompt, a.max_tokens)
         except Exception as e:
             print(f"  FAIL {arm} rep{rep} p{i}: {e!r}", flush=True)
+            with _lock:
+                failed.append((arm, rep, i))
             return
         with _lock:
             recs.append(dict(arm=arm, rep=rep, prompt_id=i, prompt=prompt, text=out,
@@ -105,6 +109,11 @@ def main():
     with ThreadPoolExecutor(max_workers=a.concurrency * 2) as ex:
         list(ex.map(work, jobs))
 
+    if failed:
+        import collections as _c
+        sys.exit(f"ABORT: {len(failed)} of {len(jobs)} calls failed "
+                 f"({dict(_c.Counter(a_ for a_, _, _ in failed))}) — a Wilson interval over an "
+                 f"incomplete arm understates the rate. Re-run.")
     json.dump(recs, open(a.out, "w"))
     print(f"wrote {a.out} ({len(recs)} calls) in {(time.time()-t0)/60:.1f} min\n")
 

@@ -29,7 +29,7 @@ The current defensible one-line spec: **the craft and stability of `base + repet
 ## Files
 
     RESULTS.md          Rounds 3/4/5 with what was retired and why. The blocking artifact.
-    DARIA.md            The served artifact: config, two serving paths, four serving traps.
+    DARIA.md            The served artifact: config, two serving paths, six serving traps.
     clamp_decision.py   Per-run re-analysis + exact permutation test (--ab, --holdout).
     clamp_ab.py         Two-lane concurrent A/B driver (generation only, no judge).
     refusal_probe.py    Wilson-interval probe for the nonsense-refusal artifact.

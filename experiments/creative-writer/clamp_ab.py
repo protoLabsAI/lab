@@ -22,8 +22,10 @@ the same wall clock, so nothing systematic separates them but the clamp.
 from __future__ import annotations
 
 import argparse
+import collections
 import json
 import os
+import sys
 import threading
 import time
 import urllib.request
@@ -68,11 +70,15 @@ def main():
 
     P = prompts()
     lanes = {"clamp_on": a.on, "clamp_off": a.off}
+    # ARM IS THE INNERMOST LOOP, deliberately. ThreadPoolExecutor consumes FIFO, so an
+    # arm-major list drains one whole arm before the other starts and the arms end up
+    # time-separated — exactly the confound concurrent serving exists to remove. The first
+    # run of this study did that: pieces 0-276 of 576 were all clamp_on (caught in review).
     jobs = [(arm, rep, pid, mod, text)
-            for arm in lanes for rep in range(a.reps) for pid, mod, text in P]
+            for rep in range(a.reps) for pid, mod, text in P for arm in lanes]
     print(f"{len(P)} prompts x {a.reps} reps x {len(lanes)} arms = {len(jobs)} pieces", flush=True)
 
-    recs, done, t0 = [], [0], time.time()
+    recs, done, failed, t0 = [], [0], [], time.time()
 
     def work(job):
         arm, rep, pid, mod, text = job
@@ -80,6 +86,8 @@ def main():
             out = call(lanes[arm], text)
         except Exception as e:
             print(f"  FAIL {arm} rep{rep} p{pid}: {e!r}", flush=True)
+            with _lock:
+                failed.append((arm, rep, pid))
             return
         with _lock:
             recs.append(dict(config=f"{arm}#{rep}", arm=arm, run=rep,
@@ -95,9 +103,17 @@ def main():
     with ThreadPoolExecutor(max_workers=a.concurrency * len(lanes)) as ex:
         list(ex.map(work, jobs))
 
-    json.dump(recs, open(a.out, "w"))
     if os.path.exists(a.out + ".tmp"):
         os.remove(a.out + ".tmp")
+
+    # A lane-specific failure biases every downstream number, so refuse to bank a partial
+    # corpus rather than publish an A/B that silently compared unequal arms.
+    if failed:
+        by_arm = collections.Counter(arm for arm, _, _ in failed)
+        sys.exit(f"ABORT: {len(failed)} of {len(jobs)} calls failed ({dict(by_arm)}) — "
+                 f"corpus NOT written. Re-run; a lane-specific failure would bias the result.")
+
+    json.dump(recs, open(a.out, "w"))
     print(f"wrote {a.out} ({len(recs)} pieces) in {(time.time()-t0)/60:.1f} min")
 
 

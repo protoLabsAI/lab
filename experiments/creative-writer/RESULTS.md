@@ -329,35 +329,53 @@ quantity, just resolved per run instead of pooled.)
 to stop there and call the clamp a placebo. `|delta|/sd = 1.4` with n=3 is a statement about
 **power**, not about the effect: at d ~ 1.4, 80% power needs about **n=9 per arm**.
 
-So we ran that. Two vLLM lanes served **concurrently** from the same NVFP4 weights and the
-same launch script — identical `MAXLEN 32768 / REP_PENALTY 1.15 / MAXSEQS 8 / UTIL 0.22`,
-differing in exactly one environment variable (`DARIA_ENABLE`) — 9 runs x 32 EQ-Bench prompts
-each, 576 pieces, 0 failures, 13.7 min. Concurrent serving is deliberate: both arms then sit
-under the same GPU contention and the same wall clock. **No judge was used**: the open question
-is the slop index, and Round 4 already settled the rubric axis at -0.16.
+So we ran that. Two vLLM lanes served from the same NVFP4 weights and the same launch script
+— identical `MAXLEN 32768 / REP_PENALTY 1.15 / MAXSEQS 8 / UTIL 0.22`, differing in exactly one
+environment variable (`DARIA_ENABLE`) — 9 runs x 32 EQ-Bench prompts each, 576 pieces, 0
+failures, 15.0 min. **No judge was used**: the open question is the slop index, and Round 4
+already settled the rubric axis at -0.16.
+
+⚠️ **The first attempt at this run was invalid, and the way it was invalid is worth keeping.**
+`clamp_ab.py` built its job list arm-major (`for arm in lanes` outermost) and
+`ThreadPoolExecutor` consumes FIFO, so all 288 clamp_on pieces completed before the first
+clamp_off piece started — pieces 0-276 were pure clamp_on. The arms were **time-separated**,
+which is precisely the confound that serving them concurrently is supposed to remove, while the
+docstring and this file both claimed concurrency. Caught in review on protoLab#31, not by us.
+The fix is one loop reorder (arm innermost); the numbers below are the re-run, whose arms
+interleave across 572 of 576 pieces and balance 145/143 across halves.
 
     arm          slop mean    sd   words   degen     refuse
-    clamp_off         5.71  1.07     744   0/288      0/288
-    clamp_on          4.32  0.75     728   1/288      0/288
+    clamp_off         5.79  0.52     745   0/288      0/288
+    clamp_on          4.29  0.61     720   0/288      0/288
 
-    delta        -1.38 per 1k words (-24.2%)
-    permutation  p = 0.0082   (EXACT, all 48620 splits of C(18,9); no normality assumption)
+    delta        -1.50 per 1k words (-25.9%)
+    permutation  p = 0.00004114 = 2/48620 — the MINIMUM attainable two-sided p at n=9/arm
+    ranges       on 3.33-5.13   off 5.32-7.00   DISJOINT
 
-**The clamp's de-slop effect is real.** The effect size replicates Round 4's estimate (-24.2%
-vs -19%), and it survives a properly powered, assumption-free test. The n=3 "null" was the
-test being too small to see a real effect, which is the failure mode opposite to the one
-Round 4 was built to catch.
+**The clamp's de-slop effect is real, and fixing the defect made it cleaner rather than
+weaker.** Every one of the nine clamp_on runs sits below every one of the nine clamp_off runs —
+perfect separation, so the permutation test returns the smallest p it can express. Run-to-run
+sd also fell (1.07/0.75 -> 0.52/0.61) because time-separation had been injecting variance that
+the interleaved design removes. The effect size replicates Round 4's estimate (-25.9% vs -19%),
+and it survives a properly powered, assumption-free test.
+
+The n=3 "null" was the test being too small to see a real effect, which is the failure mode
+opposite to the one Round 4 was built to catch.
 
 Two side results from the same run:
 
 - **The nonsense-refusal artifact is not clamp-attributable.** `refusal_probe.py`, 12 short
-  prompts x 12 reps x 2 arms: **0/144 in both** (95% CI 0-2.60%). DARIA.md reported it at "low
+  prompts x 12 reps x 2 arms, arms interleaved: **0/144 in both** (95% CI 0-2.60%). (This probe
+  had the same arm-major defect on its first pass; the numbers here are the interleaved re-run,
+  which agreed.) DARIA.md reported it at "low
   single-digit rates on short prompts", and a 2.6% upper bound does not exclude that — but it
   does rule out the clamp as the cause at any rate above ~2.6%, and it is not common on this
   prompt set. Separating a genuine 1-2% rate from zero needs ~1000+ calls per arm.
-- **Degeneration stays solved.** 0/288 clamp-off, 1/288 clamp-on, and that single piece has a
-  worst 4-gram of 13 against the >10 threshold — a mild repetition, not the 131x loops that
-  motivated the gate. No meaningful difference; `repetition_penalty` is doing this job.
+- **Degeneration stays solved.** **0/288 in both arms** on the interleaved run.
+  ⚠️ The gate is `>=10`, as this file defines it. `clamp_decision.py` originally used a strict
+  `>10`, which is why an earlier draft of the Round 5 table reported the base arm as 2/96 where
+  Round 4 reports 3/96 — under a sentence claiming the rows reproduced *exactly*. Fixed; they
+  now do. An off-by-one in a ship gate is not cosmetic.
 
 **DECISION: keep the clamp.** It does exactly one thing and that thing is now established.
 Daria's honest spec: **the craft and stability of `base + repetition_penalty 1.15`, with ~24%
@@ -378,15 +396,15 @@ published number, so they test the underlying claim — "the clamp reduces slop-
 language" — rather than "the clamp reduces these 600 strings". Same 576 banked pieces, no
 generation, no judge (`clamp_decision.py --holdout`):
 
-    band                   phrases     off      on    delta     pct   perm p
-    tuned-on (top 600)         600    5.71    4.32    -1.38  -24.2%   0.0082   <-- tuned here
-    held-out 600-1200          600    3.49    2.05    -1.44  -41.2%   0.0001
-    held-out 1200-5000        3800   13.30   10.67    -2.63  -19.8%   0.0002
-    held-out 5000-20000      15000   45.34   40.55    -4.79  -10.6%   0.0000
+    band                   phrases     off      on    delta     pct    perm p
+    tuned-on (top 600)         600    5.79    4.29    -1.50  -25.9%   0.00004   <-- tuned here
+    held-out 600-1200          600    3.35    2.24    -1.11  -33.2%   0.00004
+    held-out 1200-5000        3800   13.55   10.59    -2.96  -21.9%   0.00004
+    held-out 5000-20000      15000   45.50   39.82    -5.67  -12.5%   0.00004
 
 **The effect generalizes.** It holds on all three held-out bands — 19,400 phrases the operating
-point never saw — at p <= 0.0002, i.e. more significantly than on the band it was tuned on
-(larger phrase sets, lower variance). The declining percentage across wider bands is expected
+point never saw — at the floor p-value, the same perfect separation as the tuned band. The
+declining percentage across wider bands is expected
 rather than troubling: broader bands admit progressively more ordinary English that any prose
 contains, which dilutes the signal without reversing it.
 
