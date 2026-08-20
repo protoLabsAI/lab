@@ -1,0 +1,13 @@
+[project]
+name = "protolab-nodes"
+description = "protoLabs.nodes — ComfyUI nodes for the protoLabs ecosystem: LiteLLM gateway LLM/vision/structured, LTX-2.3 prompt enhancer, agent endpoints, Fish TTS, Whisper STT"
+version = "0.1.0"
+license = { text = "MIT" }
+dependencies = ["requests", "soundfile"]
+
+[project.urls]
+Repository = "https://github.com/protoLabsAI/protoLab"
+
+[tool.comfy]
+PublisherId = "protolabsai"
+DisplayName = "protoLabs.nodes"

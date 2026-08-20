@@ -1,0 +1,198 @@
+{
+ "a": "agents/v11.py",
+ "b": "opponents/sey_v7.py",
+ "results": [
+  {
+   "seed": 5004,
+   "swap": false,
+   "a_bank": 97626.0,
+   "b_bank": 86566.0,
+   "a_status": "DONE",
+   "b_status": "DONE"
+  },
+  {
+   "seed": 5001,
+   "swap": true,
+   "a_bank": 144172.0,
+   "b_bank": 146247.0,
+   "a_status": "DONE",
+   "b_status": "DONE"
+  },
+  {
+   "seed": 5003,
+   "swap": true,
+   "a_bank": 122576.0,
+   "b_bank": 117325.0,
+   "a_status": "DONE",
+   "b_status": "DONE"
+  },
+  {
+   "seed": 5000,
+   "swap": false,
+   "a_bank": 121072.0,
+   "b_bank": 123648.0,
+   "a_status": "DONE",
+   "b_status": "DONE"
+  },
+  {
+   "seed": 5002,
+   "swap": false,
+   "a_bank": 106856.0,
+   "b_bank": 113893.0,
+   "a_status": "DONE",
+   "b_status": "DONE"
+  },
+  {
+   "seed": 5009,
+   "swap": true,
+   "a_bank": 150651.0,
+   "b_bank": 153199.0,
+   "a_status": "DONE",
+   "b_status": "DONE"
+  },
+  {
+   "seed": 5005,
+   "swap": true,
+   "a_bank": 146659.0,
+   "b_bank": 151631.0,
+   "a_status": "DONE",
+   "b_status": "DONE"
+  },
+  {
+   "seed": 5006,
+   "swap": false,
+   "a_bank": 97770.0,
+   "b_bank": 102284.0,
+   "a_status": "DONE",
+   "b_status": "DONE"
+  },
+  {
+   "seed": 5008,
+   "swap": false,
+   "a_bank": 132119.0,
+   "b_bank": 136638.0,
+   "a_status": "DONE",
+   "b_status": "DONE"
+  },
+  {
+   "seed": 5007,
+   "swap": true,
+   "a_bank": 138815.0,
+   "b_bank": 142897.0,
+   "a_status": "DONE",
+   "b_status": "DONE"
+  },
+  {
+   "seed": 5010,
+   "swap": false,
+   "a_bank": 103391.0,
+   "b_bank": 110974.0,
+   "a_status": "DONE",
+   "b_status": "DONE"
+  },
+  {
+   "seed": 5011,
+   "swap": true,
+   "a_bank": 161937.0,
+   "b_bank": 147682.0,
+   "a_status": "DONE",
+   "b_status": "DONE"
+  },
+  {
+   "seed": 5012,
+   "swap": false,
+   "a_bank": 133803.0,
+   "b_bank": 137596.0,
+   "a_status": "DONE",
+   "b_status": "DONE"
+  },
+  {
+   "seed": 5013,
+   "swap": true,
+   "a_bank": 116175.0,
+   "b_bank": 120425.0,
+   "a_status": "DONE",
+   "b_status": "DONE"
+  },
+  {
+   "seed": 5014,
+   "swap": false,
+   "a_bank": 122274.0,
+   "b_bank": 127100.0,
+   "a_status": "DONE",
+   "b_status": "DONE"
+  },
+  {
+   "seed": 5015,
+   "swap": true,
+   "a_bank": 111887.0,
+   "b_bank": 128324.0,
+   "a_status": "DONE",
+   "b_status": "DONE"
+  },
+  {
+   "seed": 5016,
+   "swap": false,
+   "a_bank": 142648.0,
+   "b_bank": 148480.0,
+   "a_status": "DONE",
+   "b_status": "DONE"
+  },
+  {
+   "seed": 5017,
+   "swap": true,
+   "a_bank": 100509.0,
+   "b_bank": 114120.0,
+   "a_status": "DONE",
+   "b_status": "DONE"
+  },
+  {
+   "seed": 5018,
+   "swap": false,
+   "a_bank": 118834.0,
+   "b_bank": 132984.0,
+   "a_status": "DONE",
+   "b_status": "DONE"
+  },
+  {
+   "seed": 5019,
+   "swap": true,
+   "a_bank": 149598.0,
+   "b_bank": 154674.0,
+   "a_status": "DONE",
+   "b_status": "DONE"
+  },
+  {
+   "seed": 5020,
+   "swap": false,
+   "a_bank": 140869.0,
+   "b_bank": 144110.0,
+   "a_status": "DONE",
+   "b_status": "DONE"
+  },
+  {
+   "seed": 5022,
+   "swap": false,
+   "a_bank": 159281.0,
+   "b_bank": 163108.0,
+   "a_status": "DONE",
+   "b_status": "DONE"
+  },
+  {
+   "seed": 5021,
+   "swap": true,
+   "a_bank": 125499.0,
+   "b_bank": 129268.0,
+   "a_status": "DONE",
+   "b_status": "DONE"
+  },
+  {
+   "seed": 5023,
+   "swap": true,
+   "a_bank": 140567.0,
+   "b_bank": 143721.0,
+   "a_status": "DONE",
+   "b_status": "DONE"
+  }
+ ]
+}

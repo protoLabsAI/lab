@@ -1,0 +1,18 @@
+{
+ "label": "seqs32-r2",
+ "concurrency": 16,
+ "n": 64,
+ "ok": 64,
+ "failed": 0,
+ "input_tokens": 1024,
+ "output_tokens": 256,
+ "ttft_p50_ms": 422.09799599368125,
+ "ttft_p99_ms": 1706.9382671033964,
+ "tpot_p50_ms": 32.38944344304721,
+ "tpot_p99_ms": 47.80148925515366,
+ "mean_ttft_ms": 552.5323575147922,
+ "mean_tpot_ms": 32.48491635978794,
+ "agg_out_tok_s": 446.76010826172495,
+ "wall_s": 36.67292512697168,
+ "total_output_tokens": 16384
+}

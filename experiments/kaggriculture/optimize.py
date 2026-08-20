@@ -1,0 +1,131 @@
+#!/usr/bin/env python3
+"""Overnight knob optimizer: hill-climb v6 config on win margin vs sey_v7.
+
+Common random numbers: every candidate plays the same (seed, seat) pairs.
+Accept if mean margin improves. Logs to opt_log.jsonl, best to best_cfg.json.
+"""
+import json
+import os
+import random
+import sys
+import time
+from concurrent.futures import ProcessPoolExecutor
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+SEEDS = [(31000 + i, i % 2 == 1) for i in range(24)]
+N_PROCS = min(24, (os.cpu_count() or 8) - 2)
+
+SPACE = {  # name: (default, min, max, is_int)
+    "WHEAT_SCALE": (3.0, 1.0, 5.0, False),
+    "STRAW_SCALE": (0.841, 0.4, 1.4, False),
+    "MELON_SCALE": (1.502, 0.6, 2.4, False),
+    "COW_SCALE": (1.178, 0.6, 2.0, False),
+    "SHEEP_SCALE": (1.292, 0.4, 2.0, False),
+    "MAX_HANDS": (15, 12, 16, True),
+    "PORT_SHIFT": (0.15, 0.0, 0.5, False),
+    "WHEAT_WAVE": (23, 18, 27, True),
+    "SB_LAST": (16, 14, 24, True),
+    "CARRY": (14, 4, 24, True),
+    "RESERVE_E": (250, 100, 1500, True),
+    "RESERVE_L": (200, 100, 1500, True),
+    "OROPT_PASSES": (3, 1, 6, True),
+    "URGENT_V": (120.0, 40.0, 400.0, False),
+    "LIQ_DAY": (28, 26, 28, True),
+}
+
+
+def play(args):
+    cfg_path, seed, swap = args
+    os.environ["KAGG_CFG"] = cfg_path
+    from kaggle_environments import make
+    env = make("kaggriculture", configuration={"episodeSteps": 720, "seed": seed})
+    a, b = os.path.join(HERE, "agents/v23.py"), os.path.join(HERE, "opponents/sey_v7.py")
+    pair = [b, a] if swap else [a, b]
+    env.run(pair)
+    r = [s.reward or 0.0 for s in env.steps[-1]]
+    me = r[1] if swap else r[0]
+    opp = r[0] if swap else r[1]
+    return me - opp, me, opp
+
+
+def evaluate(cfg, tag):
+    cfg_path = os.path.join(HERE, f"sweep/opt_{tag}.json")
+    with open(cfg_path, "w") as f:
+        json.dump(cfg, f)
+    jobs = [(cfg_path, s, sw) for s, sw in SEEDS]
+    margins, mes, opps = [], [], []
+    with ProcessPoolExecutor(max_workers=N_PROCS) as ex:
+        for m, me, opp in ex.map(play, jobs):
+            margins.append(m)
+            mes.append(me)
+            opps.append(opp)
+    n = len(margins)
+    return {
+        "margin": sum(margins) / n,
+        "our_mean": sum(mes) / n,
+        "opp_mean": sum(opps) / n,
+        "wins": sum(1 for m in margins if m > 0),
+        "n": n,
+    }
+
+
+def main():
+    hours = float(sys.argv[1]) if len(sys.argv) > 1 else 3.0
+    deadline = time.time() + hours * 3600
+    rng = random.Random(1234)
+    os.makedirs(os.path.join(HERE, "sweep"), exist_ok=True)
+    log = open(os.path.join(HERE, "opt_log.jsonl"), "a")
+
+    best_cfg = {k: v[0] for k, v in SPACE.items()}
+    bp = os.path.join(HERE, "best_cfg.json")
+    if os.path.exists(bp):
+        prev = json.load(open(bp)).get("cfg", {})
+        best_cfg.update({k: v for k, v in prev.items() if k in SPACE})
+
+    res = evaluate(best_cfg, "base")
+    best = res["margin"]
+    print(f"baseline margin={best:.0f} our={res['our_mean']:.0f} wins={res['wins']}/{res['n']}", flush=True)
+    log.write(json.dumps({"tag": "base", "cfg": best_cfg, **res}) + "\n")
+    log.flush()
+
+    # seeded candidates from expert-schedule study
+    seeded = [
+        {"WHEAT_SCALE": 3.5, "MELON_SCALE": 1.9},
+        {"COW_SCALE": 1.7, "SHEEP_SCALE": 1.7},
+        {"STRAW_SCALE": 1.2, "WHEAT_SCALE": 2.0},
+        {"CARRY": 24, "RESERVE_E": 800},
+        {"OROPT_PASSES": 6, "MAX_HANDS": 16},
+    ]
+    i = 0
+    while time.time() < deadline:
+        i += 1
+        if i <= len(seeded):
+            cand = dict(best_cfg)
+            cand.update(seeded[i - 1])
+            tag = f"seed{i}"
+        else:
+            cand = dict(best_cfg)
+            for k in rng.sample(list(SPACE), rng.randint(2, 4)):
+                d, lo, hi, is_int = SPACE[k]
+                span = (hi - lo) * 0.35
+                v = cand[k] + rng.uniform(-span, span)
+                v = max(lo, min(hi, v))
+                cand[k] = int(round(v)) if is_int else v
+            tag = f"r{i}"
+        res = evaluate(cand, tag)
+        accept = res["margin"] > best + 300
+        log.write(json.dumps({"tag": tag, "cfg": cand, **res, "accept": accept}) + "\n")
+        log.flush()
+        print(f"{tag}: margin={res['margin']:.0f} our={res['our_mean']:.0f} "
+              f"wins={res['wins']}/{res['n']} {'ACCEPT' if accept else ''}", flush=True)
+        if accept:
+            best, best_cfg = res["margin"], cand
+            with open(os.path.join(HERE, "best_cfg.json"), "w") as f:
+                json.dump({"margin": best, "cfg": best_cfg}, f, indent=1)
+    print("done. best margin:", best)
+    with open(os.path.join(HERE, "best_cfg.json"), "w") as f:
+        json.dump({"margin": best, "cfg": best_cfg}, f, indent=1)
+
+
+if __name__ == "__main__":
+    main()
