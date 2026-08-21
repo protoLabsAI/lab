@@ -149,6 +149,14 @@ def main():
     # content — a lower cap reads as "empty output" and false-fails the gate
     ap.add_argument("--max-tokens", type=int, default=2500)
     ap.add_argument("--judge", action="store_true", help="also run adversarial LLM judge")
+    # Context ceiling used to size the generation budget. Was hardcoded to 64512, which
+    # silently starved every depth past ~62K to a 256-token budget -- on an adaptive-thinking
+    # model that returns EMPTY content and the gate reported "FAIL empty output" on a model
+    # that was actually needle-exact at 200K. Set this to the served --max-model-len.
+    ap.add_argument("--ctx", type=int, default=262144)
+    # Never generate below this: it is the floor at which a thinking model can still emit
+    # content rather than spending the whole budget in the reasoning channel.
+    ap.add_argument("--min-budget", type=int, default=2048)
     args = ap.parse_args()
 
     client = OpenAI(base_url=args.base_url, api_key="not-needed")
@@ -161,9 +169,15 @@ def main():
     failed = False
     for i, d in enumerate([int(x) for x in args.depths.split(",")]):
         prompt, needle = build_prompt(d, needle_n=1000 + i)
-        # auto-cap generation so depth + budget never overflows a 64K-class
-        # context window (learned on A1: 60K rung + 6K budget = 400 error)
-        budget = min(args.max_tokens, max(256, 64512 - d))
+        # Auto-cap generation so depth + budget never overflows the context window
+        # (learned on A1: 60K rung + 6K budget = 400 error) -- but never below
+        # --min-budget, because a starved budget is indistinguishable from corruption.
+        headroom = args.ctx - d
+        if headroom < args.min_budget:
+            print(f"depth {d:>6}: SKIP — needs {args.min_budget} tokens of headroom, "
+                  f"ctx {args.ctx} leaves {headroom}. Raise --ctx or drop this depth.")
+            continue
+        budget = max(args.min_budget, min(args.max_tokens, headroom))
         try:
             r = client.chat.completions.create(
                 model=args.model,
@@ -176,7 +190,10 @@ def main():
             failed = True
             continue
         msg = r.choices[0].message
-        text = (msg.content or "") + (getattr(msg, "reasoning_content", None) or "")
+        # vLLM 0.25 renamed reasoning_content -> reasoning; read both or the fallback misses.
+        text = ((msg.content or "")
+                + (getattr(msg, "reasoning", None) or "")
+                + (getattr(msg, "reasoning_content", None) or ""))
         det = detectors(msg.content or "")
         flags = is_degenerate(det)
         code = re.search(r"JX-\d+-VELVET", text)
