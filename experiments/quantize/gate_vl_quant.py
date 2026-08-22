@@ -8,6 +8,8 @@ against any OpenAI-compatible endpoint serving the quant.
   python gate_vl_quant.py --url http://127.0.0.1:8062/v1 --model ornith-1.5-9b-nvfp4
 """
 import argparse, base64, json, sys, urllib.request
+sys.path.insert(0, "/home/ava/dev/lab/evals/graders")
+from probe_lib import extract_text, MIN_SANE_BUDGET  # shared field-drift + budget rules
 
 OCR_IMAGE = "/home/ava/dev/lab/experiments/vision-eval/ocr_test.png"
 SHAPES_IMAGE = "/home/ava/dev/lab/experiments/vision-eval/shapes_test.png"
@@ -15,6 +17,7 @@ OCR_TRUTH = "protolabs vlm-42"
 # Ornith-1.5 thinks adaptively; anything under a prod-like budget measures the
 # budget, not the model (feedback_eval_prod_token_budget). 400 tokens returned
 MAX_TOKENS = 4096  # an EMPTY completion on a checkpoint that was fine.
+assert MAX_TOKENS >= MIN_SANE_BUDGET
 IMAGE_TRIALS = 5
 
 
@@ -40,7 +43,7 @@ def main():
                                 "In three sentences, explain why a quantized model can serve text "
                                 "correctly while its vision path is completely broken."}]})
     msg = r["choices"][0]["message"]
-    text = (msg.get("content") or "").strip() or (msg.get("reasoning") or msg.get("reasoning_content") or "").strip()
+    text = extract_text(msg)
     ok = len(text) > 80 and text.count("�") == 0
     results["completion"] = ok
     print(f"[{'PASS' if ok else 'FAIL'}] completion ({len(text)} chars)\n  {text[:220]}...\n")
@@ -88,7 +91,7 @@ def main():
                               {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
                               {"type": "text", "text": prompt}]}]})
             m = r["choices"][0]["message"]
-            out.append(((m.get("content") or "").strip() or (m.get("reasoning") or "").strip()))
+            out.append(extract_text(m))
         return out
 
     shapes = img_probe(SHAPES_IMAGE,

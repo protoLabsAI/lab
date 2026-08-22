@@ -194,6 +194,14 @@ def main():
         text = ((msg.content or "")
                 + (getattr(msg, "reasoning", None) or "")
                 + (getattr(msg, "reasoning_content", None) or ""))
+        # STARVED != FAILED. Empty output because the cap ran out is a harness problem, and
+        # reporting it as degeneration is how this gate false-failed a model that was
+        # needle-exact at 200K. Report INVALID and do not let it score.
+        if not text.strip() and getattr(r.choices[0], "finish_reason", None) == "length":
+            print(f"depth {d:>6}: INVALID — empty output at budget {budget} "
+                  f"(finish_reason=length). Starved, not degenerate: raise --min-budget/--max-tokens.")
+            failed = True
+            continue
         det = detectors(msg.content or "")
         flags = is_degenerate(det)
         code = re.search(r"JX-\d+-VELVET", text)
