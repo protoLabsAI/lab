@@ -106,6 +106,37 @@ model itself misreads the stylised "protoLabs" as "protocolabs" and invents a tr
 exactly why the gate scores the difference rather than an absolute threshold. An earlier n=5
 read showed bf16 2/5 vs NVFP4 0/5 and looked like real damage; at n=20 it vanished.
 
+## Scorecard
+
+Discriminating frontier battery against this build. Judge-free except claw, which uses an
+independent cloud judge so a local model never grades itself:
+
+    axis            score   kind                detail
+    --------------  -----   ------------------  ------
+    function_call   0.963   schema-checked      52/54 · untagged 100% · in-proc 100% · ext 90%
+    claw            0.675   agentic/LLM-judged  10 tasks · robustness 1.00 · safety-clean
+    reasoning_hard  0.611   solver-verified     5/9 full-pass
+    livecodebench   0.115   exec-graded         hard-only, 30 problems, thinking-off
+
+Judge reported **0 fallbacks**, so the LLM-judged score is real rather than a dead judge
+defaulting to 0.5.
+
+**function_call 0.963 is the best result on our internal board** — across ~26 scorecards
+spanning 9B to 397B, including dedicated coder models. For a 9B that is the reason to run
+this model: schema-correct tool calls, 100% on both the untagged and in-process suites.
+
+**LiveCodeBench 0.115 is a real weakness, and it is the model, not the quantization.**
+12 of 30 problems earned partial credit; none passed every test. The mechanism is budget
+exhaustion — **13 of 30 problems consumed the entire 32,768-token budget** deliberating and
+never emitted working code. This matches what users independently report about the Ornith-1.5
+family (failed one-shot HTML tasks, regressions versus Ornith-1.0, context exhaustion), and
+we measured the same signature on the 35B. Thinking-off does not rescue it: on the 35B we
+paired thinking-on against thinking-off on identical problems and thinking-on was *worse*
+(0.129 vs 0.329) while exhausting the budget on 6 of 7.
+
+**If code generation is your workload, this family is not the right pick at any precision.**
+If tool calling is, it is excellent.
+
 ## Release gate
 
     completion   PASS   coherent, correct, terminates

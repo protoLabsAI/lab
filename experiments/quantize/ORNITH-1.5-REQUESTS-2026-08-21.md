@@ -167,6 +167,25 @@ genuinely insufficient. **That is the fourth time today this exact trap produced
 failure** — it is worth treating token-starvation as the first hypothesis for any empty output
 on this family.
 
+## Measured scorecards (2026-08-22)
+
+    build                          claw    reas    lcb     fc
+    Ornith-1.5-9B-NVFP4            0.675   0.611   0.115   0.963  <- FC board-best
+    Ornith-1.5-35B ours            0.719   0.861   0.205   0.889
+    Ornith-1.5-35B upstream        0.752   0.861   0.192   0.870
+    Qwen3.8-27B-NVFP4-MTP          0.761   0.778   0.632   0.870  <- prod, rolled back to
+
+**The quants are faithful.** Ours vs upstream's 35B on the identical harness: LCB 0.205 vs
+0.192, reasoning_hard identical at 0.861, claw within noise. No quantization penalty.
+
+**But the model is weak at code, and prod was rolled back for it.** The Ornith-1.5 family
+exhausts its token budget deliberating: 13/30 LCB problems on the 9B and the same signature
+on the 35B. Thinking-on does NOT help — paired on identical problems it was worse (0.129 vs
+0.329). Community reports on upstream's repos describe exactly this (failed one-shot HTML,
+regression vs Ornith-1.0, context exhaustion). Since `coder` is one of the three aliases the
+smart lane serves, the lane reverted to Qwen3.8-27B-NVFP4-MTP (LCB 0.632, 3x better).
+Artifacts stay published and correct; they are just not the right prod lane.
+
 ## Open
 
 - **35B**: needs `smart`/`reasoning`/`coder` down ~1.5–2 h. Host RAM (61 GB total, ~27 GB free)

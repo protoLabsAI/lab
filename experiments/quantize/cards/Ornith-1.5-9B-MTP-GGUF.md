@@ -169,6 +169,33 @@ MTP at C=32). We publish C=1 here because llama.cpp/GGUF deployment is overwhelm
 and local, which makes C=1 the honest representative regime for this artifact — **but do not carry
 these numbers over to a batched server.** No concurrency sweep was run for this release.
 
+## Scorecard
+
+Measured on the **NVFP4 build of these same weights**
+([`protoLabsAI/Ornith-1.5-9B-NVFP4`](https://huggingface.co/protoLabsAI/Ornith-1.5-9B-NVFP4)) —
+the quantization differs from the GGUF rungs here, so treat these as characterising the
+*model*, not any specific rung. Judge-free except claw (independent cloud judge, 0 fallbacks):
+
+    axis            score   kind                detail
+    --------------  -----   ------------------  ------
+    function_call   0.963   schema-checked      52/54 · best on our internal board
+    claw            0.675   agentic/LLM-judged  10 tasks · robustness 1.00 · safety-clean
+    reasoning_hard  0.611   solver-verified     5/9 full-pass
+    livecodebench   0.115   exec-graded         hard-only, 30 problems, thinking-off
+
+**Tool calling is this model's strength** — 0.963 is the highest function_call score across
+~26 scorecards we have run, spanning 9B to 397B including dedicated coder models.
+
+**Code generation is its weakness, and it is the model rather than any quantization.**
+12 of 30 problems earned partial credit, none passed every test, and **13 of 30 consumed the
+entire 32,768-token budget** deliberating without emitting working code. Users report the same
+independently across the Ornith-1.5 family. Enabling thinking does not rescue it: paired on
+identical problems (on the 35B sibling) thinking-on scored *worse* than thinking-off, 0.129 vs
+0.329, while exhausting the budget on 6 of 7.
+
+If you are picking a rung for agentic/tool work, any of these are a good choice. If you are
+picking one for code generation, this family is not the right model at any precision.
+
 ## "Lossless" — read this
 
 MTP speculative decoding is **distribution-lossless**: every drafted token is verified against the
