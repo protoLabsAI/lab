@@ -59,9 +59,103 @@ Each phase has an exit criterion; don't move on until current phase is done.
 
 Default to publishing publicly via `protoLabsAI/` on HuggingFace and protolabs.studio for the writeup. Privacy is a drafting state, not a target. **Every shipped experiment produces a blog draft in `experiments/<name>/BLOG.md` before the next experiment starts.** audio-tags is the template.
 
-## Daily setup (dual GPU) — 2026-08-10: DSV4-Flash smart lane on the jasl fork (CANONICAL)
+## Daily setup (dual GPU) — 2026-08-23: Qwen3.8 smart (GPU1) + daria & protopen sharing GPU0 (CANONICAL)
 
-**★ CURRENT PROD (2026-08-10, Josh-approved cutover).** `vllm-smart.service` runs
+**★ CURRENT PROD (2026-08-23).** Three vLLM lanes, one card each side, no TP. GPU1 is the
+prod card; GPU0 is the shared card. Fish TTS is **stopped and disabled** — its 19.4 GiB on
+GPU1 bought nothing (0 synthesis requests in 7 days) and paid for the smart lane's KV instead.
+
+| GPU | Service | Model | Port | util | KV pool | Notes |
+|-----|---------|-------|------|------|---------|-------|
+| 1 | `vllm-smart-qwen38.service` | Qwen3.8-27B-NVFP4 + MTP K=3 | :8041 | **0.86** | **774,203 tok (2.95× @ 262K)** | `smart reasoning coder qwen3.8-27b-nvfp4` — the prod lane |
+| 1 | `embed-server.service` | Qwen3-Embedding-0.6B | :8001 | — | — | embed A (the only GPU1 co-tenant) |
+| 0 | `vllm-protopen.service` | ThinkingCap-Qwen3.6-27B-heretic-NVFP4 | :8050 | 0.55 | — | `protopen heretic`, 131K, fp8-KV, security lane |
+| 0 | `daria-lane.service` | Daria-24B-NVFP4 + v6 gated clamp | :8045 | 0.22 | 61,952 tok | `daria`, 32K, **`--max-num-seqs 1`** — single-concurrency by design |
+| 0 | `embed-b.service` | Qwen3-Embedding-0.6B | :8004 | — | — | embed B |
+| 0 | ComfyUI | LTX pipelines | :8188 | — | — | **on demand only** — see below |
+
+Measured idle footprint: GPU0 75.9/95.6 GiB (19.1 free), GPU1 84.6/95.6 GiB (10.4 free).
+
+**Fish TTS is stopped AND disabled — do not just `stop` it, the `disable` is load-bearing.**
+At smart util 0.86 the card has 10.4 GiB free; Fish wants 19.4 GiB. Left `enabled` it comes
+back at boot, loses, and takes the prod lane down with it. To bring Fish back you must first
+drop smart's util (0.86 → ~0.62) — the two cannot coexist as configured.
+
+**ComfyUI is a swap-in, not a co-tenant (Josh, 2026-08-23).** It sits on GPU0 holding ~0.5 GiB
+idle, but LTX renders want ~37 GiB against 19.1 GiB free — they will OOM. **Stop a GPU0 lane
+(protopen frees 52.5 GiB) before rendering, and `POST /free` after.** The unit is `disabled`
+at boot, which is correct; keep it that way.
+
+**GPU0 lanes are serialized by a drop-in — this is not optional.** daria-lane and
+vllm-protopen are both `enabled` and both profile GPU0 free memory at startup. Started in
+parallel they each see a nearly-empty card, both size KV against it, and one OOMs.
+`/etc/systemd/system/vllm-protopen.service.d/10-gpu0-serialize.conf` adds
+`After=daria-lane.service`, so protopen profiles against daria's settled footprint.
+daria-lane's `ExecStartPost` gates on a real completion, so the ordering is meaningful.
+Same invariant as the 2026-07-11 3-lane fleet: **never parallel-start same-GPU lanes.**
+
+**protopen's serve scripts were missing on this branch — now tracked (2026-08-23).**
+`models/serve-protopen-nvfp4.sh` + `models/protopen_health.sh` existed only in commit
+`4802692` on another branch, so the unit's `ExecStart` pointed at files that did not exist
+on `quant/ornith-1.5-requests` and the lane could not start. Restored from that commit and
+committed here. **Lesson: a systemd unit can be `enabled` and reference an `ExecStart` that
+no longer exists on the checked-out branch — `systemctl is-enabled` says nothing about
+whether the lane can actually start.** Worth checking whenever a lane is "temporarily" down.
+
+**Measured 2026-08-23 — smart lane at util 0.86, coherent prompts, 0 preemptions everywhere.**
+Random-token load is banned here: it defeats spec decode (MTP acceptance collapses on
+unpredictable tokens), so a `--dataset-name random` sweep understates this lane badly.
+
+```
+input   C    ttft p50   ttft p99   tpot p50   agg tok/s
+short   1        870ms      870ms     30.2ms       28.3
+short   8        183ms      184ms     31.3ms      221.8
+short  16        291ms      293ms     35.6ms      392.2
+~2.8k   8       1400ms     1460ms     34.5ms      152.6
+~2.8k  16       2104ms     2409ms     43.4ms      223.3
+```
+
+Peak VRAM under load was 86.7 GiB — only **1.8 GiB of transient activation above idle**, so
+the 10.4 GiB cushion is real headroom. Note this validates the util raise *under load*, not
+at boot: `--gpu-memory-utilization` IS profiled (unlike `--kv-cache-memory`, the 2026-08-11
+trap), but a clean startup still proves nothing on its own.
+
+**The util raise removed KV as a constraint; it did NOT fix the C=16 TTFT ceiling.** At
+multi-k prompts C=16 still sits at ~2.1 s p50, and that is a **`--max-num-seqs` artifact, not
+a KV one**. The lane runs `--max-num-seqs 16` and the A/B in commit `4802692`
+(`evals/results/maxseqs-ab/`, in 1k / out 256) measures the tradeoff directly:
+
+```
+max-num-seqs   C=8 ttft p50   C=8 tpot p50   C=16 ttft p50   C=16 agg tok/s
+16                    ~286ms         25.6ms         ~2297ms            ~343
+32                    ~311ms         41.5ms          ~376ms            ~397
+```
+
+seqs32 is ~6× better on TTFT at C=16 and scales on to C=24/32 (485/573 tok/s), but costs
+~60% on TPOT at C=8. Previously seqs32's KV was unaffordable; **at 774k tokens it now is** —
+raise MAXSEQS, not util, when the C=16 tail starts hurting. Left at 16 deliberately so the
+util change isn't confounded; traffic is currently light (514 requests/24h).
+
+**Rollback:** unit backups in `~/dev/.vllm-bump-review/unit-backups/`
+(`vllm-smart-qwen38.service.pre-util086-*`, `daria-lane.service.pre-seqs1-*`).
+
+**Driver is 610.43.02 / CUDA UMD 13.3** (was documented as 595.45.04 — corrected 2026-08-23).
+The GSP-hang note in [[reference_gsp_hang_blackwell]] is pinned to the 595.x-open series and
+may no longer apply.
+
+**Probe hygiene, re-learned 2026-08-23:** a `max_tokens: 16` "say ok" probe returns **empty
+content** on both smart and protopen — `finish_reason: length`, all 16 tokens spent in
+`reasoning`. The lanes were fine; the probe was token-starved. Same trap as
+[[feedback_eval_prod_token_budget]]. Gate with `enable_thinking:false` **and** a real budget,
+and always print `finish_reason` + `reasoning` before calling a lane broken.
+
+> **Below: the 2026-08-10 DSV4-Flash jasl lane** — SUPERSEDED 2026-08-15 by Qwen3.8-27B
+> (`vllm-smart.service` is `disabled`, `vllm-smart-qwen38.service` took :8041). Kept for the
+> jasl-fork build notes, the KV/`--kv-cache-memory` traps, and the TP=2 tenancy rule.
+
+## [SUPERSEDED 2026-08-15] Daily setup (dual GPU) — 2026-08-10: DSV4-Flash smart lane on the jasl fork
+
+**[EX-PROD 2026-08-10 → 2026-08-15].** `vllm-smart.service` (now `disabled`) ran
 `models/serve-dsv4-flash-jasl.sh`: DeepSeek-V4-Flash-0731 on the **jasl vLLM fork**
 (pin `aa0d513027`, env `~/dev/vllm-jasl`, rebuild via `models/build-vllm-jasl.sh`) —
 TP=2 both GPUs :8041, serves `smart reasoning coder deepseek-v4-flash`, embeds coexist.
@@ -208,7 +302,7 @@ re-enable `vllm-vision.service`, disable embed-b, drop KVMEM to 5637144576.
 
 ## [SUPERSEDED 2026-08-10] Daily setup (dual GPU) — 2026-07-22: vLLM 0.25.0 default, Ornith fast + Laguna-S smart
 
-**★ CURRENT PROD (2026-07-22).** vLLM **0.25.0** (`~/dev/vllm-025`) is now the default env — cut over from
+**[EX-PROD 2026-07-22].** vLLM **0.25.0** (`~/dev/vllm-025`) is now the default env — cut over from
 0.24.0/`vllm-024-test` (which is untouched as rollback). torch stays 2.11.0+cu130, flashinfer 0.6.13, sm120
 recipe unchanged. Behavior-preserving on Ornith (206 tok/s, tools clean).
 
