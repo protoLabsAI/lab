@@ -149,11 +149,13 @@ Measured resident VRAM, `Q6_K`, `--ctx-size 4096`, `--n-gpu-layers 99`, flash-at
 > round trip pays the host-boundary cost again — partial offload hurts MTP roughly twice as
 > much as it hurts plain decode.
 >
-> **The most likely cause is `--fit`, which is ON by default.** It silently adjusts any
-> argument you left *unset* — including `-ngl` — to fit device memory with a 1024 MiB margin.
-> Enabling MTP raises the estimate, so `--fit` can quietly shave the layers that MTP needs.
-> A machine reporting comfortable free VRAM is **not** evidence against this: `--fit` keeps
-> usage under budget precisely by moving layers to the host.
+> **The cause is `--fit`, which is ON by default.** It silently adjusts any argument you left
+> *unset* — including `-ngl` — to fit device memory with a 1024 MiB margin. Enabling MTP raises
+> the estimate, so `--fit` quietly shaves the layers that MTP needs. A machine reporting
+> comfortable free VRAM is **not** evidence against this: `--fit` keeps usage under budget
+> precisely by moving layers to the host. Confirmed in the field — this was diagnosed from a
+> user report on a 16 GB card sitting at 12.6 GB used, and `-fit off` with an explicit
+> `-ngl 99` fixed it.
 >
 > **Diagnose it:** check the `offloaded X/Y layers to GPU` line at startup. Anything but
 > `34/34` explains the slowdown by itself.
