@@ -12,7 +12,12 @@ Long generations (1500 tokens), 8 prompts x 8 seeds = 64 per cell, three degener
 | IQ3_M | 0 / 64 | **5 / 64** (7.8%) |
 | IQ2_M | **3 / 64** (4.7%) | **18 / 64** (28%) |
 
-Across a wider sweep (sampling arms x context depth to 31k x thinking on/off, 316 generations): **0/234 at IQ4_XS and above, 14/82 at IQ2_M**, p = 2.6e-9. Q8_0, Q6_K, Q4_K_M and IQ4_XS never degenerated once.
+We also ran a wider sweep — every sampling arm, context depths up to 31k, thinking on and off — 316 generations in all.
+
+- Every rung from IQ4_XS up: **0 failures out of 234**
+- IQ2_M: **14 out of 82**
+
+Q8_0, Q6_K, Q4_K_M and IQ4_XS never degenerated once.
 
 **If you're on IQ2_M, move to IQ4_XS.** It's smaller than Q4_K_M, faster, and clean at any sampler.
 

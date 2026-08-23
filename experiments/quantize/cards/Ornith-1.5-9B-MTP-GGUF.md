@@ -78,26 +78,6 @@ llama-server --model Ornith-1.5-9B-MTP-Q6_K.gguf \
   --spec-type draft-mtp --spec-draft-n-max 3
 ```
 
-## Sampling — pass these flags, they are load-bearing
-
-Ornith recommends **`presence_penalty 1.5`** (temp 1.0, top_k 20, top_p 0.95, min_p 0) for
-general use, and `temp 0.6` / `presence_penalty 0` for precise coding. The base repo ships no
-`generation_config.json`, and llama.cpp would not read one anyway — its defaults are
-`temp 0.8, top_k 40, top_p 0.95, min_p 0.05, presence_penalty 0`, i.e. **no repetition control
-at all**. Earlier versions of this card shipped a command line with no sampler flags, so every
-user got exactly that.
-
-Measured on `IQ2_M`, 64 samples per arm (8 prompts x 8 seeds, 1500-token generations):
-
-| sampling | degenerate | rate |
-|---|---:|---:|
-| Ornith-recommended (`temp 1.0 … presence_penalty 1.5`) | 3 / 64 | **4.7%** |
-| llama.cpp defaults | 18 / 64 | 28.1% |
-| greedy (`temp 0`) | 24 / 64 | 37.5% |
-
-Fisher two-sided p = 5.5e-4 vs defaults. **Low temperature makes looping worse on this family**
-— the opposite of the usual advice. This is mitigation, not a cure: the rung matters more (below).
-
 Confirm `offloaded 34/34 layers to GPU` in the startup log. If it says anything less, fix that
 before judging MTP's speed — see [VRAM](#vram--mtp-requires-a-full-offload-and-the-cliff-is-one-layer-wide).
 
@@ -117,6 +97,26 @@ llama-server --model ornith-1.5-9b-Q4_K_M.gguf \
   --model-draft mtp-head/mtp-Ornith-1.5-9B-head-Q8_0.gguf \
   --spec-type draft-mtp --spec-draft-n-max 3 --n-gpu-layers 99 --flash-attn on --jinja
 ```
+
+## Sampling — pass these flags, they are load-bearing
+
+Ornith recommends **`presence_penalty 1.5`** (temp 1.0, top_k 20, top_p 0.95, min_p 0) for
+general use, and `temp 0.6` / `presence_penalty 0` for precise coding. The base repo ships no
+`generation_config.json`, and llama.cpp would not read one anyway — its defaults are
+`temp 0.8, top_k 40, top_p 0.95, min_p 0.05, presence_penalty 0`, i.e. **no repetition control
+at all**. Earlier versions of this card shipped a command line with no sampler flags, so every
+user got exactly that.
+
+Measured on `IQ2_M`, 64 samples per arm (8 prompts x 8 seeds, 1500-token generations):
+
+| sampling | degenerate | rate |
+|---|---:|---:|
+| Ornith-recommended (`temp 1.0 … presence_penalty 1.5`) | 3 / 64 | **4.7%** |
+| llama.cpp defaults | 18 / 64 | 28.1% |
+| greedy (`temp 0`) | 24 / 64 | 37.5% |
+
+Fisher two-sided p = 5.5e-4 vs defaults. **Low temperature makes looping worse on this family**
+— the opposite of the usual advice. This is mitigation, not a cure: the rung matters more (below).
 
 ## VRAM — MTP requires a FULL offload, and the cliff is one layer wide
 
@@ -388,9 +388,13 @@ verifies its own answer* at 2.7 bpw.
 > | `IQ3_M` | 0 / 64 | **5 / 64** (7.8%) | 0.058 |
 > | `IQ2_M` | **3 / 64** (4.7%) | **18 / 64** (28%) | 5.5e-4 |
 >
-> Across the wider sweep (sampling arms x depth x thinking, 316 generations) the split is
-> **0/234 at every rung >= IQ4_XS vs 14/82 at IQ2_M**, Fisher p = 2.6e-9. `Q8_0`, `Q6_K`,
-> `Q4_K_M` and `IQ4_XS` never degenerated once.
+> A wider sweep — every sampling arm, context depths to 31k, thinking on and off, 316
+> generations in all — splits the same way:
+>
+> - every rung from `IQ4_XS` up: **0 failures out of 234**
+> - `IQ2_M`: **14 out of 82**
+>
+> Fisher p = 2.6e-9. `Q8_0`, `Q6_K`, `Q4_K_M` and `IQ4_XS` never degenerated once.
 >
 > What IQ2_M emits when it goes: `summer summer summer …` x114 · `__class__` x66 ·
 > `from typing import List, Optional, TypeVar, Generic, Iterator` x12. Not a marginal metric
