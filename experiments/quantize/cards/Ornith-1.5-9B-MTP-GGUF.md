@@ -52,7 +52,7 @@ can't speculate. These do.
 | `Ornith-1.5-9B-MTP-IQ3_M.gguf` | 4.67 GB | bundled (imatrix) | 6 GB with room for context |
 | `Ornith-1.5-9B-MTP-IQ2_M.gguf` | 3.87 GB | bundled (imatrix) | smallest; still coherent |
 | `Ornith-1.5-9B-MTP-BF16.gguf` | 18.4 GB | bundled (master) | re-quantize from this |
-| `mmproj-Ornith-1.5-9B-BF16.gguf` | 922 MB | vision projector | required for image input |
+| `mmproj-Ornith-1.5-9B-BF16.gguf` | 922 MB | vision projector | **only** for image input — costs ~1.1 GB VRAM resident |
 | `mtp-head/mtp-Ornith-1.5-9B-head-Q8_0.gguf` | 2.4 GB | standalone head | attach to a base GGUF via `--model-draft` |
 
 "Bundled" = trunk + `nextn` head in one file. The standalone head is **not a model** — loading
@@ -64,10 +64,22 @@ working with MTP enabled.
 ## Run
 
 ```bash
-llama-server --model Ornith-1.5-9B-MTP-Q8_0.gguf \
-  --mmproj mmproj-Ornith-1.5-9B-BF16.gguf \
-  --n-gpu-layers 99 --ctx-size 8192 --flash-attn on --jinja \
+# Text-only. Do NOT load the mmproj unless you are actually sending images —
+# it costs ~1.1 GB of VRAM you probably need. See "VRAM" below.
+# -fit off + an explicit -ngl is deliberate: MTP inverts if even one layer
+# lands on the CPU, and --fit (on by default) will move layers silently.
+llama-server --model Ornith-1.5-9B-MTP-Q6_K.gguf \
+  --n-gpu-layers 99 -fit off --ctx-size 8192 --flash-attn on --jinja \
   --spec-type draft-mtp --spec-draft-n-max 3
+```
+
+Confirm `offloaded 34/34 layers to GPU` in the startup log. If it says anything less, fix that
+before judging MTP's speed — see [VRAM](#vram--mtp-requires-a-full-offload-and-the-cliff-is-one-layer-wide).
+
+For image input, add the projector:
+
+```bash
+  --mmproj mmproj-Ornith-1.5-9B-BF16.gguf
 ```
 
 `--spec-draft-n-max` is the draft depth: **2** maximizes acceptance, **3** maximizes throughput,
@@ -80,6 +92,58 @@ llama-server --model ornith-1.5-9b-Q4_K_M.gguf \
   --model-draft mtp-head/mtp-Ornith-1.5-9B-head-Q8_0.gguf \
   --spec-type draft-mtp --spec-draft-n-max 3 --n-gpu-layers 99 --flash-attn on --jinja
 ```
+
+## VRAM — MTP requires a FULL offload, and the cliff is one layer wide
+
+MTP is not free in memory: the `nextn` head adds a layer and speculation adds a draft context.
+Measured resident VRAM, `Q6_K`, `--ctx-size 4096`, `--n-gpu-layers 99`, flash-attn on:
+
+    configuration                  resident VRAM   delta
+    ---------------------------    -------------   -----
+    trunk only                        7.5 GB         --
+    trunk + MTP                       8.2 GB       +0.7 GB
+    trunk + mmproj                    8.6 GB       +1.1 GB
+    trunk + mmproj + MTP              9.3 GB       +1.9 GB
+
+`Q8_0` adds roughly 2 GB on top of every row.
+
+> ### ⚠️ If MTP makes it *slower*, you are almost certainly not fully offloaded
+>
+> **MTP inverts the moment any layer lands on the CPU.** This model has **34** offloadable
+> layers (32 trunk + the `nextn` head + output). Measured, `Q6_K`, ctx 8192, `-fit off`:
+>
+>     -ngl      no-MTP pp   no-MTP tg   +MTP pp   +MTP tg    MTP verdict
+>     ------    ---------   ---------   -------   -------    -----------
+>     34 / 99        8543       171.4      6537     235.1    +37%  WIN
+>     33             5892        77.3      5438      56.0    -28%  LOSS
+>     28             3066        20.2      2846      12.1    -40%  LOSS
+>     24             2150        13.9      2044       8.2    -41%  LOSS
+>
+> **One layer short is enough.** At `-ngl 33` decode has already fallen 55% and MTP has flipped
+> from a 37% speedup to a 28% *slowdown*. Speculation drafts and verifies every step, so each
+> round trip pays the host-boundary cost again — partial offload hurts MTP roughly twice as
+> much as it hurts plain decode.
+>
+> **The most likely cause is `--fit`, which is ON by default.** It silently adjusts any
+> argument you left *unset* — including `-ngl` — to fit device memory with a 1024 MiB margin.
+> Enabling MTP raises the estimate, so `--fit` can quietly shave the layers that MTP needs.
+> A machine reporting comfortable free VRAM is **not** evidence against this: `--fit` keeps
+> usage under budget precisely by moving layers to the host.
+>
+> **Diagnose it:** check the `offloaded X/Y layers to GPU` line at startup. Anything but
+> `34/34` explains the slowdown by itself.
+>
+> **Fix, in order:** pass `-fit off` together with an explicit `-ngl 99` · drop `--mmproj` if
+> you are not sending images (−1.1 GB) · move to `IQ4_XS` (−1.6 GB vs `Q6_K`, and faster
+> anyway) · lower `--ctx-size`.
+>
+> A second, rarer cause is a driver spilling VRAM into system RAM instead of failing to load
+> (silent on Windows/WDDM, and possible via the GTT heap on AMD/Vulkan). Same symptom, same
+> fixes — and the startup layer line still tells you which one you are looking at.
+>
+> **Coming from `Ornith-1.0-9B-MTP`?** The trunk files are byte-identical in size, but 1.0 has
+> **no mmproj**. A 1.0 command line that fit your card can push 1.5 over — same rung, +1.1 GB —
+> and with `--fit` on, "over" means layers quietly move to the CPU rather than an error.
 
 ## The finding: a grafted head was NOT good enough this time
 
@@ -159,6 +223,20 @@ Q4_K_M that is below the break-even point — the verify costs more than specula
 
 On Q8_0 prose still nets positive (195.8 vs 149.6) because the baseline is slower to begin with.
 **If your workload is mostly long-form creative writing on Q4_K_M, run without `--spec-type`.**
+
+### Prompt processing
+
+The tables above are **decode**. Prompt processing was not measured for the initial release;
+it is measured here because MTP's cost lands there. `Q6_K`, ctx 16384, fully GPU-resident:
+
+| prompt tokens | no-MTP pp tok/s | +MTP pp tok/s | no-MTP tg tok/s | +MTP tg tok/s |
+|---:|---:|---:|---:|---:|
+| 2,548 | 8,059 | 6,793 | 171.8 | 231.9 |
+| 10,951 | 7,982 | 7,227 | 168.3 | 272.0 |
+
+**MTP costs 10–28% of prompt-processing throughput** and pays it back in decode. That is the
+whole of its inherent cost when the model fits in VRAM. A prompt-processing drop measured in
+*multiples* is the memory-overflow case above, not this.
 
 ### Methodology caveat — read before quoting these
 
