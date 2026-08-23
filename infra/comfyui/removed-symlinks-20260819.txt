@@ -1,0 +1,26 @@
+# Dangling ComfyUI model symlinks removed 2026-08-19
+#
+# All 16 pointed at weights deleted in the 2026-08-11 reclaim (and the 2026-05-03
+# qwen-image hardlink incident). Verified before removal: no source file exists
+# anywhere under /mnt/models or /mnt/data, and nothing but QWEN-T2I.json (itself
+# already broken) referenced any of them.
+#
+# Recreate with:  ln -s <target> ~/dev/ComfyUI/models/<link>
+#
+# link (relative to ComfyUI/models/)                           target (missing)
+checkpoints/ltx-2.3-22b-dev.safetensors                        /mnt/models/huggingface/hub/models--Lightricks--LTX-2.3/snapshots/cd784f3198e9ec3efec60b66a0fd78aafe413a86/ltx-2.3-22b-dev.safetensors
+checkpoints/ltx-2.3-22b-distilled.safetensors                  /mnt/models/huggingface/hub/models--Lightricks--LTX-2.3/snapshots/cd784f3198e9ec3efec60b66a0fd78aafe413a86/ltx-2.3-22b-distilled.safetensors
+diffusers/Qwen-Image-2512                                      /mnt/models/huggingface/hub/models--Qwen--Qwen-Image-2512/snapshots/25468b98e3276ca6700de15c6628e51b7de54a26
+diffusion_models/anima-preview2.safetensors                    /mnt/models/anima/split_files/diffusion_models/anima-preview2.safetensors
+diffusion_models/anima-preview.safetensors                     /mnt/models/anima/split_files/diffusion_models/anima-preview.safetensors
+diffusion_models/qwen_image_fp8_e4m3fn.safetensors             /mnt/models/huggingface/hub/models--Comfy-Org--Qwen-Image_ComfyUI/snapshots/c232bcb51c1523899c62d6dcaa960b2627668de5/split_files/diffusion_models/qwen_image_fp8_e4m3fn.safetensors
+diffusion_models/qwen_image_fp8_hq.safetensors                 /mnt/models/huggingface/hub/models--Comfy-Org--Qwen-Image_ComfyUI/snapshots/c232bcb51c1523899c62d6dcaa960b2627668de5/split_files/diffusion_models/qwen_image_fp8_hq.safetensors
+diffusion_models/qwen_image_fp8mixed.safetensors               /mnt/models/huggingface/hub/models--Comfy-Org--Qwen-Image_ComfyUI/snapshots/c232bcb51c1523899c62d6dcaa960b2627668de5/split_files/diffusion_models/qwen_image_fp8mixed.safetensors
+loras/gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors  /mnt/models/huggingface/hub/models--Comfy-Org--ltx-2/snapshots/bd5f9c87fcb0360ae7112f9784562670894d9492/split_files/loras/gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors
+loras/ltx-2.3-22b-distilled-lora-384.safetensors               /mnt/models/huggingface/hub/models--Lightricks--LTX-2.3/snapshots/cd784f3198e9ec3efec60b66a0fd78aafe413a86/ltx-2.3-22b-distilled-lora-384.safetensors
+text_encoders/gemma_3_12B_it_fp4_mixed.safetensors             /mnt/models/huggingface/hub/models--Comfy-Org--ltx-2/snapshots/bd5f9c87fcb0360ae7112f9784562670894d9492/split_files/text_encoders/gemma_3_12B_it_fp4_mixed.safetensors
+text_encoders/qwen_3_06b_base.safetensors                      /mnt/models/anima/split_files/text_encoders/qwen_3_06b_base.safetensors
+upscale_models/ltx-2.3-spatial-upscaler-x1.5-1.0.safetensors   /mnt/models/huggingface/hub/models--Lightricks--LTX-2.3/snapshots/cd784f3198e9ec3efec60b66a0fd78aafe413a86/ltx-2.3-spatial-upscaler-x1.5-1.0.safetensors
+upscale_models/ltx-2.3-spatial-upscaler-x2-1.1.safetensors     /mnt/models/huggingface/hub/models--Lightricks--LTX-2.3/snapshots/cd784f3198e9ec3efec60b66a0fd78aafe413a86/ltx-2.3-spatial-upscaler-x2-1.1.safetensors
+upscale_models/ltx-2.3-temporal-upscaler-x2-1.0.safetensors    /mnt/models/huggingface/hub/models--Lightricks--LTX-2.3/snapshots/cd784f3198e9ec3efec60b66a0fd78aafe413a86/ltx-2.3-temporal-upscaler-x2-1.0.safetensors
+vae/qwen_image_vae_anima.safetensors                           /mnt/models/anima/split_files/vae/qwen_image_vae.safetensors

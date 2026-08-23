@@ -59,9 +59,250 @@ Each phase has an exit criterion; don't move on until current phase is done.
 
 Default to publishing publicly via `protoLabsAI/` on HuggingFace and protolabs.studio for the writeup. Privacy is a drafting state, not a target. **Every shipped experiment produces a blog draft in `experiments/<name>/BLOG.md` before the next experiment starts.** audio-tags is the template.
 
-## Daily setup (dual GPU) — 2026-07-22: vLLM 0.25.0 default, Ornith fast + Laguna-S smart
+## Daily setup (dual GPU) — 2026-08-23: Qwen3.8 smart (GPU1) + daria & protopen sharing GPU0 (CANONICAL)
 
-**★ CURRENT PROD (2026-07-22).** vLLM **0.25.0** (`~/dev/vllm-025`) is now the default env — cut over from
+**★ CURRENT PROD (2026-08-23).** Three vLLM lanes, one card each side, no TP. GPU1 is the
+prod card; GPU0 is the shared card. Fish TTS is **stopped and disabled** — its 19.4 GiB on
+GPU1 bought nothing (0 synthesis requests in 7 days) and paid for the smart lane's KV instead.
+
+| GPU | Service | Model | Port | util | KV pool | Notes |
+|-----|---------|-------|------|------|---------|-------|
+| 1 | `vllm-smart-qwen38.service` | Qwen3.8-27B-NVFP4 + MTP K=3 | :8041 | **0.86** | **774,203 tok (2.95× @ 262K)** | `smart reasoning coder qwen3.8-27b-nvfp4` — the prod lane |
+| 1 | `embed-server.service` | Qwen3-Embedding-0.6B | :8001 | — | — | embed A (the only GPU1 co-tenant) |
+| 0 | `vllm-protopen.service` | ThinkingCap-Qwen3.6-27B-heretic-NVFP4 | :8050 | 0.55 | — | `protopen heretic`, 131K, fp8-KV, security lane |
+| 0 | `daria-lane.service` | Daria-24B-NVFP4 + v6 gated clamp | :8045 | 0.22 | 61,952 tok | `daria`, 32K, **`--max-num-seqs 1`** — single-concurrency by design |
+| 0 | `embed-b.service` | Qwen3-Embedding-0.6B | :8004 | — | — | embed B |
+| 0 | ComfyUI | LTX pipelines | :8188 | — | — | **on demand only** — see below |
+
+Measured idle footprint: GPU0 75.9/95.6 GiB (19.1 free), GPU1 84.6/95.6 GiB (10.4 free).
+
+**Fish TTS is stopped AND disabled — do not just `stop` it, the `disable` is load-bearing.**
+At smart util 0.86 the card has 10.4 GiB free; Fish wants 19.4 GiB. Left `enabled` it comes
+back at boot, loses, and takes the prod lane down with it. To bring Fish back you must first
+drop smart's util (0.86 → ~0.62) — the two cannot coexist as configured.
+
+**ComfyUI is a swap-in, not a co-tenant (Josh, 2026-08-23).** It sits on GPU0 holding ~0.5 GiB
+idle, but LTX renders want ~37 GiB against 19.1 GiB free — they will OOM. **Stop a GPU0 lane
+(protopen frees 52.5 GiB) before rendering, and `POST /free` after.** The unit is `disabled`
+at boot, which is correct; keep it that way.
+
+**GPU0 lanes are serialized by a drop-in — this is not optional.** daria-lane and
+vllm-protopen are both `enabled` and both profile GPU0 free memory at startup. Started in
+parallel they each see a nearly-empty card, both size KV against it, and one OOMs.
+`/etc/systemd/system/vllm-protopen.service.d/10-gpu0-serialize.conf` adds
+`After=daria-lane.service`, so protopen profiles against daria's settled footprint.
+daria-lane's `ExecStartPost` gates on a real completion, so the ordering is meaningful.
+Same invariant as the 2026-07-11 3-lane fleet: **never parallel-start same-GPU lanes.**
+
+**protopen's serve scripts were missing on this branch — now tracked (2026-08-23).**
+`models/serve-protopen-nvfp4.sh` + `models/protopen_health.sh` existed only in commit
+`4802692` on another branch, so the unit's `ExecStart` pointed at files that did not exist
+on `quant/ornith-1.5-requests` and the lane could not start. Restored from that commit and
+committed here. **Lesson: a systemd unit can be `enabled` and reference an `ExecStart` that
+no longer exists on the checked-out branch — `systemctl is-enabled` says nothing about
+whether the lane can actually start.** Worth checking whenever a lane is "temporarily" down.
+
+**Measured 2026-08-23 — smart lane at util 0.86, coherent prompts, 0 preemptions everywhere.**
+Random-token load is banned here: it defeats spec decode (MTP acceptance collapses on
+unpredictable tokens), so a `--dataset-name random` sweep understates this lane badly.
+
+```
+input   C    ttft p50   ttft p99   tpot p50   agg tok/s
+short   1        870ms      870ms     30.2ms       28.3
+short   8        183ms      184ms     31.3ms      221.8
+short  16        291ms      293ms     35.6ms      392.2
+~2.8k   8       1400ms     1460ms     34.5ms      152.6
+~2.8k  16       2104ms     2409ms     43.4ms      223.3
+```
+
+Peak VRAM under load was 86.7 GiB — only **1.8 GiB of transient activation above idle**, so
+the 10.4 GiB cushion is real headroom. Note this validates the util raise *under load*, not
+at boot: `--gpu-memory-utilization` IS profiled (unlike `--kv-cache-memory`, the 2026-08-11
+trap), but a clean startup still proves nothing on its own.
+
+**The util raise removed KV as a constraint; it did NOT fix the C=16 TTFT ceiling.** At
+multi-k prompts C=16 still sits at ~2.1 s p50, and that is a **`--max-num-seqs` artifact, not
+a KV one**. The lane runs `--max-num-seqs 16` and the A/B in commit `4802692`
+(`evals/results/maxseqs-ab/`, in 1k / out 256) measures the tradeoff directly:
+
+```
+max-num-seqs   C=8 ttft p50   C=8 tpot p50   C=16 ttft p50   C=16 agg tok/s
+16                    ~286ms         25.6ms         ~2297ms            ~343
+32                    ~311ms         41.5ms          ~376ms            ~397
+```
+
+seqs32 is ~6× better on TTFT at C=16 and scales on to C=24/32 (485/573 tok/s), but costs
+~60% on TPOT at C=8. Previously seqs32's KV was unaffordable; **at 774k tokens it now is** —
+raise MAXSEQS, not util, when the C=16 tail starts hurting. Left at 16 deliberately so the
+util change isn't confounded; traffic is currently light (514 requests/24h).
+
+**Rollback:** unit backups in `~/dev/.vllm-bump-review/unit-backups/`
+(`vllm-smart-qwen38.service.pre-util086-*`, `daria-lane.service.pre-seqs1-*`).
+
+**Driver is 610.43.02 / CUDA UMD 13.3** (was documented as 595.45.04 — corrected 2026-08-23).
+The GSP-hang note in [[reference_gsp_hang_blackwell]] is pinned to the 595.x-open series and
+may no longer apply.
+
+**Probe hygiene, re-learned 2026-08-23:** a `max_tokens: 16` "say ok" probe returns **empty
+content** on both smart and protopen — `finish_reason: length`, all 16 tokens spent in
+`reasoning`. The lanes were fine; the probe was token-starved. Same trap as
+[[feedback_eval_prod_token_budget]]. Gate with `enable_thinking:false` **and** a real budget,
+and always print `finish_reason` + `reasoning` before calling a lane broken.
+
+> **Below: the 2026-08-10 DSV4-Flash jasl lane** — SUPERSEDED 2026-08-15 by Qwen3.8-27B
+> (`vllm-smart.service` is `disabled`, `vllm-smart-qwen38.service` took :8041). Kept for the
+> jasl-fork build notes, the KV/`--kv-cache-memory` traps, and the TP=2 tenancy rule.
+
+## [SUPERSEDED 2026-08-15] Daily setup (dual GPU) — 2026-08-10: DSV4-Flash smart lane on the jasl fork
+
+**[EX-PROD 2026-08-10 → 2026-08-15].** `vllm-smart.service` (now `disabled`) ran
+`models/serve-dsv4-flash-jasl.sh`: DeepSeek-V4-Flash-0731 on the **jasl vLLM fork**
+(pin `aa0d513027`, env `~/dev/vllm-jasl`, rebuild via `models/build-vllm-jasl.sh`) —
+TP=2 both GPUs :8041, serves `smart reasoning coder deepseek-v4-flash`, embeds coexist.
+
+| Change vs stock 0.25.1 lane | Value |
+|---|---|
+| Decode C1 (real prompts) | **184 t/s vs 103.5 (+78%)** — DSpark spec decode K=5 (K≥5 REQUIRED, block size) |
+| Decode C8 | neutral (−0.6%) — NOT the dFlash inversion |
+| Context | **393216 (384K)** — DeepGEMM >256K ceiling fixed in fork indexer; `reasoning_effort: max` now legal |
+| KV pool | **689,133 tok (1.75× @ 384K)** via `--kv-cache-memory 8589934592`, fp8 KV — see the 2026-08-11 correction below; the 11859195904 / 951,437-tok figure measured on 08-10 runtime-OOMs and must NOT be restored |
+| Scorecard | LCB 0.633↑ FC 0.907↑ claw 0.744 · reasoning_hard 0.861 (−0.11, thinking-LENGTH delta — see below) |
+
+Full characterization: `evals/results/DSV4-JASL-TEST-2026-08-10.md`. KV footnote: stock's
+"1.89M tokens" was a reporting bug (2.19× over-report); real stock capacity ≈ 860K.
+
+**xgrammar "Failed to advance FSM" errors are LOG NOISE, not corrupted output (measured
+2026-08-11).** The jasl lane logs `backend_xgrammar.py:162 Failed to advance FSM for request
+… for tokens N` on guided-decoding requests. Root cause is **adaptive thinking × guided
+decoding** — clean A/B, identical schema:
+
+```
+                   FSM errors   reasoning chars   schema-valid
+thinking ON  (12)      18          3335 mean         12/12
+thinking OFF (12)       0             0              12/12
+tools    ON  (10)       5             —              10/10
+tools    OFF (10)       0             —              10/10
+```
+
+xgrammar is fed reasoning tokens that can't match the JSON grammar and complains; the engine
+applies the grammar only to the content stream, so **output integrity is unaffected**.
+**86 guided/tool requests across 7 schema shapes (flat, nested, array-of-objects, enum,
+regex, 4-deep, anyOf) — 100% schema-valid, zero violations.** structured 0.917 / FC 0.907 are
+NOT suspect. ⚠️ But **do not alert on this string**: every thinking+guided request emits
+~0.5–1.5 lines, so a *real* FSM failure would be buried. Fix (or upstream report) first.
+Lesson: this was initially escalated to top priority on log severity alone — measure the
+output before ranking a defect.
+
+**Known deltas / open items:**
+- **Default thinking = adaptive-ON** (short reasoning on every request in `reasoning`
+  field) vs stock's default-OFF. `thinking:false` / `reasoning_effort:"none"` force off.
+  Gateway aliases (homelab-iac#215) still assume default-OFF — **pin per-alias on ava**.
+- **reasoning_hard −0.11**: fork deliberates ~2/3 as long on hard tasks. Mitigation =
+  `reasoning_effort: xhigh/max` (2.4× deliberation, 384K allows max) — **unproven on the
+  suite**; add an effort knob to `runners/run_custom` and re-run.
+- **Accepted debt: no supply-chain review** of the fork (source build from github.com/jasl/vllm).
+- Rollback: `unit-backups/vllm-smart.service.pre-jasl-20260810-*` (stock 0.25.1 lane, ~2 min).
+- OS drive at 99% (~11G free) after the env build — Windows NVMe reclaim (~1TB) is the fix.
+
+**Vision lane RETIRED from this node 2026-08-11 (same day it landed) — moving to ava.**
+`vllm-vision.service` stopped + **disabled**; `embed-b.service` re-enabled (GPU0 :8004);
+smart lane KVMEM raised **5637144576 → 8589934592** (8 GiB; KV pool 452,238 → **689,133
+tokens**, max concurrency 1.15× → **1.75×** @ 384K). KV dtype stays **fp8** (unchanged).
+Validated under load, not just at boot: C=8 burst on 20K-token prompts (13 concurrent with
+live traffic) → 8/8 clean, **0 preemptions**, ~3.6 GiB free per card.
+
+**Do NOT restore 11859195904 here** (the 2026-08-10 "fully utilize" value) — tried it first
+and it FAILED: the pool allocates fine (951,437 tok, 2.42×) and then dies on the first real
+inference with `torch.OutOfMemoryError` on **GPU1**, wanting 256 MiB of transient activation
+with ~245 MiB free. Vision only ever constrained GPU0; **GPU1's tenancy (embed-A, 1.81 GiB)
+never changed**, so GPU1 could not hold an 11.3 GiB pool with or without vision. Yesterday's
+walk-down in the log (603,011 → 516,890 → 452,238) was the same wall being hit from the
+GPU0 side.
+
+**Two traps this exposed, both reusable:**
+1. **`--kv-cache-memory` is NOT profiled.** vLLM allocates exactly the bytes you ask for and
+   only discovers the shortfall when real activations land. A clean startup proves nothing —
+   always leave runtime headroom and validate under load, not at boot.
+2. **`/health` lies when the engine wedges.** After the worker OOM'd, the API server kept
+   returning **200** while the engine core sat behind a dead worker (`No available shared
+   memory broadcast block found in 60 seconds`) serving nothing. Any systemd gate or gateway
+   health check would have kept routing traffic to it. **Gate on a real completion.**
+
+**Why it was pulled:** the one-day-old vision lane cost the smart lane more than it was
+worth. Under real fan-out DSV4 was **KV-starved** — 13 running / 49 queued (44 blocked on
+`capacity`), KV usage 91%, **mean TTFT 50.5 s** — while vision had served **7 requests /
+646 prompt tokens** in ~4.9 h of uptime. Decode was never the problem (14.8 ms TPOT ≈ 67
+tok/s/stream, **0 preemptions**); the queue was.
+
+**The TP=2 tenancy rule this taught us — worth keeping.** Under TP=2 the KV pool is sharded
+symmetrically, so it is bounded by the **tighter card**. A lopsided tenant strands headroom
+on the other one: with vision (7.3 G) on GPU0 and embed-A (1.9 G) on GPU1, GPU0 had 688 MiB
+free while GPU1 sat on 6128 MiB that **no request could ever use**. Keep co-tenants balanced
+across both cards, or the imbalance is paid twice. (Consolidating both tenants onto one card
+is *worse*, not better — it just moves the binding constraint.)
+
+**Note `--max-model-len` is NOT a KV lever here.** With `--kv-cache-memory` pinned, the pool
+is a fixed byte allocation; lowering max-model-len frees ~0 bytes (activation memory scales
+with `--max-num-batched-tokens`, not context length). It only lowers the *floor* vLLM will
+accept (5.01 GiB for one 393216-token request) and the reported concurrency ratio. Cutting
+context to buy KV does not work — buy bytes instead. 384K also stays load-bearing: it's what
+makes `reasoning_effort: max` legal.
+
+**MEASURED 2026-08-11 — full `speed-test-v2 full` sweep at KVMEM 8 GiB, 25 cells, 0 errors.**
+Full table + caveats: `evals/results/speed-v2/dsv4-jasl-8gib-20260811-104306/RESULTS.md`.
+
+```
+regime      C  ttft p50  tpot p50  agg tok/s  goodput      regimes: chat 1k/1k
+chat       16     302ms    29.3ms      508.4     0.50       context 8k/1k
+context     8    1343ms    30.2ms      248.0     0.22       gen 1k/8k
+context    16    1405ms    49.0ms      309.8     0.12       think 1k/16k
+think      16     320ms    12.2ms     1096.0     0.06       legacy 128/800
+legacy     16     182ms    28.0ms      529.2     0.66
+```
+
+**`--max-num-seqs 16` is a HARD CEILING — the top actionable finding.** The C=32 cliff
+reproduces in **all five regimes**: throughput flat (−2% to +13%) while TTFT p50 collapses
+to 21–216 s and goodput goes to ~0. `think` C=32 has a **216 s median** TTFT. Above 16
+concurrent, requests queue instead of degrading. The lane **already runs at the cap** (13–15
+concurrent under load; 13 running / 49 waiting in the KV incident) and KV can now afford more
+(44% util, 0 preemptions) — raise MAXSEQS, not KVMEM.
+
+**Optimal concurrency is C=16 — except long prompts, where it's C=8.** `context` (8k) pushes
+TPOT to 49.0 ms p50 / 62.9 p99 at C=16, through the 50 ms SLO; goodput peaks at C=8 (0.22)
+and falls to 0.12 at C=16. Long-output work is this lane's strength: `think` does 1096 tok/s
+at C=16 with 320 ms TTFT, and 3.6 ms TPOT (~278 tok/s/stream) at C=1.
+
+⚠️ **`--dataset-name random` silently defeats spec decode — a caveat the script's honesty
+notes don't mention.** A draft head can't predict random tokens: DSpark acceptance measured
+**11–22% (len 1.57–2.12)** during this sweep vs **48.9% (len 3.44)** on coherent prompts. The
+fork's headline feature contributes ~nothing here while still paying 5–10× verify-batch
+inflation. **These numbers are a floor**, and benchmarking this lane against a
+non-spec-decode lane on random data is actively unfair to it. (Same day, live traffic
+measured 1.47 s mean TTFT — better than `context` predicts, via cache hits + coherent text.)
+
+**Still on the table (not taken — needs a load-test window, not a boot check):**
+- **KVMEM 8 → ~10 GiB.** ~3.6 GiB/card was left as cushion; the true ceiling is between
+  8 GiB (holds) and 11.05 GiB (runtime-OOMs). Probe with `speed-test-v2.sh full` at real
+  prompt sizes, not a single request.
+- **`--max-num-batched-tokens 4096` is the bigger TTFT lever, and it is untouched.** In the
+  KV-starved incident only **8.6 s of the 50.5 s mean TTFT was queue wait** — the other ~42 s
+  was prefill. At MNBT 4096 a p88-sized 50K-token prompt needs 12+ chunked-prefill iterations
+  competing with decode. Raising MNBT costs activation memory (which is why it pairs *against*
+  a KVMEM raise — they draw on the same cushion). Decode was never the problem: 14.8 ms TPOT
+  ≈ 67 tok/s/stream throughout.
+
+**Consumers left dangling until MiniCPM lands on ava:** `protolabs/vision` gateway alias
+(dead :8050) and protoAgent `knowledge.image_describe_model: protolabs/vision` in
+`~/.protoagent/default/config/langgraph-config.yaml`. No local vision fallback — the fast
+lane (Ornith-35B-NVFP4), which *out-visions* MiniCPM (OCRBench 89.7 vs 77.3, MMMU 75.6 vs
+50.2), has been down since the 2026-08-08 DSV4 cutover. To bring vision back here instead:
+re-enable `vllm-vision.service`, disable embed-b, drop KVMEM to 5637144576.
+
+> **Below: the prior 2026-07-22 setup** — kept for Ornith/Laguna serving notes and rollback context.
+
+## [SUPERSEDED 2026-08-10] Daily setup (dual GPU) — 2026-07-22: vLLM 0.25.0 default, Ornith fast + Laguna-S smart
+
+**[EX-PROD 2026-07-22].** vLLM **0.25.0** (`~/dev/vllm-025`) is now the default env — cut over from
 0.24.0/`vllm-024-test` (which is untouched as rollback). torch stays 2.11.0+cu130, flashinfer 0.6.13, sm120
 recipe unchanged. Behavior-preserving on Ornith (206 tok/s, tools clean).
 
@@ -185,6 +426,19 @@ bash models/vllm-swap.sh qwen-122b-int4     # quality ceiling INT4 TP=2 (122 tok
 bash models/vllm-swap.sh qwen-27b-fp8-tp2   # FP8 official TP=2 (70 tok/s, 131K)
 ```
 
+## A/B chat (side-by-side model comparison)
+
+```bash
+python models/ab_chat.py                    # defaults: Daria gated :8043 vs base :8045
+python models/ab_chat.py --a URL --am MODEL --al LABEL --b URL --bm MODEL --bl LABEL
+python models/ab_chat.py --once "prompt"    # one-shot, scriptable
+```
+
+Single input → two columns, independent multi-turn histories, per-side latency. Works against any
+two OpenAI-compatible endpoints (vLLM lanes, llama.cpp, custom servers). In-chat: `/sys <text>`
+(system prompt both sides), `/clear`, `/save [path]` (JSON transcript → good sample material for
+cards/blogs), `/quit`. Knobs: `--max-tokens --temp --timeout`. Zero deps beyond `requests`.
+
 ## Speed testing
 
 ```bash
@@ -236,7 +490,10 @@ NCCL env vars for PCIe (no NVLink): `NCCL_ALGO=Ring NCCL_PROTO=Simple NCCL_MIN_N
 - Root cause: ACS enabled on PCIe bridges corrupts P2P during CUDA graph replay
 - Disabling P2P forces shared memory transport — slight overhead, fully stable
 - TTFT: 3077 ms → 29 ms with prefix caching after warmup
-- Power draw: 88–96 W per card at 600 W limit — MoE is not power-bound
+- Power draw: 88–96 W per card — MoE is not power-bound. **⚠️ The "600 W limit" in this line
+  was stale: both cards are capped at 375 W** by `nvidia-power-limit.service` (enabled,
+  `nvidia-smi -pl 375`; `ExecStop` restores 600). Default/max is 600 W, min 150 W — so ~60%
+  more power is available on request, deliberately not taken (energy budget).
 - 35B TP=2: prefix caching fixed 1.8 s TTFT → 0.5 s (**−70%**), wall tok/s +25%
 - `VLLM_USE_FLASHINFER_MOE_FP8` crashes on 122B FP8 (unsupported quant scheme) — don't use
 - Previous finding that TP=2 needs enforce-eager was wrong — `NCCL_P2P_DISABLE=1` is the fix
@@ -319,6 +576,58 @@ Cold storage (`/mnt/data/models-cold/`): FLUX.2-klein 9B+base (100GB), Z-Image+T
 
 ## Blackwell constraints
 
+**GPU thermals / power (characterized 2026-08-11 under sustained TP=2 load).** `GPU 0` =
+PCI `01:00.0` = the **top card**, and it runs a consistent **~12 °C hotter** than GPU 1
+(`03:00.0`) — 85/73 °C at peak, 76/64 °C at moderate load. Cause is airflow, not workload:
+the lower card exhausts up into the top one. **This costs nothing today** — HW *and* SW
+thermal slowdown both read **0 µs cumulative**, no throttle flags ever set, both cards hold
+an identical 2805 MHz SM clock, and fans sit at 40–47%. Headroom is real, not marginal.
+Power is capped at **375 W** (not the 600 W this doc used to claim) by
+`nvidia-power-limit.service`; draw under load is ~260–380 W. Raising toward the 600 W
+default is the obvious lever if a workload ever needs it — but it spends straight into the
+top card's thermal delta, so measure GPU 0 first. Don't diagnose a hot top card as a fault.
+
+**Chassis fans ARE measurable (2026-08-11) — `modprobe nct6775`, no reboot, no kernel args.**
+It binds cleanly on this board (ASUS ROG Crosshair X670E Hero, BIOS 0922); ACPI does *not*
+reserve the ports, so `acpi_enforce_resources=lax` is unnecessary. Chip = **NCT6799D at
+0x2e:0x290** (`nct6799-isa-0290`). Persisted in `/etc/modules-load.d/nct6775.conf`.
+node-exporter's hwmon collector picks it up with **zero config change** — 46 new
+`node_hwmon_fan*` series flow straight to Prometheus on ava.
+
+**And the finding that matters: the board's fan curve is GPU-blind.** Only 2 of 7 headers
+are populated (fan2 ~1128 RPM, fan3 ~919 RPM) and both sit at **57% PWM** while GPU 0 runs
+86 °C. Smart Fan IV (`pwm_enable=5`) regulates off the board's own thermistors — SYSTIN 52,
+CPUTIN 54.5, PECI 57, all far under the 80 °C threshold — so the controller sees an idle-cool
+machine and never ramps. The heat source is invisible to the thing moving the air. That is
+*why* the top card runs hot, and it is a missing input, not a broken curve. Fixing it means
+driving PWM from GPU temp — see the fan-curve task; **any such daemon must restore
+`pwm_enable=5` on exit**, or a dead process leaves the fans pinned wherever it last wrote.
+Ignore the `in0..in17` voltage ALARMs — lm-sensors ships no limits for this chip, so
+min=max=0 flags everything.
+
+**…and then MEASURED it, which killed the idea. Chassis airflow is NOT the constraint.**
+Controlled A/B, load held constant at 10-14 concurrent requests, 4 min soak per arm:
+
+```
+                gpu0  gpu1   fan2 RPM  fan3 RPM
+57% PWM (board)   85    72      1128       934
+100% PWM          83    71      1662      1430
+```
+
+**+47% fan RPM bought ~1 °C** — and the 100% arm was carrying *more* load, so the real effect
+is ≤1 °C. Don't build a GPU-driven chassis fan curve: it trades a genuine failure mode
+(`pwm_enable=1` held by a process that can die) for nothing. The case already supplies more
+air than the GPU coolers can use. It also means **the ~12 °C GPU0/GPU1 delta is card-to-card,
+not case airflow** — GPU 1 exhausts into GPU 0's intake, and no amount of case fan can undo
+that. The remaining lever is the cards' own fans, which idle at **52% / 44% while at 84/70 °C**
+(read-only via `nvidia-smi`; `nvidia-settings` needs an X display this box doesn't have).
+
+⚠️ **Thermal-A/B methodology, learned by getting it wrong:** the first run showed a glorious
+86 → 47 °C "win" from ramping fans. It was entirely bogus — the lane went idle mid-test and
+that was just residual heat bleeding off at zero load. Only caught because the sampler
+printed `running=0.0`. **Always instrument load in a thermal experiment and hold it constant
+across arms**; the confound is huge and points the same way as the hypothesis.
+
 **2026-07-22: prod migrated to vLLM 0.25.0** (`~/dev/vllm-025`, clone of vllm-024-test + `pip install vllm==0.25.0`). Driven by poolside Laguna, whose card **requires 0.25.0+** — on 0.24.0 it garbled tool-calling + multi-turn agentic (band-aids: drop fp8-KV, patch `poolside_v1` regex #47311, sampling override — S/118B still borked). 0.25.0 fixes it NATIVELY (#42650 Blackwell attn + #47311 parser baked in; stock parser + fp8-KV clean, multi-turn stable). torch **stays 2.11.0+cu130**, flashinfer 0.6.12→0.6.13, sm120 recipe unchanged (first-load JIT ~4min). Behavior-preserving on Ornith: 206 tok/s (= 0.24.0), tools clean. `vllm-fast.service` repointed vllm-024-test→vllm-025 (rollback: `vllm-fast.service.pre-025-bak`; vllm-024-test env untouched). See [[reference_laguna_serving]].
 
 **2026-07-11: prod migrated to vLLM 0.24.0** (both Ornith-35B-NVFP4 replicas, `vllm.service` + `vllm-replica-b.service`). torch **stays ==2.11.0+cu130** (0.24.0 pins it) — only vllm + flashinfer 0.6.11→0.6.12 + compressed-tensors 0.15→0.17 + `nvidia-cutlass-dsl[cu13]` moved. **Behavior-preserving:** same config (`--moe-backend marlin`, NO MTP, 256K, vision), MARLIN NVFP4 backend confirmed in both engine logs, FC parity 89% (vs ~91% baseline = noise). Env lives at `~/dev/vllm-024-test` (units repointed there: ExecStart + CUDA_HOME + PATH; sm120 recipe env unchanged). **Rollback = restore units from `~/dev/.vllm-bump-review/unit-backups/*.pre-0240-20260711-*` + daemon-reload + restart** (0.22.1 `~/dev/vllm-env` untouched). **Install debt:** `vllm-024-test` was a plain `pip install vllm==0.24.0` into a clone of prod `vllm-env`, NOT the hash-locked supply-chain review the 0.22.1 cutover got — harden before treating as canonical. Enables NVFP4+bf16-MTP composition (drop `--moe-backend`, oracle picks cutlass) — MTP left OFF pending a concurrency benchmark ([[project_qwen36_27b_smartlane_gate]]).
@@ -357,9 +666,46 @@ All secrets in Infisical at `secrets.proto-labs.ai`. Never commit secrets. Gatew
 
 ## Storage
 
-- `/mnt/models` — frequently-accessed model weights only (1TB NVMe, 420GB free)
-- `/mnt/data` — datasets, checkpoints, outputs, cold model storage (2TB NVMe)
-- `/mnt/data/models-cold/` — FLUX, Z-Image, Voxtral, OCR
+- `/mnt/models` — frequently-accessed model weights only (1TB NVMe, **257GB free / 71%** after
+  the 2026-08-11 reclaim; was 30GB free / 97%)
+- `/mnt/data` — datasets, checkpoints, outputs, cold model storage (2TB NVMe, **383GB free /
+  78%** after the 2026-08-11 reclaim; was 88GB free / 95%)
+
+**Reclaim 2026-08-11 — 523GB freed.** Removed, all verified zero-reference first:
+superseded **poolside Laguna** trio (121G, lane replaced by DSV4 on 08-10) · **LTX-2 19B**
+(293G — the generation before LTX-2.3's 22B; its 7 ComfyUI symlinks removed in the same
+pass) · unused `ideogram-4-fp8` HF copy (26G — the *used* copy is `models-cold/Ideogram-4`) ·
+`RedHatAI/gemma-4-31B-it-NVFP4` (22G) · HF `fishaudio/s2-pro` (11G — live copy is
+`~/dev/fish-speech/checkpoints/s2-pro`) · `Ornith-1.0-9B-NVFP4` (11G) · gemma4 dspark/dflash/
+eagle3 drafts (17G — DSV4's DSpark head is built in, no external draft) · canary-1b-flash +
+non-turbo whisper-large-v3 (6G — protoVoice pins the **turbo** variant) · MiniCPM ×3 (6.8G,
+vision retired here) · GLM-OCR (2.5G).
+
+**Two rules that made this safe, worth reusing:**
+- **`/mnt/models` and `/mnt/data` are separate filesystems**, so the `--local-dir` hardlink
+  trap cannot span them. Verified `find -type f -links +1` returned **0** across the whole
+  delete set before touching anything. Always run that check first.
+- **Grep-absence is NOT proof of orphanhood.** `models-cold/ltx2-textenc` (13G) has *zero*
+  grep-able references anywhere yet **is** the live text encoder for both LTX-2.3 workflows,
+  reached only through one ComfyUI symlink. Enumerate symlink targets, don't just grep.
+  **KEEP:** `ltx2-textenc`, `LTX-2.3`, `DeepSeek-V4-Flash-0731`, `gemma-3-12b`, `ACE-Step-1.5`.
+
+**Pre-existing breakage found (NOT caused by the reclaim):** 16 dangling ComfyUI symlinks,
+all predating this cleanup — targets `models--Comfy-Org--Qwen-Image_ComfyUI` (the documented
+2026-05-03 hardlink incident), `models--Qwen--Qwen-Image-2512`, `models--Comfy-Org--ltx-2`,
+`/mnt/models/anima`, plus stale `models--Lightricks--LTX-2.3` HF-cache links whose files are
+gone (the working LTX-2.3 links point at `models-cold/LTX-2.3`). Image-gen workflows using
+qwen-image or anima are already broken.
+- `/mnt/data/models-cold/` — FLUX, Z-Image, Voxtral, OCR, **and the live DSV4-Flash
+  checkpoint** the prod smart lane serves from (`DeepSeek-V4-Flash-0731`) — despite the
+  "cold" name this path is load-bearing for prod; don't treat it as archive space
+- `/` (OS drive) — **49% / 454GB free as of 2026-08-11** (was 99% / ~11GB; freed by Josh).
+- **🚫 The Windows install is PERMANENT — do not propose reclaiming it (Josh, 2026-08-11).**
+  `nvme1n1` (~931GB, EFI + MSR + NTFS + recovery) stays as-is. It is NOT free capacity, is
+  not a reclaim candidate, and should not be offered as one when a drive fills up. Solve
+  storage pressure by pruning models/data instead. The Windows DATA drive is **`/dev/sdb`**
+  (1.8TB NTFS, label `Backup`) — never format or mount it either. (Node CLAUDE.md still
+  calls it `/dev/sdd`; it enumerates as `sdb` now.)
 - `/mnt/scratch` — logs, caches, docker volumes (disposable)
 - `/mnt/pool` — **REMOVED 2026-05-28**: the 37TB mergerfs HDD pool (2x 20TB IronWolf Pro) was pulled and relocated to external housing on another machine. No bulk HDD storage on this node anymore; training corpora that lived here (incl. the 6.4T salm-duplex set) are now on the external box.
 

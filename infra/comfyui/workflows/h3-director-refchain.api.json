@@ -1,0 +1,1260 @@
+{
+ "1": {
+  "class_type": "UNETLoader",
+  "inputs": {
+   "unet_name": "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+   "weight_dtype": "default"
+  }
+ },
+ "2": {
+  "class_type": "CLIPLoader",
+  "inputs": {
+   "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+   "type": "minimax",
+   "device": "default"
+  }
+ },
+ "3": {
+  "class_type": "VAELoader",
+  "inputs": {
+   "vae_name": "minimax_h3_video_vae_fp16.safetensors"
+  }
+ },
+ "4": {
+  "class_type": "VAELoader",
+  "inputs": {
+   "vae_name": "minimax_h3_audio_vae_fp32.safetensors"
+  }
+ },
+ "10": {
+  "class_type": "PrimitiveStringMultiline",
+  "inputs": {
+   "value": "A night-shift radio telescope operator, alone in a control room in the high desert, picks up a repeating signal she cannot explain, and has to decide whether to log it or call someone."
+  }
+ },
+ "11": {
+  "class_type": "ProtoStructured",
+  "inputs": {
+   "model": "protolabs/smart",
+   "prompt": [
+    "10",
+    0
+   ],
+   "json_schema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"title\": {\n      \"type\": \"string\"\n    },\n    \"shots\": {\n      \"type\": \"array\",\n      \"minItems\": 6,\n      \"maxItems\": 6,\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"prompt\": {\n            \"type\": \"string\"\n          },\n          \"frames\": {\n            \"type\": \"integer\",\n            \"enum\": [\n              124,\n              175,\n              226,\n              277\n            ]\n          }\n        },\n        \"required\": [\n          \"prompt\",\n          \"frames\"\n        ]\n      }\n    }\n  },\n  \"required\": [\n    \"title\",\n    \"shots\"\n  ]\n}",
+   "system": "You are the director of a short generated film. You turn one raw idea into a shot list for MiniMax H3, a model that generates picture and sound together in a single pass.\n\nWrite exactly 6 shots that read as one continuous piece: the same characters, wardrobe, location, time of day, weather and visual style throughout, advancing in time from shot to shot. Each shot is generated independently and cannot see the others, so every shot's prompt must restate the style and re-describe the subject in the same concrete words. Consistency comes from repeating the description verbatim, not from referring back.\n\nEach shot's `prompt` is ONE flowing paragraph, at most 150 words:\n\n- Open with a short style clause, identical in every shot, then a colon. Example: \"Realistic live-action cinematic look, warm tungsten interior:\".\n- State the main action first, in the present progressive (\"is walking\", \"is speaking\"), then specific movements and gestures, then the precise appearance of the subject, then the environment.\n- Always state the camera: static frame, slow pan, tracking shot, dolly in, push in, pull back, orbit, handheld, overhead, and the framing (wide, medium, close). Name where the shot ends up (\"settling into a close-up of her hands\"). Unspecified camera means random drift.\n- Weave the sound chronologically alongside the actions, never appended at the end, and be specific: \"boot heels on wet concrete\", not \"ambient sound\". Dialogue is the exact words in quotes with the voice described: \"says quietly, in a low even voice: 'we are out of time'\". Pure ambience without any speech or music is this model's weakest audio \u2014 give most shots something definite to hear.\n- Restrained, concrete language. \"Red coat\", not \"vibrant crimson coat\". Never use quality words like epic, stunning, masterpiece, 8K, best quality \u2014 they measurably hurt.\n- Only what a camera and a microphone could capture. No smells, no thoughts, no internal states: render feeling as an observable cue (\"her jaw tightens and she looks away\").\n- No timestamps, no scene headings, no markdown, no shot numbers inside the prompt text.\n\nPick each shot's `frames` from the allowed values by how much action it holds: 124 for a single beat, 175 for a normal shot, 226 or 277 only when the action genuinely needs the time.\n\n`title` is a short slug for the piece, lowercase words separated by underscores.\n\nShot 1 establishes the subject and is generated from your words alone, so describe the subject in full there. Every later shot is generated with a still frame from shot 1 supplied as a reference image, addressed in the prompt as <Picture 1>. In shots 2 and later, refer to the subject through that reference \u2014 \"the man from <Picture 1> is now kneeling by the door\" \u2014 instead of re-describing their face and build, but keep restating the style clause, the wardrobe and the location. The reference carries identity; your words still carry everything else.",
+   "temperature": 0.6,
+   "max_tokens": 8192,
+   "seed": 0
+  }
+ },
+ "12": {
+  "class_type": "ProtoShowText",
+  "inputs": {
+   "text": [
+    "11",
+    0
+   ]
+  }
+ },
+ "13": {
+  "class_type": "ResolutionSelector",
+  "inputs": {
+   "aspect_ratio": "16:9 (Widescreen)",
+   "megapixels": 0.4,
+   "multiple": 32
+  }
+ },
+ "14": {
+  "class_type": "KSamplerSelect",
+  "inputs": {
+   "sampler_name": "res_multistep"
+  }
+ },
+ "15": {
+  "class_type": "BasicScheduler",
+  "inputs": {
+   "model": [
+    "1",
+    0
+   ],
+   "scheduler": "simple",
+   "steps": 20,
+   "denoise": 1.0
+  }
+ },
+ "100": {
+  "class_type": "ProtoJSONGet",
+  "inputs": {
+   "json_string": [
+    "11",
+    0
+   ],
+   "path": "shots[0].prompt",
+   "default": "Realistic live-action cinematic look, overcast daylight: a person in a grey coat is standing still at the end of an empty pier, looking out at flat water as wind moves their hair, the camera holding a slow push in from a wide shot to a medium, wind hissing over the microphone and water slapping the pilings below."
+  }
+ },
+ "101": {
+  "class_type": "ProtoJSONGet",
+  "inputs": {
+   "json_string": [
+    "11",
+    0
+   ],
+   "path": "shots[0].frames",
+   "default": "124"
+  }
+ },
+ "102": {
+  "class_type": "ProtoShowText",
+  "inputs": {
+   "text": [
+    "100",
+    0
+   ]
+  }
+ },
+ "103": {
+  "class_type": "MiniMaxH3ReferenceToVideo",
+  "inputs": {
+   "clip": [
+    "2",
+    0
+   ],
+   "vae": [
+    "3",
+    0
+   ],
+   "audio_vae": [
+    "4",
+    0
+   ],
+   "prompt": [
+    "100",
+    0
+   ],
+   "width": [
+    "13",
+    0
+   ],
+   "height": [
+    "13",
+    1
+   ],
+   "length": [
+    "101",
+    1
+   ],
+   "ref_image_size": "match"
+  }
+ },
+ "104": {
+  "class_type": "RandomNoise",
+  "inputs": {
+   "noise_seed": 2201
+  }
+ },
+ "105": {
+  "class_type": "BasicGuider",
+  "inputs": {
+   "model": [
+    "1",
+    0
+   ],
+   "conditioning": [
+    "103",
+    0
+   ]
+  }
+ },
+ "106": {
+  "class_type": "SamplerCustomAdvanced",
+  "inputs": {
+   "noise": [
+    "104",
+    0
+   ],
+   "guider": [
+    "105",
+    0
+   ],
+   "sampler": [
+    "14",
+    0
+   ],
+   "sigmas": [
+    "15",
+    0
+   ],
+   "latent_image": [
+    "103",
+    1
+   ]
+  }
+ },
+ "107": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "106",
+    0
+   ],
+   "vae": [
+    "3",
+    0
+   ]
+  }
+ },
+ "108": {
+  "class_type": "VAEDecodeAudio",
+  "inputs": {
+   "samples": [
+    "106",
+    0
+   ],
+   "vae": [
+    "4",
+    0
+   ]
+  }
+ },
+ "109": {
+  "class_type": "CreateVideo",
+  "inputs": {
+   "images": [
+    "107",
+    0
+   ],
+   "fps": 24.0,
+   "audio": [
+    "108",
+    0
+   ],
+   "bit_depth": 8
+  }
+ },
+ "110": {
+  "class_type": "SaveVideo",
+  "inputs": {
+   "video": [
+    "109",
+    0
+   ],
+   "filename_prefix": "video/H3_Chain_shot1",
+   "format": "auto",
+   "codec": "auto"
+  }
+ },
+ "120": {
+  "class_type": "ProtoJSONGet",
+  "inputs": {
+   "json_string": [
+    "11",
+    0
+   ],
+   "path": "shots[1].prompt",
+   "default": "Realistic live-action cinematic look, overcast daylight: a person in a grey coat is standing still at the end of an empty pier, looking out at flat water as wind moves their hair, the camera holding a slow push in from a wide shot to a medium, wind hissing over the microphone and water slapping the pilings below."
+  }
+ },
+ "121": {
+  "class_type": "ProtoJSONGet",
+  "inputs": {
+   "json_string": [
+    "11",
+    0
+   ],
+   "path": "shots[1].frames",
+   "default": "124"
+  }
+ },
+ "122": {
+  "class_type": "ProtoShowText",
+  "inputs": {
+   "text": [
+    "120",
+    0
+   ]
+  }
+ },
+ "123": {
+  "class_type": "MiniMaxH3ReferenceToVideo",
+  "inputs": {
+   "clip": [
+    "2",
+    0
+   ],
+   "vae": [
+    "3",
+    0
+   ],
+   "audio_vae": [
+    "4",
+    0
+   ],
+   "prompt": [
+    "120",
+    0
+   ],
+   "width": [
+    "13",
+    0
+   ],
+   "height": [
+    "13",
+    1
+   ],
+   "length": [
+    "121",
+    1
+   ],
+   "ref_image_size": "match",
+   "ref_images.ref_image_0": [
+    "800",
+    0
+   ]
+  }
+ },
+ "124": {
+  "class_type": "RandomNoise",
+  "inputs": {
+   "noise_seed": 2202
+  }
+ },
+ "125": {
+  "class_type": "BasicGuider",
+  "inputs": {
+   "model": [
+    "1",
+    0
+   ],
+   "conditioning": [
+    "123",
+    0
+   ]
+  }
+ },
+ "126": {
+  "class_type": "SamplerCustomAdvanced",
+  "inputs": {
+   "noise": [
+    "124",
+    0
+   ],
+   "guider": [
+    "125",
+    0
+   ],
+   "sampler": [
+    "14",
+    0
+   ],
+   "sigmas": [
+    "15",
+    0
+   ],
+   "latent_image": [
+    "123",
+    1
+   ]
+  }
+ },
+ "127": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "126",
+    0
+   ],
+   "vae": [
+    "3",
+    0
+   ]
+  }
+ },
+ "128": {
+  "class_type": "VAEDecodeAudio",
+  "inputs": {
+   "samples": [
+    "126",
+    0
+   ],
+   "vae": [
+    "4",
+    0
+   ]
+  }
+ },
+ "129": {
+  "class_type": "CreateVideo",
+  "inputs": {
+   "images": [
+    "127",
+    0
+   ],
+   "fps": 24.0,
+   "audio": [
+    "128",
+    0
+   ],
+   "bit_depth": 8
+  }
+ },
+ "130": {
+  "class_type": "SaveVideo",
+  "inputs": {
+   "video": [
+    "129",
+    0
+   ],
+   "filename_prefix": "video/H3_Chain_shot2",
+   "format": "auto",
+   "codec": "auto"
+  }
+ },
+ "140": {
+  "class_type": "ProtoJSONGet",
+  "inputs": {
+   "json_string": [
+    "11",
+    0
+   ],
+   "path": "shots[2].prompt",
+   "default": "Realistic live-action cinematic look, overcast daylight: a person in a grey coat is standing still at the end of an empty pier, looking out at flat water as wind moves their hair, the camera holding a slow push in from a wide shot to a medium, wind hissing over the microphone and water slapping the pilings below."
+  }
+ },
+ "141": {
+  "class_type": "ProtoJSONGet",
+  "inputs": {
+   "json_string": [
+    "11",
+    0
+   ],
+   "path": "shots[2].frames",
+   "default": "124"
+  }
+ },
+ "142": {
+  "class_type": "ProtoShowText",
+  "inputs": {
+   "text": [
+    "140",
+    0
+   ]
+  }
+ },
+ "143": {
+  "class_type": "MiniMaxH3ReferenceToVideo",
+  "inputs": {
+   "clip": [
+    "2",
+    0
+   ],
+   "vae": [
+    "3",
+    0
+   ],
+   "audio_vae": [
+    "4",
+    0
+   ],
+   "prompt": [
+    "140",
+    0
+   ],
+   "width": [
+    "13",
+    0
+   ],
+   "height": [
+    "13",
+    1
+   ],
+   "length": [
+    "141",
+    1
+   ],
+   "ref_image_size": "match",
+   "ref_images.ref_image_0": [
+    "800",
+    0
+   ]
+  }
+ },
+ "144": {
+  "class_type": "RandomNoise",
+  "inputs": {
+   "noise_seed": 2203
+  }
+ },
+ "145": {
+  "class_type": "BasicGuider",
+  "inputs": {
+   "model": [
+    "1",
+    0
+   ],
+   "conditioning": [
+    "143",
+    0
+   ]
+  }
+ },
+ "146": {
+  "class_type": "SamplerCustomAdvanced",
+  "inputs": {
+   "noise": [
+    "144",
+    0
+   ],
+   "guider": [
+    "145",
+    0
+   ],
+   "sampler": [
+    "14",
+    0
+   ],
+   "sigmas": [
+    "15",
+    0
+   ],
+   "latent_image": [
+    "143",
+    1
+   ]
+  }
+ },
+ "147": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "146",
+    0
+   ],
+   "vae": [
+    "3",
+    0
+   ]
+  }
+ },
+ "148": {
+  "class_type": "VAEDecodeAudio",
+  "inputs": {
+   "samples": [
+    "146",
+    0
+   ],
+   "vae": [
+    "4",
+    0
+   ]
+  }
+ },
+ "149": {
+  "class_type": "CreateVideo",
+  "inputs": {
+   "images": [
+    "147",
+    0
+   ],
+   "fps": 24.0,
+   "audio": [
+    "148",
+    0
+   ],
+   "bit_depth": 8
+  }
+ },
+ "150": {
+  "class_type": "SaveVideo",
+  "inputs": {
+   "video": [
+    "149",
+    0
+   ],
+   "filename_prefix": "video/H3_Chain_shot3",
+   "format": "auto",
+   "codec": "auto"
+  }
+ },
+ "160": {
+  "class_type": "ProtoJSONGet",
+  "inputs": {
+   "json_string": [
+    "11",
+    0
+   ],
+   "path": "shots[3].prompt",
+   "default": "Realistic live-action cinematic look, overcast daylight: a person in a grey coat is standing still at the end of an empty pier, looking out at flat water as wind moves their hair, the camera holding a slow push in from a wide shot to a medium, wind hissing over the microphone and water slapping the pilings below."
+  }
+ },
+ "161": {
+  "class_type": "ProtoJSONGet",
+  "inputs": {
+   "json_string": [
+    "11",
+    0
+   ],
+   "path": "shots[3].frames",
+   "default": "124"
+  }
+ },
+ "162": {
+  "class_type": "ProtoShowText",
+  "inputs": {
+   "text": [
+    "160",
+    0
+   ]
+  }
+ },
+ "163": {
+  "class_type": "MiniMaxH3ReferenceToVideo",
+  "inputs": {
+   "clip": [
+    "2",
+    0
+   ],
+   "vae": [
+    "3",
+    0
+   ],
+   "audio_vae": [
+    "4",
+    0
+   ],
+   "prompt": [
+    "160",
+    0
+   ],
+   "width": [
+    "13",
+    0
+   ],
+   "height": [
+    "13",
+    1
+   ],
+   "length": [
+    "161",
+    1
+   ],
+   "ref_image_size": "match",
+   "ref_images.ref_image_0": [
+    "800",
+    0
+   ]
+  }
+ },
+ "164": {
+  "class_type": "RandomNoise",
+  "inputs": {
+   "noise_seed": 2204
+  }
+ },
+ "165": {
+  "class_type": "BasicGuider",
+  "inputs": {
+   "model": [
+    "1",
+    0
+   ],
+   "conditioning": [
+    "163",
+    0
+   ]
+  }
+ },
+ "166": {
+  "class_type": "SamplerCustomAdvanced",
+  "inputs": {
+   "noise": [
+    "164",
+    0
+   ],
+   "guider": [
+    "165",
+    0
+   ],
+   "sampler": [
+    "14",
+    0
+   ],
+   "sigmas": [
+    "15",
+    0
+   ],
+   "latent_image": [
+    "163",
+    1
+   ]
+  }
+ },
+ "167": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "166",
+    0
+   ],
+   "vae": [
+    "3",
+    0
+   ]
+  }
+ },
+ "168": {
+  "class_type": "VAEDecodeAudio",
+  "inputs": {
+   "samples": [
+    "166",
+    0
+   ],
+   "vae": [
+    "4",
+    0
+   ]
+  }
+ },
+ "169": {
+  "class_type": "CreateVideo",
+  "inputs": {
+   "images": [
+    "167",
+    0
+   ],
+   "fps": 24.0,
+   "audio": [
+    "168",
+    0
+   ],
+   "bit_depth": 8
+  }
+ },
+ "170": {
+  "class_type": "SaveVideo",
+  "inputs": {
+   "video": [
+    "169",
+    0
+   ],
+   "filename_prefix": "video/H3_Chain_shot4",
+   "format": "auto",
+   "codec": "auto"
+  }
+ },
+ "180": {
+  "class_type": "ProtoJSONGet",
+  "inputs": {
+   "json_string": [
+    "11",
+    0
+   ],
+   "path": "shots[4].prompt",
+   "default": "Realistic live-action cinematic look, overcast daylight: a person in a grey coat is standing still at the end of an empty pier, looking out at flat water as wind moves their hair, the camera holding a slow push in from a wide shot to a medium, wind hissing over the microphone and water slapping the pilings below."
+  }
+ },
+ "181": {
+  "class_type": "ProtoJSONGet",
+  "inputs": {
+   "json_string": [
+    "11",
+    0
+   ],
+   "path": "shots[4].frames",
+   "default": "124"
+  }
+ },
+ "182": {
+  "class_type": "ProtoShowText",
+  "inputs": {
+   "text": [
+    "180",
+    0
+   ]
+  }
+ },
+ "183": {
+  "class_type": "MiniMaxH3ReferenceToVideo",
+  "inputs": {
+   "clip": [
+    "2",
+    0
+   ],
+   "vae": [
+    "3",
+    0
+   ],
+   "audio_vae": [
+    "4",
+    0
+   ],
+   "prompt": [
+    "180",
+    0
+   ],
+   "width": [
+    "13",
+    0
+   ],
+   "height": [
+    "13",
+    1
+   ],
+   "length": [
+    "181",
+    1
+   ],
+   "ref_image_size": "match",
+   "ref_images.ref_image_0": [
+    "800",
+    0
+   ]
+  }
+ },
+ "184": {
+  "class_type": "RandomNoise",
+  "inputs": {
+   "noise_seed": 2205
+  }
+ },
+ "185": {
+  "class_type": "BasicGuider",
+  "inputs": {
+   "model": [
+    "1",
+    0
+   ],
+   "conditioning": [
+    "183",
+    0
+   ]
+  }
+ },
+ "186": {
+  "class_type": "SamplerCustomAdvanced",
+  "inputs": {
+   "noise": [
+    "184",
+    0
+   ],
+   "guider": [
+    "185",
+    0
+   ],
+   "sampler": [
+    "14",
+    0
+   ],
+   "sigmas": [
+    "15",
+    0
+   ],
+   "latent_image": [
+    "183",
+    1
+   ]
+  }
+ },
+ "187": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "186",
+    0
+   ],
+   "vae": [
+    "3",
+    0
+   ]
+  }
+ },
+ "188": {
+  "class_type": "VAEDecodeAudio",
+  "inputs": {
+   "samples": [
+    "186",
+    0
+   ],
+   "vae": [
+    "4",
+    0
+   ]
+  }
+ },
+ "189": {
+  "class_type": "CreateVideo",
+  "inputs": {
+   "images": [
+    "187",
+    0
+   ],
+   "fps": 24.0,
+   "audio": [
+    "188",
+    0
+   ],
+   "bit_depth": 8
+  }
+ },
+ "190": {
+  "class_type": "SaveVideo",
+  "inputs": {
+   "video": [
+    "189",
+    0
+   ],
+   "filename_prefix": "video/H3_Chain_shot5",
+   "format": "auto",
+   "codec": "auto"
+  }
+ },
+ "200": {
+  "class_type": "ProtoJSONGet",
+  "inputs": {
+   "json_string": [
+    "11",
+    0
+   ],
+   "path": "shots[5].prompt",
+   "default": "Realistic live-action cinematic look, overcast daylight: a person in a grey coat is standing still at the end of an empty pier, looking out at flat water as wind moves their hair, the camera holding a slow push in from a wide shot to a medium, wind hissing over the microphone and water slapping the pilings below."
+  }
+ },
+ "201": {
+  "class_type": "ProtoJSONGet",
+  "inputs": {
+   "json_string": [
+    "11",
+    0
+   ],
+   "path": "shots[5].frames",
+   "default": "124"
+  }
+ },
+ "202": {
+  "class_type": "ProtoShowText",
+  "inputs": {
+   "text": [
+    "200",
+    0
+   ]
+  }
+ },
+ "203": {
+  "class_type": "MiniMaxH3ReferenceToVideo",
+  "inputs": {
+   "clip": [
+    "2",
+    0
+   ],
+   "vae": [
+    "3",
+    0
+   ],
+   "audio_vae": [
+    "4",
+    0
+   ],
+   "prompt": [
+    "200",
+    0
+   ],
+   "width": [
+    "13",
+    0
+   ],
+   "height": [
+    "13",
+    1
+   ],
+   "length": [
+    "201",
+    1
+   ],
+   "ref_image_size": "match",
+   "ref_images.ref_image_0": [
+    "800",
+    0
+   ]
+  }
+ },
+ "204": {
+  "class_type": "RandomNoise",
+  "inputs": {
+   "noise_seed": 2206
+  }
+ },
+ "205": {
+  "class_type": "BasicGuider",
+  "inputs": {
+   "model": [
+    "1",
+    0
+   ],
+   "conditioning": [
+    "203",
+    0
+   ]
+  }
+ },
+ "206": {
+  "class_type": "SamplerCustomAdvanced",
+  "inputs": {
+   "noise": [
+    "204",
+    0
+   ],
+   "guider": [
+    "205",
+    0
+   ],
+   "sampler": [
+    "14",
+    0
+   ],
+   "sigmas": [
+    "15",
+    0
+   ],
+   "latent_image": [
+    "203",
+    1
+   ]
+  }
+ },
+ "207": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "206",
+    0
+   ],
+   "vae": [
+    "3",
+    0
+   ]
+  }
+ },
+ "208": {
+  "class_type": "VAEDecodeAudio",
+  "inputs": {
+   "samples": [
+    "206",
+    0
+   ],
+   "vae": [
+    "4",
+    0
+   ]
+  }
+ },
+ "209": {
+  "class_type": "CreateVideo",
+  "inputs": {
+   "images": [
+    "207",
+    0
+   ],
+   "fps": 24.0,
+   "audio": [
+    "208",
+    0
+   ],
+   "bit_depth": 8
+  }
+ },
+ "210": {
+  "class_type": "SaveVideo",
+  "inputs": {
+   "video": [
+    "209",
+    0
+   ],
+   "filename_prefix": "video/H3_Chain_shot6",
+   "format": "auto",
+   "codec": "auto"
+  }
+ },
+ "800": {
+  "class_type": "ImageFromBatch",
+  "inputs": {
+   "image": [
+    "107",
+    0
+   ],
+   "batch_index": -1,
+   "length": 1
+  }
+ },
+ "801": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "images": [
+    "800",
+    0
+   ],
+   "filename_prefix": "video/H3_Chain_ref"
+  }
+ },
+ "901": {
+  "class_type": "ImageBatch",
+  "inputs": {
+   "image1": [
+    "107",
+    0
+   ],
+   "image2": [
+    "127",
+    0
+   ]
+  }
+ },
+ "951": {
+  "class_type": "AudioConcat",
+  "inputs": {
+   "audio1": [
+    "108",
+    0
+   ],
+   "audio2": [
+    "128",
+    0
+   ],
+   "direction": "after"
+  }
+ },
+ "902": {
+  "class_type": "ImageBatch",
+  "inputs": {
+   "image1": [
+    "901",
+    0
+   ],
+   "image2": [
+    "147",
+    0
+   ]
+  }
+ },
+ "952": {
+  "class_type": "AudioConcat",
+  "inputs": {
+   "audio1": [
+    "951",
+    0
+   ],
+   "audio2": [
+    "148",
+    0
+   ],
+   "direction": "after"
+  }
+ },
+ "903": {
+  "class_type": "ImageBatch",
+  "inputs": {
+   "image1": [
+    "902",
+    0
+   ],
+   "image2": [
+    "167",
+    0
+   ]
+  }
+ },
+ "953": {
+  "class_type": "AudioConcat",
+  "inputs": {
+   "audio1": [
+    "952",
+    0
+   ],
+   "audio2": [
+    "168",
+    0
+   ],
+   "direction": "after"
+  }
+ },
+ "904": {
+  "class_type": "ImageBatch",
+  "inputs": {
+   "image1": [
+    "903",
+    0
+   ],
+   "image2": [
+    "187",
+    0
+   ]
+  }
+ },
+ "954": {
+  "class_type": "AudioConcat",
+  "inputs": {
+   "audio1": [
+    "953",
+    0
+   ],
+   "audio2": [
+    "188",
+    0
+   ],
+   "direction": "after"
+  }
+ },
+ "905": {
+  "class_type": "ImageBatch",
+  "inputs": {
+   "image1": [
+    "904",
+    0
+   ],
+   "image2": [
+    "207",
+    0
+   ]
+  }
+ },
+ "955": {
+  "class_type": "AudioConcat",
+  "inputs": {
+   "audio1": [
+    "954",
+    0
+   ],
+   "audio2": [
+    "208",
+    0
+   ],
+   "direction": "after"
+  }
+ },
+ "990": {
+  "class_type": "CreateVideo",
+  "inputs": {
+   "images": [
+    "905",
+    0
+   ],
+   "fps": 24.0,
+   "audio": [
+    "955",
+    0
+   ],
+   "bit_depth": 8
+  }
+ },
+ "991": {
+  "class_type": "SaveVideo",
+  "inputs": {
+   "video": [
+    "990",
+    0
+   ],
+   "filename_prefix": "video/H3_Chain",
+   "format": "auto",
+   "codec": "auto"
+  }
+ }
+}

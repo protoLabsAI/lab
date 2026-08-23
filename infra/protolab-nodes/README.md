@@ -37,6 +37,12 @@ protoLab/Prompt
                                                      the first frame wired in
   Text Template            {a}{b}{c}{d} -> text
   Show Text                text -> text              display + passthrough
+protoLab/JSON
+  JSON Get                 json,path -> text,int,   dotted/bracketed path (`shots[0].prompt`);
+                                       float,ok     falls back to `default` on a miss rather
+                                                    than failing the run. Core's
+                                                    JsonExtractString reads flat keys only.
+  JSON Count               json,path -> int         list length / object key count
 protoLab/Audio
   TTS Fish S2-Pro          text -> AUDIO             gateway /audio/speech; 500s while
                                                      protovoice-stack is parked
