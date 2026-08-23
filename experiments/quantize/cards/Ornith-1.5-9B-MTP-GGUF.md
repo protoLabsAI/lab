@@ -28,8 +28,10 @@ can't speculate. These do.
   **299 tok/s with MTP (1.38×)**. MTP's verify step is nearly free on FP4 tensor cores and
   costs real time on the K-quant dequant path, so the two compound.
 - **6 GB card? Use `IQ4_XS`** (5.45 GB). It is smaller *than* `Q4_K_M`, faster, and takes a
-  bigger MTP gain (1.21× vs 1.06×). `IQ3_M` (4.67 GB) and `IQ2_M` (3.87 GB) go lower and stay
-  coherent — both still recall a needle exactly at 32K.
+  bigger MTP gain (1.21× vs 1.06×).
+- **⚠️ `IQ2_M` degenerates on long generations — do not use it for prose or code.** It repeats
+  itself in 28% of 1500-token generations at llama.cpp's default sampling. `IQ3_M` is marginal
+  (7.8% at defaults, clean with the recommended sampler). Measured table below.
 - **Use `Q8_0` for reference quality.** It takes the largest *relative* MTP gain, because
   its baseline is the most bandwidth-bound (1.57×–1.77× depending on prompt mix) — but it is
   still slower in absolute terms than `NVFP4`.
@@ -49,8 +51,8 @@ can't speculate. These do.
 | `Ornith-1.5-9B-MTP-Q5_K_M.gguf` | 6.6 GB | bundled | balanced quality |
 | `Ornith-1.5-9B-MTP-Q4_K_M.gguf` | 5.8 GB | bundled | superseded by `IQ4_XS` — see above |
 | `Ornith-1.5-9B-MTP-IQ4_XS.gguf` | 5.45 GB | bundled (imatrix) | **best low-VRAM rung**, fits 6 GB |
-| `Ornith-1.5-9B-MTP-IQ3_M.gguf` | 4.67 GB | bundled (imatrix) | 6 GB with room for context |
-| `Ornith-1.5-9B-MTP-IQ2_M.gguf` | 3.87 GB | bundled (imatrix) | smallest; still coherent |
+| `Ornith-1.5-9B-MTP-IQ3_M.gguf` | 4.67 GB | bundled (imatrix) | 6 GB with room for context; **needs the recommended sampler** |
+| `Ornith-1.5-9B-MTP-IQ2_M.gguf` | 3.87 GB | bundled (imatrix) | smallest; **⚠️ degenerates on long output** |
 | `Ornith-1.5-9B-MTP-BF16.gguf` | 18.4 GB | bundled (master) | re-quantize from this |
 | `mmproj-Ornith-1.5-9B-BF16.gguf` | 922 MB | vision projector | **only** for image input — costs ~1.1 GB VRAM resident |
 | `mtp-head/mtp-Ornith-1.5-9B-head-Q8_0.gguf` | 2.4 GB | standalone head | attach to a base GGUF via `--model-draft` |
@@ -68,10 +70,33 @@ working with MTP enabled.
 # it costs ~1.1 GB of VRAM you probably need. See "VRAM" below.
 # -fit off + an explicit -ngl is deliberate: MTP inverts if even one layer
 # lands on the CPU, and --fit (on by default) will move layers silently.
+# The sampler flags are NOT optional — see "Sampling" below. llama.cpp's
+# defaults apply no repetition control and measurably increase looping.
 llama-server --model Ornith-1.5-9B-MTP-Q6_K.gguf \
   --n-gpu-layers 99 -fit off --ctx-size 8192 --flash-attn on --jinja \
+  --temp 1.0 --top-k 20 --top-p 0.95 --min-p 0.0 --presence-penalty 1.5 \
   --spec-type draft-mtp --spec-draft-n-max 3
 ```
+
+## Sampling — pass these flags, they are load-bearing
+
+Ornith recommends **`presence_penalty 1.5`** (temp 1.0, top_k 20, top_p 0.95, min_p 0) for
+general use, and `temp 0.6` / `presence_penalty 0` for precise coding. The base repo ships no
+`generation_config.json`, and llama.cpp would not read one anyway — its defaults are
+`temp 0.8, top_k 40, top_p 0.95, min_p 0.05, presence_penalty 0`, i.e. **no repetition control
+at all**. Earlier versions of this card shipped a command line with no sampler flags, so every
+user got exactly that.
+
+Measured on `IQ2_M`, 64 samples per arm (8 prompts x 8 seeds, 1500-token generations):
+
+| sampling | degenerate | rate |
+|---|---:|---:|
+| Ornith-recommended (`temp 1.0 … presence_penalty 1.5`) | 3 / 64 | **4.7%** |
+| llama.cpp defaults | 18 / 64 | 28.1% |
+| greedy (`temp 0`) | 24 / 64 | 37.5% |
+
+Fisher two-sided p = 5.5e-4 vs defaults. **Low temperature makes looping worse on this family**
+— the opposite of the usual advice. This is mitigation, not a cure: the rung matters more (below).
 
 Confirm `offloaded 34/34 layers to GPU` in the startup log. If it says anything less, fix that
 before judging MTP's speed — see [VRAM](#vram--mtp-requires-a-full-offload-and-the-cliff-is-one-layer-wide).
@@ -344,8 +369,48 @@ Needle recall + degeneration detectors at 4K / 16K / 32K context, plus a verifia
 | IQ3_M | clean | clean | clean | correct, with a distance check |
 | IQ2_M | clean | clean | clean | correct, with a distance check |
 
-Needle exact at every depth on every rung — no repetition loops, no mid-word garbage. IQ2_M
-solves the two-train problem correctly *and verifies its own answer* at 2.7 bpw.
+Needle exact at every depth on every rung. IQ2_M solves the two-train problem correctly *and
+verifies its own answer* at 2.7 bpw.
+
+> ### ⚠️ That table is not enough, and an earlier version of this card over-claimed from it
+>
+> Those are **short** outputs. Degeneration on this family scales with *generation length*, not
+> context depth — so a needle probe can come back perfectly clean on a rung that falls apart
+> when asked for 1500 tokens of prose. This card previously called `IQ2_M` "genuinely usable"
+> and "still coherent" on the strength of the table above. That was wrong.
+>
+> Re-measured with long generations (1500 tokens, 8 prompts x 8 seeds = 64 per cell, three
+> overlapping degeneration detectors):
+>
+> | rung | Ornith-recommended sampling | llama.cpp defaults | Fisher p |
+> |---|---:|---:|---:|
+> | `IQ4_XS` | 0 / 64 | 0 / 64 | 1.0 |
+> | `IQ3_M` | 0 / 64 | **5 / 64** (7.8%) | 0.058 |
+> | `IQ2_M` | **3 / 64** (4.7%) | **18 / 64** (28%) | 5.5e-4 |
+>
+> Across the wider sweep (sampling arms x depth x thinking, 316 generations) the split is
+> **0/234 at every rung >= IQ4_XS vs 14/82 at IQ2_M**, Fisher p = 2.6e-9. `Q8_0`, `Q6_K`,
+> `Q4_K_M` and `IQ4_XS` never degenerated once.
+>
+> What IQ2_M emits when it goes: `summer summer summer …` x114 · `__class__` x66 ·
+> `from typing import List, Optional, TypeVar, Generic, Iterator` x12. Not a marginal metric
+> call.
+>
+> **Guidance:** `IQ4_XS` is safe at any sampler. `IQ3_M` is fine *with the recommended sampler*
+> and marginal without it. `IQ2_M` should be treated as a size-constrained curiosity, not a
+> general-purpose rung — the recommended sampler cuts its failure rate 6x but does not clear it.
+>
+> Harness, raw JSONL and the full write-up:
+> [`experiments/quantize/looping/`](https://github.com/protoLabsAI/lab).
+
+### A different failure that also gets called "looping"
+
+On hard coding problems this model will argue with itself — *"Hmm. Wait no. Let me
+reconsider… Actually, the—"* — until it consumes the entire token budget. We reproduced one at
+**32,768 tokens with thinking off**, and its repetition score was near zero: it never repeats,
+it just never stops. **No sampler setting fixes this one.** It is consistent with the
+scorecard below (LiveCodeBench 0.115, 13 of 30 problems hitting the cap). If your looping is
+specifically on code generation, that is the model, not the quantization.
 
 **Want the vLLM build?** [`protoLabsAI/Ornith-1.5-9B-NVFP4`](https://huggingface.co/protoLabsAI/Ornith-1.5-9B-NVFP4)
 — W4A4 NVFP4 for vLLM on Blackwell, same distilled MTP head, vision verified against the bf16
