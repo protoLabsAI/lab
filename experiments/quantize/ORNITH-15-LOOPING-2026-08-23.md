@@ -135,3 +135,60 @@ should not claim "it is the presence penalty" without an isolated, powered arm.
     looping/lcbloop.py     replays the LCB problems that capped, keeping text
     looping/ctxshift.py    long generation overrunning a small context
     looping/powered.py     64-per-arm sampling A/B at IQ2_M
+
+## Follow-up: does harness sampling depress our LiveCodeBench score? (No.)
+
+`run_livecodebench.py` defaults to temp 0.2 with no presence penalty, and every Ornith-1.5
+scorecard ran at exactly that (confirmed in each `run.log`). Ornith documents 0.6 for precise
+coding. Since low temperature is the worst regime for looping on this family, the obvious
+worry was that we had measured the harness rather than the model.
+
+**We had not.** Graded re-run, 9B NVFP4, 30 hard problems, 3 trials per arm:
+
+    arm         trials                    mean    capped/30   avg tokens
+    temp 0.2    0.128 / 0.155 / 0.147     0.143       12.3       14,400
+    temp 0.6    0.125 / 0.168 / 0.095     0.129       14.3       17,100
+
+Paired per-problem across all 30 tasks, sign-flip permutation: **p = 0.69**. No effect, and
+0.6 was directionally *worse* on every axis. The published 0.115 reproduces at 0.143 across
+three trials — consistent within LCB's known single-trial noise. **The score is real.**
+
+Two things this corrects, both ours:
+
+1. **An n=8 probe on the `Q6_K` GGUF said temp 0.6 halved the cap rate (4/8 → 2/8).** It did
+   not replicate on NVFP4 via vLLM at n=30x3 — it inverted. The probe was underpowered, was
+   labelled as such, and was still used to put a recommendation on a public model card before
+   the powered test existed. That was the mistake: the ordering, not the probe.
+2. **`no_code_in_budget = 0` on every scorecard**, so hitting the 32k cap never blocked
+   grading. The mechanism we were chasing — "burns the budget, emits nothing" — does not
+   exist. The model emits code every time; the code is wrong.
+
+**The 35B never had this problem at all**: 0/30 capped, 2,818 mean tokens. Sampling cannot
+explain its 0.205 either.
+
+### And a harness failure worth recording
+
+The first attempt at this A/B returned `mean=0.000` six times in ~10 s per run, and the runner
+reported those as scores. Cause: the lane was served with `--max-model-len 32768` while LCB
+requests `max_tokens=32768`, so prompt + budget exceeded context and vLLM returned **400 on
+every call**. `call_model` swallows exceptions and records `0 tokens, score 0.00`.
+
+The preflight missed it because it probed with `max_tokens=2048` — a token-cheap health check
+passes while every real request fails. **Gate at the budget the eval actually uses.** Same
+family as [[feedback_eval_harness_selfsabotage]] and the `llm_judge` 0.5-fallback: a config
+error is being laundered into a publishable number. `call_model` should distinguish "no code
+produced" from "the request failed"; it currently cannot.
+
+## Harness changes made
+
+`evals/runners/sampling.py` — one place that resolves and **records** sampling. Per-suite
+defaults reproduce each runner's prior behaviour exactly (LCB 0.2/none, CTI 0.0/none, FC
+0.0/1.5, RAG 0.7/1.5) so no board number moves; the change is that sampling is overridable
+per-suite by env (`LCB_PRESENCE_PENALTY` now exists), and written into `config.sampling` in
+the results JSON so it reaches `scorecard.json` instead of only `run.log`.
+
+Wired into `run_livecodebench`, `run_ctibench`, `run_function_call`. Defaults deliberately
+NOT harmonised — LCB at 0.2 with no penalty is probably wrong for thinking models, but
+changing it silently would invalidate every historical LCB number without a re-baseline.
+FC's local-vs-cloud sampling asymmetry (cloud APIs reject `extra_body`) is now documented in
+code rather than implicit.

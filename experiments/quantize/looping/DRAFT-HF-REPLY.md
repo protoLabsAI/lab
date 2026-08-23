@@ -33,7 +33,18 @@ llama-server --model Ornith-1.5-9B-MTP-IQ4_XS.gguf \
 
 Worth knowing: **low temperature makes looping worse on this family** — greedy was our worst arm at 38%. Backwards from the usual advice.
 
-One caveat, in case it's what you're actually hitting. There's a second failure people also call looping. On hard coding problems this model argues with itself — *"Hmm. Wait no. Let me reconsider..."* — until it burns the whole budget. We reproduced one at 32,768 tokens with thinking off, and its repetition score was near zero. It never repeats; it just never stops. No sampler fixes that, and it tracks its LiveCodeBench score (0.115, with 13 of 30 problems hitting the cap). Strong at tool calling, weak at code gen. If your looping is specifically on coding, that's the model rather than the quant.
+One caveat, in case it's what you're actually hitting. There's a second failure people also call looping: on hard coding problems this model argues with itself — *"Hmm. Wait no. Let me reconsider..."* — until it burns the whole budget. It never repeats, it just never stops.
+
+We tried to fix that one with sampling and it doesn't work. Graded LiveCodeBench re-run on these weights, 30 hard problems, 3 trials per arm:
+
+| sampling | LCB mean | hit the 32k cap | mean tokens |
+|---|---:|---:|---:|
+| temp 0.2 | 0.143 | 12.3 / 30 | 14,400 |
+| temp 0.6 (Ornith "precise coding") | 0.129 | 14.3 / 30 | 17,100 |
+
+Paired per-problem, p = 0.69 — no difference, and 0.6 was slightly worse. (I'd briefly suggested temp 0.6 here off a small n=8 probe; it didn't hold up at proper power, so ignore that.)
+
+Every capped problem still emitted a code block, so the low score is wrong answers rather than missing ones. Strong at tool calling, weak at code gen — no sampler setting changes that.
 
 If none of this matches — are you on Ollama or LM Studio? Context shift on? Does it start only after a long multi-turn session fills the context? We couldn't reproduce upstream's "recursive past ~22k" report single-turn, so that one's still open and we'd like to.
 

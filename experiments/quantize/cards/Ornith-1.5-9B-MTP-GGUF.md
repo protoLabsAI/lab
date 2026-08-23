@@ -412,9 +412,26 @@ verifies its own answer* at 2.7 bpw.
 On hard coding problems this model will argue with itself — *"Hmm. Wait no. Let me
 reconsider… Actually, the—"* — until it consumes the entire token budget. We reproduced one at
 **32,768 tokens with thinking off**, and its repetition score was near zero: it never repeats,
-it just never stops. **No sampler setting fixes this one.** It is consistent with the
-scorecard below (LiveCodeBench 0.115, 13 of 30 problems hitting the cap). If your looping is
-specifically on code generation, that is the model, not the quantization.
+it just never stops.
+
+We tried to fix this with sampling and **it does not work.** A graded LiveCodeBench re-run on
+these weights — 30 hard problems, 3 trials per arm — comparing our eval's temp 0.2 against
+Ornith's documented temp 0.6 for precise coding:
+
+| sampling | LCB mean (3 trials) | hit the 32k cap | mean tokens |
+|---|---:|---:|---:|
+| temp 0.2 | 0.128 / 0.155 / 0.147 → **0.143** | 12.3 / 30 | 14,400 |
+| temp 0.6 | 0.125 / 0.168 / 0.095 → **0.129** | 14.3 / 30 | 17,100 |
+
+Paired per-problem across all 30 tasks, **p = 0.69** — no effect, and temp 0.6 was if anything
+slightly worse. An earlier version of this card recommended temp 0.6 for coding here on the
+strength of an n=8 probe on the `Q6_K` GGUF; that signal **did not replicate** at proper power
+and the recommendation is withdrawn.
+
+So: sampling fixes the *repetition* failure (see the rung table above) but not this one. Every
+capped problem still emitted an extractable code block (`no_code_in_budget = 0`), so the low
+score is wrong answers, not missing ones. If your looping is specifically on code generation,
+no sampler setting will help — this family is strong at tool calling and weak at code.
 
 **Want the vLLM build?** [`protoLabsAI/Ornith-1.5-9B-NVFP4`](https://huggingface.co/protoLabsAI/Ornith-1.5-9B-NVFP4)
 — W4A4 NVFP4 for vLLM on Blackwell, same distilled MTP head, vision verified against the bf16
